@@ -1,0 +1,132 @@
+
+uint8
+uint16
+uint32
+uint64
+
+int8
+int16
+int32
+int64
+
+float32
+float64
+
+TODO list {
+    literals:
+        int32: 12
+        float: 12.0f
+        double: 12.0
+        string: "Hello \"World\""
+
+    arithmetic expessions:
+        i + 12
+        i * (12 - 4)
+
+
+    functions:
+        overloads
+
+    types:
+        pointers
+
+        structs
+            member functions
+        function pointers
+       
+}
+
+
+struct Gameobject {
+
+    (float => void) update;
+
+    addChild(Gameobject* child) {
+
+    }
+}
+
+let g = alloc Gameobject;
+Gameobject* g = malloc(sizeof(Gameobject));
+
+let gs = alloc Gameobject[12];
+Gameobject* gs = malloc(sizeof(Gameobject) * 12);
+
+
+g.addChild(&child);
+
+Gameobject_addChild(&g, &child);
+
+
+int i = 10;
+
+void*(void*) funcPtr = () => { };
+
+(void* => void*) funcPtr
+
+int(string) name = (string text) => {
+    return 12;
+};
+
+
+
+((void => void) => (void => void))
+
+(void => void) name = () => { };
+
+
+void boolExprTest() {
+    let i = 10;
+    bool b = i is 
+        > 20 
+        or < 5
+        and != 12; 
+}
+
+
+
+
+
+import-library "Hello.dll";
+
+link-lib "glfw3.lib";
+
+
+
+struct A {
+    ref Test test;
+}
+
+class Test {
+    int a, b, c;
+}
+
+struct ClassTest {
+    ushort typeIndex, refCount;
+
+    int a, b, c;
+}
+
+
+function pointer syntax proposals:
+
+    [int, [int => void] => void] myFunc = (i, f) => {
+        f(i);
+    };
+
+    (int, (int => void) => char*) myFunc = (i, f) => {
+        f(i);
+        return "Hello World";
+    };
+
+
+    (=>) myFunc = () => {
+
+    }
+
+    char* f(char* str, int len) {
+
+    }
+
+    (char*, int => char*) myFunc = f;
+

@@ -1,0 +1,91 @@
+
+int main() {
+
+    //let v = alloc vec2[1024];
+
+    //sayHello();
+
+    let g = alloc float[255];
+
+
+    char* s = "Hello World";
+    let f = "Hello World";
+
+    let obj = alloc Gameobject;
+
+    let myTestNum = 1f + ((1f / 4f) * 100f);
+
+
+    // dawd
+    //d awsgrdwa
+
+    while (true) {
+        print "Looooooooop";
+    }
+
+
+    /*
+    
+        Hello World
+
+    */
+
+
+    print "Hello plang";
+
+    foo(12, 5, "test");
+
+
+    return 0;
+}
+
+
+void foo(int a, int b, char* str) {
+    print "foo";
+    //other();
+}
+
+char* bar() {
+
+    if (true) {
+        if (false) {
+
+        }
+        if (true) {
+
+        }
+    }
+    if (false) {
+        
+    }
+
+    return 0;
+}
+
+struct Self {
+    Self* self;
+}
+
+struct Transform {
+    vec2 pos;
+    vec2 scale;
+}
+
+struct Gameobject {
+    Transform transform;
+
+    Gameobject* parent;
+    
+    int child_count;
+    Gameobject** children;
+
+}
+
+
+char* getMessage() {
+    if (true) {
+        return "Hello World";
+    }
+
+    return "Nice";
+}

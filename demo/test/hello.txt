@@ -1,0 +1,27 @@
+
+
+void sayHello() {
+    let g = alloc Gameobject;
+    //getMessage();
+    print "I was told to say \"Hello\" so... Hello.\n";
+}
+
+
+void localsTest() {
+    let g1 = alloc int[100];
+    int* g2 = alloc int[100];
+
+    if (true) {
+        let b = false;
+
+        if (true) {
+            b = true;
+            let i = 12;
+        }
+
+        i = 100;
+    }
+
+    b = true; 
+}
+

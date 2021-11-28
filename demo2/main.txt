@@ -1,0 +1,30 @@
+
+int main() {
+    print "Hello, World!\n";
+
+    foo();    
+    daw();
+
+    let x = 10;
+
+    if (true) {
+        x = 12;
+        y = 4;
+
+        let g = "foo";
+
+        if (false) {
+            g = null;
+
+            x = 4;
+        }
+
+    }
+
+
+    return 0;
+}
+
+void foo() {
+    print "FooBar\n";
+}
