@@ -4,8 +4,15 @@ using static Program;
 using System.Collections.Generic;
 
 abstract class Node {
+    public int lineNum = -1;
     public Codeblock enclosingBlock;
+    public PlangFile file;
     public abstract void transpile();
+
+    public Node() {
+        file = currentFile;
+    }
+
 }
 
 class BlankNode : Node {
@@ -92,7 +99,7 @@ class Codeblock : Node {
                 if (ass.enclosingBlock.hasLocal(ass.name, out Typename t)) {
                     // TODO: type missmatch error
                 } else {
-                    error($"local \"{ass.name}\" does not exist.");
+                    error($"local \"{ass.name}\" does not exist.", ass);
                 }
             } else if (item is Codeblock block) {
                 block.validate();

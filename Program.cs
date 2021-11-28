@@ -45,15 +45,13 @@ using static pcombinator.Parser;
 
 static class Global {
 
-    public static PlangFile currentFile;
-
     public static Dictionary<string, PlangFile> fileDependencies = new();
 
     public static List<Function> functions = new();
 
     public static void addFunction(Function func) {
         functions.Add(func);
-        fileDependencies[func.name] = currentFile;
+        fileDependencies[func.name] = Program.currentFile;
     }
 
     public static void validate() {
@@ -113,16 +111,16 @@ class PlangProject {
 
     public void parse() {
         foreach (var filename in Directory.EnumerateFiles(projDir, "*.txt", SearchOption.AllDirectories)) {
-            Global.currentFile = new(Path.GetRelativePath(projDir, filename));
-            files.Add(Global.currentFile);
+            Program.currentFile = new(Path.GetRelativePath(projDir, filename));
+            files.Add(Program.currentFile);
 
             var state = Plang.mainParser.run(File.ReadAllText(filename));
             if (state.isError) Program.error(state.errorMsg);
             
-            Global.currentFile.parsedState = state;
+            Program.currentFile.parsedState = state;
         }
 
-        foreach (var item in files) System.Console.WriteLine(item.filepath + " " + item.parsedState.isError);
+        //foreach (var item in files) System.Console.WriteLine(item.filepath + " " + item.parsedState.isError);
     }
 
     public void transpile() {
@@ -159,7 +157,9 @@ class PlangProject {
 
 static class Program {
 
+    public static PlangFile currentFile;
     public static Codewriter cFile, hFile;
+    public static PlangProject project;
 
 
     static void Main(string[] args) {
@@ -172,10 +172,18 @@ static class Program {
 
         if (args.Length == 1) {
             
-            var project = new PlangProject(args[0]);
+            project = new PlangProject(args[0]);
             project.parse();
 
             Global.validate();
+
+            if (project.errors.Count != 0) {
+                foreach (var error in project.errors) System.Console.WriteLine(error);
+
+                System.Console.WriteLine(project.errors.Count + " errors generated.");
+                System.Console.WriteLine("Resolve errors and try again.");
+                return;
+            }
 
             project.transpile();
 
@@ -188,8 +196,13 @@ static class Program {
     }
 
 
-    public static void error(string message) {
-        System.Console.WriteLine(message);
+    public static void error(string message, Node node = null) {
+        if (node is not null) {
+            var str = node.file.filepath + " line:" + node.lineNum + ": error: " + message;
+            project.errors.Add(str);
+        } else {
+            project.errors.Add(message);
+        }
     }
 
     public static void warn(string message) {

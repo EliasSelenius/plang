@@ -5,11 +5,13 @@ int main() {
     foo();    
     daw();
 
+    //b = true;
+
     let x = 10;
 
     if (true) {
         x = 12;
-        y = 4;
+        //y = 4;
 
         let g = "foo";
 

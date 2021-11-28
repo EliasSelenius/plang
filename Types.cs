@@ -11,6 +11,9 @@ using static pcombinator.Parser;
 */
 
 static class Types {
+
+    public static Typename voidPtr => new Typename("void", 1);
+
     public static bool isPrimitive(Typename t) => 
         isInteger(t) ||
         t.structName switch {
@@ -41,14 +44,12 @@ class StructDeclaration : Node {
     public StructDeclaration(string name, StructMember[] members) {
         this.members = members;
         this.name = name;
-        this.file = Global.currentFile;
 
         Global.structs.Add(name, this);
         
         foreach (var member in members) member.structDecl = this;
     }
 
-    public PlangFile file;
     public string name;
     public StructMember[] members;
 

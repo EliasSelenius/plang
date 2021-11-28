@@ -59,11 +59,18 @@ class StringLiteral : Expression {
     }
 }
 
+class NullLiteral : Expression {
+    public Typename getExpressedType() => Types.voidPtr;
+
+    public string transpileExpression() => "((void*)0)";
+}
+
 static class Literals {
     
     public static Parser number;
     public static Parser doubleQuoteString;
     public static Parser boolean;
+    public static Parser nullLiteral;
 
     public static Parser anyLiteralValue;
 
@@ -79,6 +86,8 @@ static class Literals {
 
         boolean = (str("true") | "false").map(res => new BooleanLiteral { value = res });
 
-        anyLiteralValue = number | boolean | doubleQuoteString; 
+        nullLiteral = str("null").map((res, i) => new NullLiteral());
+
+        anyLiteralValue = number | boolean | doubleQuoteString | nullLiteral;
     }
 }

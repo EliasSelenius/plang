@@ -8,10 +8,9 @@ int main() {
     int x = 10;
     if (1) {
         x = 12;
-        y = 4;
         char* g = "foo";
         if (0) {
-            g = null;
+            g = ((void*)0);
             x = 4;
         } 
     } 

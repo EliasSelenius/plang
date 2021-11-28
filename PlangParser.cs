@@ -174,8 +174,9 @@ static class Plang {
         funcPtrType = inParentheses((typeParser / argDevisor) & optWs & "=>" & optWs & optional(typeParser));
         typeParser.init(funcPtrType | objectType);
 
-        Parser assignment = (identifier & ws & str("=") & ws & expressionParser).map(res => {
+        Parser assignment = (identifier & ws & str("=") & ws & expressionParser).map((res, i) => {
             return new Assignment {
+                lineNum = i,
                 name = res[0],
                 assignmentOp = res[2],
                 value = res[4]
