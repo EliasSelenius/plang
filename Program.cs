@@ -25,7 +25,6 @@ using static pcombinator.Parser;
         - return type inference
         - subfunctions
         *- while, for i in 0..10, loop, break, continue
-        *- else if
         - modules
 
     InProgress:
@@ -33,6 +32,7 @@ using static pcombinator.Parser;
         - keep track of stack variables (for type inference and syntax checking)
 
     Done:
+        *- <Done> else if
         - <Done> forgot semicolon error message?
         - <Done> Typename distinguish struct and primitive type
         *- <Done> resolve header includes

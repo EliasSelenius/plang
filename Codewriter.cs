@@ -20,13 +20,20 @@ class Codewriter {
         plangFile = pFile;
     }
 
+    public void pushtab() {
+        tabs += tab;
+    }
+    public void poptab() {
+        tabs = tabs.Substring(0, tabs.Length - 4);
+    }
+
     public void startblock(string pre) {
         builder.AppendLine(tabs + pre + " {");
-        tabs += tab;
+        pushtab();
     }
 
     public void endblock(string post = "") {
-        tabs = tabs.Substring(0, tabs.Length - 4);
+        poptab();
         builder.AppendLine(tabs + "} " + post);
     }
 
@@ -37,6 +44,8 @@ class Codewriter {
     public void writeline(string line) {
         builder.AppendLine(tabs + line);
     }
+
+    public void write(string str) => builder.Append(str);
 
     public override string ToString() {
         foreach (var file in fileDependencies) {

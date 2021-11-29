@@ -5,22 +5,18 @@ int main() {
     foo();    
     daw();
 
-    //b = true;
-
-    let x = 10;
+    let c = 10;
+    let b = 12;
+    let h = 43;
 
     if (true) {
-        x = 12;
-        //y = 4;
-
-        let g = "foo";
-
-        if (false) {
-            g = null;
-
-            x = 4;
-        }
-
+        c = 1;
+    } else if (true) {
+        c = 54;
+        h = 321;
+    } else {
+        c = 4;
+        b = 12;
     }
 
 

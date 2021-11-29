@@ -9,6 +9,8 @@ abstract class Node {
     public PlangFile file;
     public abstract void transpile();
 
+    public virtual void setEnclosingBlock(Codeblock block) => enclosingBlock = block; 
+
     public Node() {
         file = currentFile;
     }
@@ -86,10 +88,10 @@ class Codeblock : Node {
 
     public Codeblock(List<Node> nodes) {
         this.nodes = nodes;
-        foreach (var item in nodes) item.enclosingBlock = this;
+        foreach (var item in nodes) item.setEnclosingBlock(this);
     }
 
-    public void validate() {
+    public virtual void validate() {
         foreach (var item in nodes) {
 
             if (item is VariableDeclaration vd) {
@@ -128,10 +130,48 @@ class Codeblock : Node {
 class IfStatement : Codeblock {
     public BooleanExpression condition;
 
+    public PostIfStatement postIf;
+
     public IfStatement(List<Node> nodes) : base(nodes) { }
 
+    public override void setEnclosingBlock(Codeblock block) {
+        base.setEnclosingBlock(block);
+        postIf.setEnclosingBlock(block);
+    }
+
+    public override void validate() {
+        base.validate();
+        postIf.validate();
+    }
+
+    protected virtual string getIfType() => "if";
+
     public override void transpile() {
-        cFile.startblock($"if ({condition.transpileExpression()})");
+        cFile.startblock($"{getIfType()} ({condition.transpileExpression()})");
+        base.transpile();
+        cFile.endblock();
+
+        if (postIf != null) postIf.transpile();
+    }
+}
+
+interface PostIfStatement {
+    void transpile();
+    void validate();
+    void setEnclosingBlock(Codeblock block);
+}
+
+class ElifStatement : IfStatement, PostIfStatement {
+    public ElifStatement(List<Node> nodes) : base(nodes) { }
+    protected override string getIfType() => "else if";
+}
+
+class ElseStatement : Codeblock, PostIfStatement {
+
+    public ElseStatement(List<Node> nodes) : base(nodes) { }
+
+    public override void transpile() {
+        cFile.startblock("else");
         base.transpile();
         cFile.endblock();
     }

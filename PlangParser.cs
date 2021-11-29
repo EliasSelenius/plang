@@ -193,11 +193,19 @@ static class Plang {
 
         Parser condition = (optWs & inParentheses(boolExpression) & optWs).map(res => res[1]);
 
-        //Parser elseStatement = ("else" & optWs & codeBlock)
+        Parser postIfStatement = new();
+        Parser elseStatement = ("else" & optWs & codeBlock).map(res => new ElseStatement(nodes:res[2]));
+        Parser elseIfStatement = ("else if" & condition & codeBlock & optWs & postIfStatement).map(res => new ElifStatement(nodes:res[2]) {
+            condition = res[1],
+            postIf = res[4]
+        });
 
-        Parser ifStatement = ("if" & condition & codeBlock).map(res => {
+        postIfStatement.init(optional(elseIfStatement | elseStatement));
+
+        Parser ifStatement = ("if" & condition & codeBlock & optWs & postIfStatement).map(res => {
             return new IfStatement(nodes:res[2]) {
-                condition = res[1]
+                condition = res[1],
+                postIf = res[4]
             };
         });
 

@@ -5,14 +5,19 @@ int main() {
     printf("%s", "Hello, World!\n");
     foo();
     daw();
-    int x = 10;
+    int c = 10;
+    int b = 12;
+    int h = 43;
     if (1) {
-        x = 12;
-        char* g = "foo";
-        if (0) {
-            g = ((void*)0);
-            x = 4;
-        } 
+        c = 1;
+    } 
+    else if (1) {
+        c = 54;
+        h = 321;
+    } 
+    else {
+        c = 4;
+        b = 12;
     } 
     printf("%s", "\n");
     printf("%s", "Now is the end of the application, good bye!\n");
