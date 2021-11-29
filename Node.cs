@@ -3,8 +3,8 @@ using static Program;
 
 using System.Collections.Generic;
 
-abstract class Node {
-    public int lineNum = -1;
+abstract class Node : pcombinator.IParsedNode {
+    public int lineNum { get; set; } = -1;
     public Codeblock enclosingBlock;
     public PlangFile file;
     public abstract void transpile();
@@ -95,6 +95,11 @@ class Codeblock : Node {
         foreach (var item in nodes) {
 
             if (item is VariableDeclaration vd) {
+                if (hasLocal(vd.name, out _)) {
+                    error("local already declared.", vd);
+                    continue;
+                }
+
                 vd.inferType();
                 locals.Add(vd.name, vd);
             } else if (item is Assignment ass) {
