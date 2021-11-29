@@ -14,6 +14,8 @@ int main() {
             x = 4;
         } 
     } 
+    printf("%s", "\n");
+    printf("%s", "Now is the end of the application, good bye!\n");
     return 0;
 } 
 void foo() {

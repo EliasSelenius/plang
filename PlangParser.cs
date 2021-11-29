@@ -191,17 +191,18 @@ static class Plang {
             };
         });
 
+        Parser condition = (optWs & inParentheses(boolExpression) & optWs).map(res => res[1]);
 
+        //Parser elseStatement = ("else" & optWs & codeBlock)
 
-
-        Parser ifStatement = ("if" & optWs & inParentheses(boolExpression) & optWs & codeBlock).map(res => {
-            return new IfStatement(nodes:res[4]) {
-                condition = res[2]
+        Parser ifStatement = ("if" & condition & codeBlock).map(res => {
+            return new IfStatement(nodes:res[2]) {
+                condition = res[1]
             };
         });
 
-        Parser whileLoopParser = ("while" & optWs & inParentheses(boolExpression) & optWs & codeBlock).map(res => new WhileLoop(nodes:res[4]) {
-            condition = res[2]
+        Parser whileLoopParser = ("while" & condition & codeBlock).map(res => new WhileLoop(nodes:res[2]) {
+            condition = res[1]
         });
 
 
@@ -222,6 +223,11 @@ static class Plang {
         Parser lineComment = regex("^(//.*)");
         Parser multiLineComment = regex("^(/\\*(.|\\n)*?\\*/)");
 
+        Parser statementEnd = semicolon.mapError((r, i) => {
+            Program.error("Missing semicolon.", i);
+            return null;
+        });
+
         Parser statement = (choice(
             vardeclaration,
             assignment,
@@ -229,7 +235,7 @@ static class Plang {
             printCommand,
             returnStatement
 
-        ) & semicolon).map(res => res[0]);
+        ) & statementEnd).map(res => res[0]);
 
         codeBlock.init(inCurlyBrackets(+(ignore(ws) | statement | blockStatement | lineComment | multiLineComment)).map(res => {
             List<Node> nodes = new();

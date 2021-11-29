@@ -6,7 +6,7 @@ int main() {
     char* f = "Hello World";
     Gameobject* obj = malloc(sizeof(Gameobject));
     float myTestNum = (1 + ((1 / 4) * 100));
-    while (1) {
+    while (0) {
         printf("%s", "Looooooooop");
     } 
     printf("%s", "Hello plang");

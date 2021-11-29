@@ -14,7 +14,5 @@ void localsTest() {
             b = 1;
             int i = 12;
         } 
-        i = 100;
     } 
-    b = 1;
 } 

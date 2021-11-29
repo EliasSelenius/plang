@@ -22,17 +22,18 @@ using static pcombinator.Parser;
         - function pointers
         - function overloads
         - member functions
-        - forgot semicolon error message?
         - return type inference
         - subfunctions
         *- while, for i in 0..10, loop, break, continue
         *- else if
+        - modules
 
     InProgress:
         *- pointer operators ( . -> * & )
         - keep track of stack variables (for type inference and syntax checking)
 
     Done:
+        - <Done> forgot semicolon error message?
         - <Done> Typename distinguish struct and primitive type
         *- <Done> resolve header includes
         - <Done> better number literal type inference
@@ -195,6 +196,10 @@ static class Program {
         }
     }
 
+    public static void error(string message, int lineNum) {
+        var str = currentFile.filepath + " line:" + lineNum + ": error: " + message;
+        project.errors.Add(str);
+    }
 
     public static void error(string message, Node node = null) {
         if (node is not null) {

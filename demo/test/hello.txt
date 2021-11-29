@@ -19,9 +19,9 @@ void localsTest() {
             let i = 12;
         }
 
-        i = 100;
+        //i = 100;
     }
 
-    b = true; 
+    //b = true; 
 }
 

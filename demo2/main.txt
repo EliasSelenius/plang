@@ -24,6 +24,9 @@ int main() {
     }
 
 
+    print "\n";
+    print "Now is the end of the application, good bye!\n";
+
     return 0;
 }
 

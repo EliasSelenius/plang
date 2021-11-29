@@ -1,4 +1,9 @@
 
+
+extern GLFWwindow* glfwCreateWindow();
+
+
+
 uint8
 uint16
 uint32
