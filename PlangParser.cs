@@ -227,6 +227,9 @@ static class Plang {
             returnValue = res[2]
         });
 
+        Parser breakStatement = str("break").map(res => new BreakStatemenet());
+        Parser continueStatement = str("continue").map(res => new ContinueStatement());
+
         Parser lineComment = regex("^(//.*)");
         Parser multiLineComment = regex("^(/\\*(.|\\n)*?\\*/)");
 
@@ -240,7 +243,9 @@ static class Plang {
             assignment,
             funcCall,
             printCommand,
-            returnStatement
+            returnStatement,
+            breakStatement,
+            continueStatement
 
         ) & statementEnd).map(res => res[0]);
 

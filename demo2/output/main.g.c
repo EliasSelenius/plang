@@ -8,6 +8,11 @@ int main() {
     int c = 10;
     int b = 12;
     int h = 43;
+    while (1) {
+        if (1) {
+            break;
+        } 
+    } 
     if (1) {
         c = 1;
     } 

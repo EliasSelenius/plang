@@ -15,6 +15,13 @@ abstract class Node : pcombinator.IParsedNode {
         file = currentFile;
     }
 
+    public bool isEnclosedInLoop() => 
+        enclosingBlock switch {
+            Loooop => true,
+            null => false,
+            _ => enclosingBlock.isEnclosedInLoop()
+        };
+
 }
 
 class BlankNode : Node {
@@ -108,6 +115,8 @@ class Codeblock : Node {
                 } else {
                     error($"local \"{ass.name}\" does not exist.", ass);
                 }
+            } else if (item is LoopControllStatement) {
+                if (!item.isEnclosedInLoop()) error("statement is not in loop statement.", item);
             } else if (item is Codeblock block) {
                 block.validate();
             }
@@ -141,12 +150,12 @@ class IfStatement : Codeblock {
 
     public override void setEnclosingBlock(Codeblock block) {
         base.setEnclosingBlock(block);
-        postIf.setEnclosingBlock(block);
+        postIf?.setEnclosingBlock(block);
     }
 
     public override void validate() {
         base.validate();
-        postIf.validate();
+        postIf?.validate();
     }
 
     protected virtual string getIfType() => "if";
