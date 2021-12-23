@@ -12,7 +12,7 @@ The C language is cool since it gives you low-level controll over memory and suc
 
 Some C features that have been removed/changed/added are:
 
-1. header files / include directives. A function in C is global, always, except the ones that are static. Using forward declarations, include directives and header files, we can pretend these functions are not global, but they are. If you call a function that is not forward declared, the compiler will complain, but as long as there is an implementation the linker is all good. Further more, you as the programer can always lie to the compiler and forward declare a function that doesnt exist, in wich case there will be a linker error. In any case the linker will resolve externaly defined symbols. So whats the point with forward declarations? All they do is create a dissonance between the compiler and the linker.
+1. header files / include directives. A function in C is global, always, except the ones that are static. By using forward declarations, include directives and header files, we can pretend these functions are not global, but they are. If you call a function that is not forward declared, the compiler will complain, but as long as there is an implementation the linker is all good. Further more, you as the programer can always lie to the compiler and forward declare a function that doesnt exist, in wich case there will be a linker error. In any case the linker will resolve externaly defined symbols. So whats the point with forward declarations? All they do is create a dissonance between the compiler and the linker.
 
 2. 
 

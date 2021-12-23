@@ -104,7 +104,7 @@ static class Plang {
             return res;
         });
 
-        expr.init( inParentheses(expr) | arithmeticExpr);
+        expr.init( inParentheses(expr) | arithmeticExpr | Literals.number);
 
 
         var r1 = expr.run("1 + 2 / 3");

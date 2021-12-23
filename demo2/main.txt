@@ -2,12 +2,15 @@
 int main() {
     print "Hello, World!\n";
 
-    foo();    
+    // foo();    
     daw();
 
     let c = 10;
     let b = 12;
     let h = 43;
+
+
+    //foo f = hello();
 
     while (true) {
         if (true) {
@@ -32,6 +35,12 @@ int main() {
     return 0;
 }
 
-void foo() {
-    print "FooBar\n";
+foo hello() {
+
+}
+
+
+
+struct foo {
+    int i;
 }

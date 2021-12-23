@@ -3,7 +3,6 @@
 
 int main() {
     printf("%s", "Hello, World!\n");
-    foo();
     daw();
     int c = 10;
     int b = 12;
@@ -28,6 +27,5 @@ int main() {
     printf("%s", "Now is the end of the application, good bye!\n");
     return 0;
 } 
-void foo() {
-    printf("%s", "FooBar\n");
+foo hello() {
 } 

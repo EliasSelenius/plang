@@ -172,8 +172,9 @@ static class Program {
         //runParserTests();
         System.Console.WriteLine("directory: " + Directory.GetCurrentDirectory());
         
-        //Plang.newExpressionsTest();
+        // Plang.newExpressionsTest();
 
+        // return;
 
         if (args.Length == 1) {
             

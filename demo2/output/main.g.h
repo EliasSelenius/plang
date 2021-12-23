@@ -1,4 +1,7 @@
 #pragma once
 
 int main();
-void foo();
+foo hello();
+typedef struct foo {
+    int i;
+} foo;

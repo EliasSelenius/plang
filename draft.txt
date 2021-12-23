@@ -135,3 +135,31 @@ function pointer syntax proposals:
 
     (char*, int => char*) myFunc = f;
 
+
+
+Linq:
+
+sample 1:
+
+    let names = from o in list
+                select o.name;
+
+    u32 len = listLength(list);
+    char* names[len];
+    for (int i = 0; i < len; i++) {
+        names[i] = list[i].name;
+    }
+
+sample 2:
+
+    let names = from o in list
+                where o.age == 12
+                select o.name;
+
+    u32 len = listLength(list);
+    char* names[len];
+    u32 index = 0;
+    for (int i = 0; i < len; i++) {
+        if (list[i].age == 12)
+            names[index++] = list[i].name;
+    }
