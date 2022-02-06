@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <ProjectReference Include="..\parser_combinator\csharp\pcombinator\pcombinator.csproj" />
+    <ProjectReference Include="..\..\parser_combinator\csharp\pcombinator\pcombinator.csproj" />
   </ItemGroup>
 
   <PropertyGroup>
