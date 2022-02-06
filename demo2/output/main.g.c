@@ -3,6 +3,7 @@
 
 int main() {
     printf("%s", "Hello, World!\n");
+    printf("%s", "Hello, Universe!\n");
     daw();
     int c = 10;
     int b = 12;

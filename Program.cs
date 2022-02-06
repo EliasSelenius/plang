@@ -1,6 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
+﻿global using System;
+global using System.Collections.Generic;
+global using System.IO;
 
 using pcombinator;
 using static pcombinator.Parser;
@@ -167,38 +167,99 @@ static class Program {
     public static PlangProject project;
 
 
+	/*	cli args
+			
+			plang		  // usage info
+			plang trans   // transpile 
+			plang build   // build to exe
+			plang run	  // build to exe and execute
+			plang *other* // wrong argument format
+		
+	*/
+
+	enum CliCommand {
+		Transpile,
+		Build,
+		Run,
+		WrongFormat
+	};
+
     static void Main(string[] args) {
 
         //runParserTests();
         System.Console.WriteLine("directory: " + Directory.GetCurrentDirectory());
-        
+
+
+
+
+        NewParser.lex(new[] {
+            "Hello World",
+            "void test() {",
+            "    // some code ...",
+            "}"
+        });
+
+        return;
+
+
+
+
+        /* args = new[] {
+            "run",
+            "demo2"
+        }; */
+		
+		if (args.Length == 2) {
+			
+			var command = args[0] switch {
+				"trans" => CliCommand.Transpile,
+				"build" => CliCommand.Build,
+				"run" => CliCommand.Run,
+				_ => CliCommand.WrongFormat 
+			};
+			
+			
+			
+			project = new PlangProject(args[1]);
+			project.parse();
+			Global.validate();
+			
+			if (project.errors.Count != 0) {
+				foreach (var error in project.errors) Console.WriteLine(error);
+
+                Console.WriteLine(project.errors.Count + " errors generated.");
+                Console.WriteLine("Resolve errors and try again.");
+                return;
+			}
+			
+			
+			switch (command) {
+				case CliCommand.Transpile: {
+					project.transpile();
+				} break;
+				
+				case CliCommand.Build: {
+					project.transpile();
+					System.Diagnostics.Process.Start("clang", project.getClangCmd()).WaitForExit();
+				} break;
+				
+				case CliCommand.Run: {
+					project.transpile();
+					System.Diagnostics.Process.Start("clang", project.getClangCmd()).WaitForExit();
+					System.Diagnostics.Process.Start(Path.Combine(project.projDir, "Program.exe"));
+				} break;
+				
+				case CliCommand.WrongFormat: {
+					Console.WriteLine("wrong argument format.");
+				} break;
+			}
+		} else {
+			Console.WriteLine("wrong argument format.");
+		}
+		
+		
         // Plang.newExpressionsTest();
 
-        // return;
-
-        if (args.Length == 1) {
-            
-            project = new PlangProject(args[0]);
-            project.parse();
-
-            Global.validate();
-
-            if (project.errors.Count != 0) {
-                foreach (var error in project.errors) System.Console.WriteLine(error);
-
-                System.Console.WriteLine(project.errors.Count + " errors generated.");
-                System.Console.WriteLine("Resolve errors and try again.");
-                return;
-            }
-
-            project.transpile();
-
-            System.Diagnostics.Process.Start("clang", project.getClangCmd()).WaitForExit();
-            System.Diagnostics.Process.Start(Path.Combine(project.projDir, "Program.exe"));
-
-        } else {
-            System.Console.WriteLine("wrong argument format.");
-        }
     }
 
     public static void error(string message, int lineNum) {

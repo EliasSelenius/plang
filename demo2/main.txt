@@ -1,8 +1,9 @@
 
 int main() {
     print "Hello, World!\n";
+	print "Hello, Universe!\n";
 
-    // foo();    
+    // foo(); 
     daw();
 
     let c = 10;
@@ -35,12 +36,13 @@ int main() {
     return 0;
 }
 
+struct foo {
+    int i;
+}
+
 foo hello() {
 
 }
 
 
 
-struct foo {
-    int i;
-}
