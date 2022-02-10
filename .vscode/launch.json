@@ -21,6 +21,15 @@
             "name": ".NET Core Attach",
             "type": "coreclr",
             "request": "attach"
+        },
+        {
+            "name": "c project",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/c/bin/plang.exe",
+            //"args": ["-arg1", "-arg2"],
+            "cwd": "${workspaceFolder}/c",
+            "preLaunchTask": "c_project_build"
         }
     ]
 }
