@@ -7,6 +7,7 @@ typedef char bool;
 #define false 0
 
 typedef unsigned int u32;
+typedef unsigned char u8;
 
 typedef enum TokenType {
     Tok_Whitespace,
@@ -130,7 +131,6 @@ void lex(char* input) {
         if (isLetter(*cursor)) {
             char* wordStart = cursor;
             while (isLetter(*++cursor));
-            int wordLength = cursor - wordStart;
             cursor--;
 
             tokens[tokens_length++] = (Token) {
@@ -138,7 +138,7 @@ void lex(char* input) {
                 .line = current_line,
                 .value = (StrSpan) {
                     .start = wordStart,
-                    .length = wordLength
+                    .length = cursor - (wordStart - 1)
                 }
             };
 
@@ -279,6 +279,75 @@ void lex(char* input) {
     
 }
 
+
+u32 token_index;
+
+
+typedef struct PlangType {
+    StrSpan structName;
+    u8 numPointers;
+} PlangType;
+
+typedef struct PlangFunction {
+    StrSpan name;
+    PlangType returnType;
+} PlangFunction;
+
+// returns false if the token can not be interpreted as a type
+bool parseType(PlangType* type) {
+    if (tokens[token_index].type == Tok_Word) {
+        
+        type->structName = tokens[token_index].value;
+        token_index++;
+
+        u8 np = 0;
+        while (tokens[token_index++].type == Tok_Mul) np++;
+        type->numPointers = np;
+        token_index--;
+
+        return true;
+    }
+
+    return false;
+}
+
+#define assertToken(tok) if (tokens[token_index++].type != tok) goto failCase;
+
+#define nextToken(tok) (tokens[token_index++].type == tok)
+
+bool parseFunction() {
+    u32 startingIndex = token_index;
+
+    PlangFunction func;
+
+    // type
+    if (!parseType(&func.name)) goto failCase;
+
+    // name
+    if (tokens[token_index++].type != Tok_Word) goto failCase;    
+    func.name = tokens[token_index].value;
+
+    // args
+    assertToken(Tok_OpenParen)
+    assertToken(Tok_CloseParen)
+
+    // body
+    assertToken(Tok_OpenCurl)
+    assertToken(Tok_CloseCurl)
+
+    return true;
+failCase:
+    token_index = startingIndex;
+    return false;
+}
+
+void parse() {
+    for (token_index = 0; token_index < tokens_length; token_index++) {
+
+    }
+}
+
+
 char* fileread(const char* filename, u32* strLength) {
     FILE* file = fopen(filename, "r");
 
@@ -304,11 +373,11 @@ char* fileread(const char* filename, u32* strLength) {
 
 int main(int argc, char* argv[]) {
 
-    // char text[] = "Hello\n    12\nWorld!\n    DAw\nvoid main() {\n    let x = 12;\n    x += 10;\n    if (x == 12 || x <= 12) return;\n}";
+    // char text[] = "void main() }  Hello\n    12\nWorld!\n    DAw\nvoid main() {\n    let x = 12;\n    x += 10;\n    if (x == 12 || x <= 12) return;}";
 
     u32 filesize;
-    // char* text = fileread("lexTest.txt", &filesize);
-    char* text = fileread("src/main.c", &filesize);
+    char* text = fileread("lexTest.txt", &filesize);
+    // char* text = fileread("src/main.c", &filesize);
 
 
     printf("Start lexing\n");
@@ -323,6 +392,13 @@ int main(int argc, char* argv[]) {
 
     printf("No more tokens\n");
 
+    printf("Start Parsing...\n");
+
+    if (parseFunction()) {
+        printf("success\n");
+    } else {
+        printf("succesfully failed\n");
+    }
 
     return 0;
 }
