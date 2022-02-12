@@ -293,6 +293,41 @@ typedef struct PlangFunction {
     PlangType returnType;
 } PlangFunction;
 
+typedef enum ExprType {
+    ExprType_Number,
+    ExprType_Variable,
+    ExprType_Arithmetic
+} ExprType;
+
+typedef struct Expression {
+    ExprType expressionType;
+    union {
+        StrSpan* value;
+        struct {
+            u32 count;
+            StrSpan** operator;
+            struct Expression** values;
+        };
+    };
+} Expression;
+
+void printExpression(Expression* expr) {
+    switch (expr->expressionType) {
+        case ExprType_Variable:
+        case ExprType_Number: 
+            printf("%.*s", expr->value->length, expr->value->start); 
+            break;
+
+        case ExprType_Arithmetic: {
+            for (u32 i = 0; i < expr->count; i++) {
+                printExpression(expr->values[i]);
+                printf(" / ");
+            }
+        }
+    }
+}
+
+
 // returns false if the token can not be interpreted as a type
 bool parseType(PlangType* type) {
     if (tokens[token_index].type == Tok_Word) {
@@ -321,7 +356,7 @@ bool parseFunction() {
     PlangFunction func;
 
     // type
-    if (!parseType(&func.name)) goto failCase;
+    if (!parseType(&func.returnType)) goto failCase;
 
     // name
     if (tokens[token_index++].type != Tok_Word) goto failCase;    
@@ -340,6 +375,98 @@ failCase:
     token_index = startingIndex;
     return false;
 }
+
+
+inline bool isOperator(TokenType type) {
+    return type >= Tok_Plus && type <= Tok_Div;
+}
+
+Expression* parseLeafExpression() {
+    Token* token = &tokens[token_index++];
+    ExprType eType;
+
+    switch (token->type) {
+        case Tok_Word: {
+            eType = ExprType_Variable;
+        } break;
+        case Tok_Number: {
+            eType = ExprType_Number;
+        } break;
+
+        case Tok_OpenParen: {
+            // TODO: parse sub expr
+        } break;
+
+        default: {
+            token_index--;
+            return NULL;
+        }
+    }
+
+    Expression* expr = malloc(sizeof(Expression));
+    expr->value = &token->value;
+    expr->expressionType = eType;
+    return expr;
+}
+
+Expression* parseExpression() {
+    u32 startingIndex = token_index;
+
+    Expression* leafExpr = parseLeafExpression();
+    if (!leafExpr) goto failCase;
+
+    u32 i = 0;
+    Expression* temp[16];
+    temp[i++] = leafExpr;
+
+    while (isOperator(tokens[token_index].type)) {
+        token_index++;
+        temp[i++] = parseLeafExpression();
+    }
+
+    if (i == 1) return leafExpr;
+
+
+    Expression* expr = malloc(sizeof(Expression));
+    expr->expressionType = ExprType_Arithmetic;
+    expr->count = i;
+    expr->values = malloc(sizeof(Expression) * i);
+    for (u32 j = 0; j < expr->count; j++) {
+        expr->values[j] = temp[j];
+    }
+
+    // while (i > 0) expr->values[--i] = temp[i];
+
+    return expr;
+
+
+failCase:
+    token_index = startingIndex;
+    return NULL;
+}
+
+/*
+    parse expression 1
+        - arithmetic
+            - leaf (op leaf)+
+        - leaf
+
+    parse expression 2 
+        - leaf
+        - if op
+
+Expression* parseExpression() {
+    u32 startingIndex = token_index;
+
+    Expression* expr;
+    if ( (expr = parseArithmeticExpression()) ) return expr;
+
+    if ( (expr = parseLeafExpression()) ) return expr;
+
+    token_index = startingIndex;
+    return NULL;
+}
+*/
 
 void parse() {
     for (token_index = 0; token_index < tokens_length; token_index++) {
@@ -371,6 +498,9 @@ char* fileread(const char* filename, u32* strLength) {
     return res;
 }
 
+Expression* gExpressions[16];
+u32 exprIndex = 0;
+
 int main(int argc, char* argv[]) {
 
     // char text[] = "void main() }  Hello\n    12\nWorld!\n    DAw\nvoid main() {\n    let x = 12;\n    x += 10;\n    if (x == 12 || x <= 12) return;}";
@@ -393,6 +523,8 @@ int main(int argc, char* argv[]) {
     printf("No more tokens\n");
 
     printf("Start Parsing...\n");
+
+    while ( (gExpressions[exprIndex++] = parseExpression()) );
 
     if (parseFunction()) {
         printf("success\n");
