@@ -30,9 +30,11 @@ void main() {
     daw";
 #
 
+    let text = io:fileread(filename);
+
 /*
     wow it's 
-    a Multi-line
+    a Multi-line 
 
     comment
 
