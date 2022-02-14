@@ -3,7 +3,7 @@
 #include "types.h"
 
 // TODO: inluded due to StrSpan. move StrSpan into own file, or create string library
-#include "plang-lexer.h"
+#include "lexer.h"
 
 typedef struct PlangType {
     StrSpan structName;
@@ -46,7 +46,7 @@ typedef enum StatementType {
     
     Statement_If,
     Statement_While
-}
+} StatementType;
 
 typedef struct Statement {
     StatementType statementType;

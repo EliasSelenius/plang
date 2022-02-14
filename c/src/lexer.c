@@ -1,4 +1,4 @@
-#include "plang-lexer.h"
+#include "lexer.h"
 
 #include <stdio.h>
 

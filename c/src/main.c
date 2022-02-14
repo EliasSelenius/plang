@@ -3,8 +3,8 @@
 #include <stdlib.h>
 
 #include "types.h"
-#include "plang-parser.h"
-#include "plang-lexer.h"
+#include "parser.h"
+#include "lexer.h"
 
 
 char* fileread(const char* filename, u32* strLength) {

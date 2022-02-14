@@ -1,5 +1,5 @@
-#include "plang-parser.h"
-#include "plang-lexer.h"
+#include "parser.h"
+#include "lexer.h"
 
 // included for NULL
 #include <stdlib.h>
