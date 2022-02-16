@@ -224,6 +224,7 @@ static bool parseFunction() {
     return true;
 failCase:
     token_index = startingIndex;
+    func_count--;
     return false;
 }
 
@@ -253,7 +254,7 @@ void parse() {
         if (parseFunction()) continue;
         if (parseStruct()) continue;
 
-        printf("Error while parsing. At line %d", tokens[token_index].line);
+        printf("Error while parsing. At line %d\n", tokens[token_index].line);
         break;
     }
 }

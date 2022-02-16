@@ -61,9 +61,13 @@ int main(int argc, char* argv[]) {
     printf("End Parsing...\n");
 
     PlangFunction* funcs = &functions;
-
     for (u32 i = 0; i < func_count; i++) {
         printf("func: %.*s\n", functions[i].name.length, functions[i].name.start);
+    }
+
+    PlangStruct* strus = &structs;
+    for (u32 i = 0; i < struct_count; i++) {
+        printf("struct: %.*s\n", structs[i].name.length, structs[i].name.start);
     }
 
     return 0;

@@ -2,11 +2,15 @@
 #$
 
 int* foo() {
-
 }
 
-void main() {
+struct Test {
+    // TEst
+}
 
+
+void main() {
+    // Or here
 
 }
 

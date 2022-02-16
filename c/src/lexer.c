@@ -125,6 +125,7 @@ void lex(char* input) {
             while (*++cursor != '\n');
             cursor--;
 
+            /*
             tokens[tokens_length++] = (Token) {
                 .type = Tok_Comment,
                 .line = current_line,
@@ -133,6 +134,7 @@ void lex(char* input) {
                     .length = cursor - (commentStart - 1)
                 }
             };
+            */
 
 
             continue;
@@ -147,6 +149,7 @@ void lex(char* input) {
             }
             cursor++;
 
+            /*
             tokens[tokens_length++] = (Token) {
                 .type = Tok_MultiComment,
                 .line = current_line,
@@ -155,6 +158,7 @@ void lex(char* input) {
                     .length = cursor - (commentStart - 1)
                 }
             };
+            */
 
             continue;
         }
