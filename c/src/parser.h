@@ -2,18 +2,19 @@
 
 #include "types.h"
 
-// TODO: inluded due to StrSpan. move StrSpan into own file, or create string library
-#include "lexer.h"
+#include "string.h"
+
+void parse();
+
+
 
 typedef struct PlangType {
     StrSpan structName;
     u8 numPointers;
 } PlangType;
 
-typedef struct PlangFunction {
-    StrSpan name;
-    PlangType returnType;
-} PlangFunction;
+
+// ----Expressions---------------------------------------------
 
 typedef enum ExprType {
     ExprType_Number,
@@ -34,8 +35,13 @@ typedef struct Expression {
     };
 } Expression;
 
+
+
+// ----Statements----------------------------------------------
+
 typedef struct VarDecl {
     PlangType type;
+    StrSpan name;
     Expression* assignmentOrNull;
 } VarDecl;
 
@@ -55,8 +61,22 @@ typedef struct Statement {
 
 
 typedef struct Codeblock {
-    Statement* statements; // list
+    struct Codeblock* parentScope;
+    Statement* statements; // darray
 } Codeblock;
 
 
-Expression* parseExpression();
+typedef struct PlangFunction {
+    StrSpan name;
+    PlangType returnType;
+    Codeblock scope;
+} PlangFunction;
+
+typedef struct PlangStruct {
+    StrSpan name;
+} PlangStruct;
+
+extern PlangFunction functions[256];
+extern u32 func_count;
+extern PlangStruct structs[256];
+extern u32 struct_count;

@@ -52,13 +52,20 @@ void lex(char* input) {
             while (isLetter(*++cursor));
             cursor--;
 
+            StrSpan word = (StrSpan) {
+                .start = wordStart,
+                .length = cursor - (wordStart - 1)
+            };
+
+            TokenType tokType = Tok_Word;
+
+            // Keywords
+            if (spanEquals(word, "struct")) tokType = Tok_Keyword_Struct;
+
             tokens[tokens_length++] = (Token) {
-                .type = Tok_Word,
+                .type = tokType,
                 .line = current_line,
-                .value = (StrSpan) {
-                    .start = wordStart,
-                    .length = cursor - (wordStart - 1)
-                }
+                .value = word
             };
 
             continue;

@@ -56,12 +56,14 @@ int main(int argc, char* argv[]) {
 
     printf("Start Parsing...\n");
 
-    while ( (gExpressions[exprIndex++] = parseExpression()) );
+    parse();
 
-    if (parseFunction()) {
-        printf("success\n");
-    } else {
-        printf("succesfully failed\n");
+    printf("End Parsing...\n");
+
+    PlangFunction* funcs = &functions;
+
+    for (u32 i = 0; i < func_count; i++) {
+        printf("func: %.*s\n", functions[i].name.length, functions[i].name.start);
     }
 
     return 0;

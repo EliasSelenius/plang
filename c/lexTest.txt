@@ -1,55 +1,13 @@
 
-12
-
-6 + 2
-
-x + 1 / 5
-
-(1 + x) / (a - b)
-(x + 1)
-
+#$
 
 int* foo() {
 
 }
 
 void main() {
-    let x = 10;
-    x += 4;
-
-#
 
 
-    // Hello this is a comment
-
-    let msg = "Hello, \"World\"!";
-
-    x /= 1.25;
-
-    let m = "dwa
-    daw";
-#
-
-    let text = io:fileread(filename);
-
-/*
-    wow it's 
-    a Multi-line 
-
-    comment
-
-*/
-
-    if (x == 14) {
-        // X is now 14
-        while (x >= 0) x--;
-    }
-
-$#@@@
-
-@@
-
-%~%
-
-    x *= -1;
 }
+
+%
