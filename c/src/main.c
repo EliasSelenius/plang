@@ -5,7 +5,7 @@
 #include "types.h"
 #include "parser.h"
 #include "lexer.h"
-
+#include "darray.h"
 
 char* fileread(const char* filename, u32* strLength) {
     FILE* file = fopen(filename, "r");
@@ -30,8 +30,21 @@ char* fileread(const char* filename, u32* strLength) {
     return res;
 }
 
-Expression* gExpressions[16];
-u32 exprIndex = 0;
+typedef struct PlangFile {
+    char* path;
+    
+    Token* tokens; // darray
+
+    PlangFunction* functions; // darray
+    PlangStruct* structs; // darray
+
+} PlangFile;
+
+
+
+void transpile() {
+
+}
 
 int main(int argc, char* argv[]) {
 
@@ -60,13 +73,13 @@ int main(int argc, char* argv[]) {
 
     printf("End Parsing...\n");
 
-    PlangFunction* funcs = &functions;
-    for (u32 i = 0; i < func_count; i++) {
+    PlangFunction* funcs = functions;
+    for (u32 i = 0; i < darrayLength(funcs); i++) {
         printf("func: %.*s\n", functions[i].name.length, functions[i].name.start);
     }
 
-    PlangStruct* strus = &structs;
-    for (u32 i = 0; i < struct_count; i++) {
+    PlangStruct* strus = structs;
+    for (u32 i = 0; i < darrayLength(strus); i++) {
         printf("struct: %.*s\n", structs[i].name.length, structs[i].name.start);
     }
 

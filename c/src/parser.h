@@ -76,7 +76,5 @@ typedef struct PlangStruct {
     StrSpan name;
 } PlangStruct;
 
-extern PlangFunction functions[256];
-extern u32 func_count;
-extern PlangStruct structs[256];
-extern u32 struct_count;
+extern PlangFunction* functions;
+extern PlangStruct* structs;

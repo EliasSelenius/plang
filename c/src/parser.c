@@ -1,5 +1,6 @@
 #include "parser.h"
 #include "lexer.h"
+#include "darray.h"
 
 // included for NULL
 #include <stdlib.h>
@@ -7,12 +8,8 @@
 
 static u32 token_index;
 
-// TODO: dynamic arrays
-PlangFunction functions[256];
-u32 func_count = 0;
-
-PlangStruct structs[256];
-u32 struct_count = 0;
+PlangFunction* functions = NULL;
+PlangStruct* structs = NULL;
 
 Expression* parseExpression();
 
@@ -142,9 +139,8 @@ static VarDecl* parseVarDecl() {
     PlangType type;
     if (!parseType(&type)) goto failCase;
 
-    StrSpan name;
-    if (nextToken(Tok_Word)) name = tokens[token_index].value;
-    else goto failCase;
+    Token nameToken = tokens[token_index];
+    if (!nextToken(Tok_Word)) goto failCase;
 
     Expression* assign = NULL;
     if (nextToken(Tok_Assign)) {
@@ -157,7 +153,7 @@ static VarDecl* parseVarDecl() {
 
     VarDecl* res = malloc(sizeof(VarDecl));
     res->type = type;
-    res->name = name;
+    res->name = nameToken.value;
     res->assignmentOrNull = assign;
     return res;
 failCase:
@@ -169,28 +165,33 @@ static bool parseStatement(Statement* statement) {
 
     if ( (statement->node = parseVarDecl()) ) {
         statement->statementType = Statement_Declaration;
+    } else {
+        return false;
     }
 
 
     if (!nextToken(Tok_Semicolon)) {
-        printf("Error: Expected semicolon.\n");
+        printf("Error: Expected semicolon. At line %d\n", tokens[token_index].line);
     }
 
     return true;
 }
 
-static bool parseBlock() {
+static bool parseBlock(Codeblock* scope) {
     u32 startingIndex = token_index;
 
     assertToken(Tok_OpenCurl)
 
+
+    scope->statements = darrayCreate(Statement);
     
-    /*
+    
     Statement statement;
     while (parseStatement(&statement)) {
 
+        darrayAdd(scope->statements, statement);
     }
-    */
+    
 
     assertToken(Tok_CloseCurl)
 
@@ -203,15 +204,16 @@ failCase:
 static bool parseFunction() {
     u32 startingIndex = token_index;
 
-    PlangFunction* func = &functions[func_count++];
+
+    PlangFunction func;
 
     // type
-    if (!parseType(&func->returnType)) goto failCase;
+    if (!parseType(&func.returnType)) goto failCase;
 
     // name
     Token* nameToken = &tokens[token_index++];
     if (nameToken->type != Tok_Word) goto failCase;    
-    func->name = nameToken->value;
+    func.name = nameToken->value;
 
     // args
     assertToken(Tok_OpenParen)
@@ -219,12 +221,12 @@ static bool parseFunction() {
     assertToken(Tok_CloseParen)
 
     // body
-    if (!parseBlock()) goto failCase;
+    if (!parseBlock(&func.scope)) goto failCase;
 
+    darrayAdd(functions, func);
     return true;
 failCase:
     token_index = startingIndex;
-    func_count--;
     return false;
 }
 
@@ -239,8 +241,9 @@ static bool parseStruct() {
     assertToken(Tok_OpenCurl);
     assertToken(Tok_CloseCurl);
 
-    PlangStruct* stru = &structs[struct_count++];
-    stru->name = nameToken->value;
+    PlangStruct stru;
+    stru.name = nameToken->value;
+    darrayAdd(structs, stru);
 
     return true;
 failCase:
@@ -248,7 +251,30 @@ failCase:
     return false;
 }
 
+void printAST(PlangFunction* func) {
+    
+    printf("function name: %.*s\n", func->name.length, func->name.start);
+
+    Statement* statements = func->scope.statements;
+    u32 len = darrayLength(statements);
+    for (u32 i = 0; i < len; i++) {
+        switch (statements[i].statementType) {
+            case Statement_Declaration: {
+                VarDecl* vd = statements[i].node;
+                printf("|%.*s| |%.*s|\n", vd->type.structName.length,
+                                    vd->type.structName.start,
+                                    vd->name.length, vd->name.start);
+            } break;
+        }
+    }
+}
+
 void parse() {
+
+    // TODO: PlangFile
+    functions = darrayCreate(PlangFunction);
+    structs = darrayCreate(PlangStruct);
+
     token_index = 0;
     while (token_index < tokens_length) {
         if (parseFunction()) continue;
@@ -257,4 +283,6 @@ void parse() {
         printf("Error while parsing. At line %d\n", tokens[token_index].line);
         break;
     }
+
+    printAST(&functions[1]);
 }

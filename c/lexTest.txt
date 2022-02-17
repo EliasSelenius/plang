@@ -1,5 +1,4 @@
 
-#$
 
 int* foo() {
 }
@@ -11,7 +10,5 @@ struct Test {
 
 void main() {
     // Or here
-
+    let g = 1;
 }
-
-%
