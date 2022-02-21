@@ -30,6 +30,28 @@ void printExpression(Expression* expr) {
     }
 }
 
+// asserts the existence of a semicolon
+inline void semicolon() {
+    if (tokens[token_index].type != Tok_Semicolon) {
+        printf("Error Ln%d. Expected semicolon, but got \"%.*s\" instead.\n", 
+            tokens[token_index].line,
+            tokens[token_index].value.length,
+            tokens[token_index].value.start);
+    }
+    token_index++;
+}
+
+static StrSpan identifier() {
+    Token* token = &tokens[token_index];
+    if (token->type != Tok_Word) {
+        printf("Error Ln%d. \"%.*s\" is not a valid identifier.\n",
+            token->line,
+            token->value.length,
+            token->value.start);
+    }
+    token_index++;
+    return token->value;
+}
 
 // returns false if the token can not be interpreted as a type
 static bool parseType(PlangType* type) {
@@ -169,10 +191,7 @@ static bool parseStatement(Statement* statement) {
         return false;
     }
 
-
-    if (!nextToken(Tok_Semicolon)) {
-        printf("Error: Expected semicolon. At line %d\n", tokens[token_index].line);
-    }
+    semicolon();
 
     return true;
 }
@@ -231,24 +250,42 @@ failCase:
 }
 
 static bool parseStruct() {
-    u32 startingIndex = token_index;
 
-    assertToken(Tok_Keyword_Struct);
-
-    Token* nameToken = &tokens[token_index++];
-    if (nameToken->type != Tok_Word) goto failCase;
-
-    assertToken(Tok_OpenCurl);
-    assertToken(Tok_CloseCurl);
+    if (tokens[token_index].type != Tok_Keyword_Struct) return false;
+    token_index++;
 
     PlangStruct stru;
+
+    Token* nameToken = &tokens[token_index++];
+    if (nameToken->type != Tok_Word) {
+        printf("Expected struct name. At line %d\n", nameToken->line);
+    }
     stru.name = nameToken->value;
+
+    if (tokens[token_index++].type != Tok_OpenCurl) {
+        printf("Expected open curlybracket.\n");
+    }
+
+    stru.fields = darrayCreate(Field);
+
+    do {
+        Field field;
+        if (!parseType(&field.type)) {
+            printf("Expected type\n");
+        }
+
+        field.name = identifier();
+
+        semicolon();
+
+        darrayAdd(stru.fields, field);
+
+    } while (tokens[token_index].type != Tok_CloseCurl);
+    token_index++;
+
     darrayAdd(structs, stru);
 
     return true;
-failCase:
-    token_index = startingIndex;
-    return false;
 }
 
 void printAST(PlangFunction* func) {
@@ -283,6 +320,4 @@ void parse() {
         printf("Error while parsing. At line %d\n", tokens[token_index].line);
         break;
     }
-
-    printAST(&functions[1]);
 }

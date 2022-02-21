@@ -2,7 +2,7 @@
 
 #include "types.h"
 
-#include "string.h"
+#include "essh-string.h"
 
 void parse();
 
@@ -72,8 +72,14 @@ typedef struct PlangFunction {
     Codeblock scope;
 } PlangFunction;
 
+typedef struct Field {
+    PlangType type;
+    StrSpan name;
+} Field;
+
 typedef struct PlangStruct {
     StrSpan name;
+    Field* fields; // darray
 } PlangStruct;
 
 extern PlangFunction* functions;

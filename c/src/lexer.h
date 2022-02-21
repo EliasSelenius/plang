@@ -1,7 +1,7 @@
 #pragma once
 
 #include "types.h"
-#include "string.h"
+#include "essh-string.h"
 
 
 typedef enum TokenType {

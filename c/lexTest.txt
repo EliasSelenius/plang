@@ -5,6 +5,9 @@ int* foo() {
 
 struct Test {
     // TEst
+
+    float x;
+    float y;
 }
 
 

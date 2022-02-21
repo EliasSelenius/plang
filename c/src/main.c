@@ -6,6 +6,7 @@
 #include "parser.h"
 #include "lexer.h"
 #include "darray.h"
+#include "essh-string.h"
 
 char* fileread(const char* filename, u32* strLength) {
     FILE* file = fopen(filename, "r");
@@ -30,6 +31,18 @@ char* fileread(const char* filename, u32* strLength) {
     return res;
 }
 
+void filewrite(const char* filename, char* content) {
+    FILE* file = fopen(filename, "w");
+
+    if (file == NULL) {
+        printf("Could not write to file: %s\n", filename);
+    }
+
+    fprintf(file, "%s", content);
+
+    fclose(file);
+}
+
 typedef struct PlangFile {
     char* path;
     
@@ -41,47 +54,27 @@ typedef struct PlangFile {
 } PlangFile;
 
 
-
-void transpile() {
-
-}
-
 int main(int argc, char* argv[]) {
 
-    // char text[] = "void main() }  Hello\n    12\nWorld!\n    DAw\nvoid main() {\n    let x = 12;\n    x += 10;\n    if (x == 12 || x <= 12) return;}";
+
 
     u32 filesize;
     char* text = fileread("lexTest.txt", &filesize);
-    // char* text = fileread("src/main.c", &filesize);
 
-
-    printf("Start lexing\n");
+    printf("Tokenize...\n");
     lex(text);
-    printf("End lexing\n");
 
-    for (u32 i = 0; i < tokens_length; i++) {
+    /* for (u32 i = 0; i < tokens_length; i++) {
         Token token = tokens[i];
 
         printf("Token %d: |%.*s|\n", token.type, token.value.length, token.value.start);
-    }
+    }*/
 
-    printf("No more tokens\n");
-
-    printf("Start Parsing...\n");
-
+    printf("Parse...\n");
     parse();
-
-    printf("End Parsing...\n");
-
-    PlangFunction* funcs = functions;
-    for (u32 i = 0; i < darrayLength(funcs); i++) {
-        printf("func: %.*s\n", functions[i].name.length, functions[i].name.start);
-    }
-
-    PlangStruct* strus = structs;
-    for (u32 i = 0; i < darrayLength(strus); i++) {
-        printf("struct: %.*s\n", structs[i].name.length, structs[i].name.start);
-    }
+    
+    printf("Transpile...\n");
+    transpile();
 
     return 0;
 }
