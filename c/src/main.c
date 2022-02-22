@@ -8,6 +8,10 @@
 #include "darray.h"
 #include "essh-string.h"
 
+
+void transpile();
+
+
 char* fileread(const char* filename, u32* strLength) {
     FILE* file = fopen(filename, "r");
 
@@ -54,6 +58,43 @@ typedef struct PlangFile {
 } PlangFile;
 
 
+void validateFunction(PlangFunction* func) {
+    for (u32 i = 0; i < darrayLength(func->scope.statements); i++) {
+        Statement* sta = &func->scope.statements[i];
+        switch (sta->statementType) {
+            case Statement_Declaration: {
+                // TODO: is already declared?
+                
+                VarDecl* decl = (VarDecl*)sta->node;
+                if (decl->mustInferType) {
+                    if (decl->assignmentOrNull) {
+                        decl->type = getExpressedType(decl->assignmentOrNull);
+                    } else {
+                        // TODO: error message: var must be assigned to to be infered
+                    }
+                }
+
+            } break;
+            case Statement_Assignment: {
+                // TODO: is variable declared?
+            } break;
+            case Statement_If: {
+                // TODO: recurse
+            } break;
+            case Statement_While: {
+                // TODO: recurse
+            } break;
+        }
+    }
+}
+
+void validate() {
+    for (u32 i = 0; i < darrayLength(functions); i++) {
+        validateFunction(&functions[i]);
+    }
+}
+
+
 int main(int argc, char* argv[]) {
 
 
@@ -64,7 +105,7 @@ int main(int argc, char* argv[]) {
     printf("Tokenize...\n");
     lex(text);
 
-    /* for (u32 i = 0; i < tokens_length; i++) {
+    /*for (u32 i = 0; i < tokens_length; i++) {
         Token token = tokens[i];
 
         printf("Token %d: |%.*s|\n", token.type, token.value.length, token.value.start);
