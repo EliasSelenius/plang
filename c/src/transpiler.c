@@ -16,14 +16,43 @@ inline void newline() {
     sbAppend(sb, tabs[tabing]);
 }
 
-static void transpileExpression(Expression* expr) {
-    sbAppend(sb, "expr");
-}
-
 static void transpileType(PlangType type) {
     // TODO: transpile pointers
     sbAppendSpan(sb, type.structName);
 }
+
+static void transpileExpression(Expression* expr) {
+
+    switch (expr->expressionType) {
+        case ExprType_Arithmetic: {
+            sbAppend(sb, "(");
+
+            transpileExpression(expr->subExpressions[0]);
+            for (u32 i = 1; i < expr->count; i++) {
+                sbAppend(sb, " ");
+                sbAppendSpan(sb, expr->operators[i - 1]);
+                sbAppend(sb, " ");
+                transpileExpression(expr->subExpressions[i]);
+            }
+
+            sbAppend(sb, ")");
+        } break;
+
+        case ExprType_Number:
+        case ExprType_Variable: {
+            sbAppendSpan(sb, expr->value);
+        } break;
+
+        case ExprType_Alloc: {
+            AllocExpression* allocExpr = ((AllocExpression*)expr->node);
+            sbAppend(sb, "malloc(sizeof(");
+            transpileType(allocExpr->type);
+            sbAppend(sb, "))");
+        } break;
+    }
+
+}
+
 
 static void transpileStatement(Statement* statement) {
     switch (statement->statementType) {

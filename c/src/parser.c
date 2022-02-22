@@ -14,22 +14,6 @@ PlangStruct* structs = NULL;
 Expression* parseExpression();
 
 
-void printExpression(Expression* expr) {
-    switch (expr->expressionType) {
-        case ExprType_Variable:
-        case ExprType_Number: 
-            printf("%.*s", expr->value->length, expr->value->start); 
-            break;
-
-        case ExprType_Arithmetic: {
-            for (u32 i = 0; i < expr->count; i++) {
-                printExpression(expr->subExpressions[i]);
-                printf(" / ");
-            }
-        }
-    }
-}
-
 // asserts the existence of a semicolon
 inline void semicolon() {
     if (tokens[token_index].type != Tok_Semicolon) {
@@ -37,6 +21,7 @@ inline void semicolon() {
             tokens[token_index].line,
             tokens[token_index].value.length,
             tokens[token_index].value.start);
+        return;
     }
     token_index++;
 }
@@ -52,6 +37,20 @@ static StrSpan identifier() {
     token_index++;
     return token->value;
 }
+
+static void expect(TokenType type) {
+    if (tokens[token_index].type != type) {
+        // TODO: get TokenType as string
+        printf("Error Ln%d. Expected token type %d, but got \"%.*s\" instead.\n",
+            tokens[token_index].line,
+            type,
+            tokens[token_index].value.length,
+            tokens[token_index].value.start);
+        return;
+    }
+    token_index++;
+}
+
 
 // returns false if the token can not be interpreted as a type
 static bool parseType(PlangType* type) {
@@ -71,6 +70,16 @@ static bool parseType(PlangType* type) {
     return false;
 }
 
+static PlangType expectType() {
+    PlangType res = {0};
+    if (!parseType(&res)) {
+        printf("Error Ln%d. Expected type, but got \"%.*s\" instead.\n",
+            tokens[token_index].line,
+            tokens[token_index].value.length,
+            tokens[token_index].value.start);
+    }
+    return res;
+}
 
 
 inline bool isOperator(TokenType type) {
@@ -92,10 +101,20 @@ static Expression* parseLeafExpression() {
 
         case Tok_OpenParen: {
             Expression* e = parseExpression();
-            if (tokens[token_index++].type != Tok_CloseParen) 
-                printf("Error: expected closing parenthese\n"); // TODO: proper error messages
-
+            expect(Tok_CloseParen);
             return e;
+        } break;
+
+        case Tok_Keyword_Alloc: {
+            AllocExpression* allocExpr = malloc(sizeof(AllocExpression));
+            allocExpr->type = expectType();
+            allocExpr->size = NULL;
+            // TODO: optional array allocation
+
+            Expression* expr = malloc(sizeof(Expression));
+            expr->node = allocExpr;
+            expr->expressionType = ExprType_Alloc;
+            return expr;        
         } break;
 
         default: {
@@ -105,7 +124,7 @@ static Expression* parseLeafExpression() {
     }
 
     Expression* expr = malloc(sizeof(Expression));
-    expr->value = &token->value;
+    expr->value = token->value;
     expr->expressionType = eType;
     return expr;
 }
@@ -118,12 +137,16 @@ static Expression* parseExpression() {
     if (!leafExpr) goto failCase;
 
     u32 i = 0;
-    Expression* temp[16]; // TODO: this temp array needs to go.
+    
+    Expression* temp[16]; // TODO: these arrays needs to go.
     temp[i++] = leafExpr;
 
-    while (isOperator(tokens[token_index].type)) {
+    StrSpan ops[15];
 
-        // TODO: store operators in expression
+    while (isOperator(tokens[token_index].type)) {
+        
+        ops[i - 1] = tokens[token_index].value;
+
         token_index++;
         temp[i++] = parseLeafExpression();
     }
@@ -134,10 +157,14 @@ static Expression* parseExpression() {
     Expression* expr = malloc(sizeof(Expression));
     expr->expressionType = ExprType_Arithmetic;
     expr->count = i;
+    expr->operators = malloc(sizeof(StrSpan) * (i - 1));
     expr->subExpressions = malloc(sizeof(Expression) * i);
-    for (u32 j = 0; j < expr->count; j++) {
+
+    for (u32 j = 0; j < expr->count; j++)
         expr->subExpressions[j] = temp[j];
-    }
+
+    for (u32 j = 0; j < expr->count - 1; j++)
+        expr->operators[j] = ops[j];
 
     // TODO: I'd like to know why this didnt work
     // while (i > 0) expr->subExpressions[--i] = temp[i];
@@ -157,9 +184,15 @@ failCase:
 
 static VarDecl* parseVarDecl() {
     u32 startingIndex = token_index;
-    
+    bool useTypeInference = false;
     PlangType type;
-    if (!parseType(&type)) goto failCase;
+    if (!parseType(&type)) {
+        if (tokens[token_index].type == Tok_Keyword_Let) {
+            useTypeInference = true;
+        } else {
+            goto failCase;
+        }
+    }
 
     Token nameToken = tokens[token_index];
     if (!nextToken(Tok_Word)) goto failCase;
@@ -174,6 +207,7 @@ static VarDecl* parseVarDecl() {
     }
 
     VarDecl* res = malloc(sizeof(VarDecl));
+    res->mustInferType = useTypeInference;
     res->type = type;
     res->name = nameToken.value;
     res->assignmentOrNull = assign;
@@ -256,11 +290,7 @@ static bool parseStruct() {
 
     PlangStruct stru;
 
-    Token* nameToken = &tokens[token_index++];
-    if (nameToken->type != Tok_Word) {
-        printf("Expected struct name. At line %d\n", nameToken->line);
-    }
-    stru.name = nameToken->value;
+    stru.name = identifier();
 
     if (tokens[token_index++].type != Tok_OpenCurl) {
         printf("Expected open curlybracket.\n");

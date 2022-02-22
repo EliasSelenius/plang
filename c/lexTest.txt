@@ -7,11 +7,24 @@ struct Test {
     // TEst
 
     float x;
-    float y;
+    double y;
+}
+
+struct Foo {
+    char* string;
+}
+
+struct Bar30 {
+    Foo foo;
 }
 
 
 void main() {
     // Or here
-    let g = 1;
+    let a = 5;
+    let g = 30 * (3 + a);
+
+    let i = 2 * (6 + 2);
+
+    let foo = alloc Foo;
 }

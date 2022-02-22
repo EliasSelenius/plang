@@ -9,6 +9,8 @@ typedef enum TokenType {
     Tok_Word,
 
     Tok_Keyword_Struct,
+    Tok_Keyword_Alloc,
+    Tok_Keyword_Let,
 
     Tok_Number,
     Tok_String,

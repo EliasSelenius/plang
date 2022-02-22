@@ -70,13 +70,7 @@ bool spStartsWith(StrSpan sv, char* start) {
 
 
 bool spanEquals(StrSpan span, char* str) {
-    
-    for (u32 i = 0; i < span.length; i++) {
-        if (str[i] == '\0') return false;
-        if (span.start[i] != str[i]) return false;
-    }
-
-    return true;
+    return spanEqualsSpan(span, spFrom(str));
 }
 
 bool spanEqualsSpan(StrSpan span1, StrSpan span2) {

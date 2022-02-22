@@ -49,7 +49,7 @@ void lex(char* input) {
         // Word
         if (isLetter(*cursor)) {
             char* wordStart = cursor;
-            while (isLetter(*++cursor));
+            while (isLetter(*++cursor) || isDigit(*cursor));
             cursor--;
 
             StrSpan word = (StrSpan) {
@@ -61,6 +61,9 @@ void lex(char* input) {
 
             // Keywords
             if (spanEquals(word, "struct")) tokType = Tok_Keyword_Struct;
+            else if (spanEquals(word, "alloc")) tokType = Tok_Keyword_Alloc;
+            else if (spanEquals(word, "let")) tokType = Tok_Keyword_Let;
+            
 
             tokens[tokens_length++] = (Token) {
                 .type = tokType,

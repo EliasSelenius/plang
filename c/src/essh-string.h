@@ -11,7 +11,7 @@ typedef struct StrSpan {
 
 
 StrSpan spFrom(char* str);
-void svCopyTo(StrSpan src, char* dest);
+void spCopyTo(StrSpan src, char* dest);
 
 StrSpan spTrim(StrSpan sv);
 StrSpan spTrimStart(StrSpan sv);
