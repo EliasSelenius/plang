@@ -14,9 +14,15 @@ PlangStruct* structs = NULL;
 Expression* parseExpression();
 
 
+/*
+inline void printError(char* format, char* msg) {
+    printf("Error Ln%d. ", tokens[token_index].line);
+    printf(format, msg);
+}*/
+
 // asserts the existence of a semicolon
 inline void semicolon() {
-    if (tokens[token_index].type != Tok_Semicolon) {
+    if (tokens[token_index].type != Tok_Semicolon) {        
         printf("Error Ln%d. Expected semicolon, but got \"%.*s\" instead.\n", 
             tokens[token_index].line,
             tokens[token_index].value.length,
@@ -98,6 +104,15 @@ static Expression* parseLeafExpression() {
         case Tok_Number: {
             eType = ExprType_Number;
         } break;
+        case Tok_String: {
+            eType = ExprType_String;
+        } break;
+
+        case Tok_Keyword_False:
+        case Tok_Keyword_True: {
+            eType = ExprType_Bool;
+        } break;
+
 
         case Tok_OpenParen: {
             Expression* e = parseExpression();
@@ -131,10 +146,9 @@ static Expression* parseLeafExpression() {
 
 // returns NULL if it fails to parse an expression
 static Expression* parseExpression() {
-    u32 startingIndex = token_index;
 
     Expression* leafExpr = parseLeafExpression();
-    if (!leafExpr) goto failCase;
+    if (!leafExpr) return NULL;
 
     u32 i = 0;
     
@@ -170,11 +184,17 @@ static Expression* parseExpression() {
     // while (i > 0) expr->subExpressions[--i] = temp[i];
 
     return expr;
+}
 
-
-failCase:
-    token_index = startingIndex;
-    return NULL;
+static Expression* expectExpression() {
+    Expression* res = parseExpression();
+    if (res == NULL) {
+        printf("Error Ln%d. Expected expression, but got \"%.*s\" instead.\n",
+            tokens[token_index].line,
+            tokens[token_index].value.length,
+            tokens[token_index].value.start);
+    }
+    return res;
 }
 
 
@@ -189,6 +209,7 @@ static VarDecl* parseVarDecl() {
     if (!parseType(&type)) {
         if (tokens[token_index].type == Tok_Keyword_Let) {
             useTypeInference = true;
+            token_index++;
         } else {
             goto failCase;
         }
@@ -199,11 +220,7 @@ static VarDecl* parseVarDecl() {
 
     Expression* assign = NULL;
     if (nextToken(Tok_Assign)) {
-        assign = parseExpression();
-        if (!assign) {
-            // TODO: goto failCase or produce error?
-            // Error: Expected expression
-        }
+        assign = expectExpression();        
     }
 
     VarDecl* res = malloc(sizeof(VarDecl));
@@ -215,6 +232,21 @@ static VarDecl* parseVarDecl() {
 failCase:
     token_index = startingIndex;
     return NULL;
+}
+
+static If_While_Statement* parseIfStatement() {
+    if (tokens[token_index].type != Tok_Keyword_If) return NULL;
+    token_index++;
+
+    If_While_Statement* res = malloc(sizeof(If_While_Statement));
+
+    expect(Tok_OpenParen);
+    res->condition = expectExpression();
+    expect(Tok_CloseParen);
+
+    expectBlock(&res->scope);
+
+    return res;
 }
 
 static bool parseStatement(Statement* statement) {
@@ -252,6 +284,15 @@ static bool parseBlock(Codeblock* scope) {
 failCase:
     token_index = startingIndex;
     return false;
+}
+
+static void expectBlock(Codeblock* scope) {
+    if (!parseBlock(scope)) {
+        printf("Error Ln%d. Expected block, but got \"%.*s\" instead.\n",
+            tokens[token_index].line,
+            tokens[token_index].value.length,
+            tokens[token_index].value.start);
+    }
 }
 
 static bool parseFunction() {

@@ -19,6 +19,8 @@ typedef struct PlangType {
 
 typedef enum ExprType {
     ExprType_Number,
+    ExprType_String,
+    ExprType_Bool,
     ExprType_Variable,
     ExprType_Arithmetic,
     ExprType_Alloc
@@ -42,7 +44,6 @@ typedef struct Expression {
     };
 } Expression;
 
-PlangType getExpressedType(Expression* expr);
 
 typedef struct AllocExpression {
     Expression* size;
@@ -60,6 +61,10 @@ typedef struct VarDecl {
     Expression* assignmentOrNull;
 } VarDecl;
 
+typedef struct If_While_Statement {
+    Expression* condition;
+    Codeblock scope;
+} If_While_Statement;
 
 typedef enum StatementType {
     Statement_Declaration,

@@ -19,6 +19,10 @@ inline void newline() {
 static void transpileType(PlangType type) {
     // TODO: transpile pointers
     sbAppendSpan(sb, type.structName);
+    u32 np = type.numPointers;
+    while (np-- > 0) {
+        sbAppend(sb, "*");
+    }
 }
 
 static void transpileExpression(Expression* expr) {
@@ -38,6 +42,8 @@ static void transpileExpression(Expression* expr) {
             sbAppend(sb, ")");
         } break;
 
+        case ExprType_Bool:
+        case ExprType_String:
         case ExprType_Number:
         case ExprType_Variable: {
             sbAppendSpan(sb, expr->value);
@@ -59,7 +65,7 @@ static void transpileStatement(Statement* statement) {
         case Statement_Declaration: {
             VarDecl* decl = (VarDecl*)statement->node;
 
-            sbAppendSpan(sb, decl->type.structName);
+            transpileType(decl->type);
             sbAppend(sb, " ");
             sbAppendSpan(sb, decl->name);
 
@@ -83,7 +89,7 @@ static void transpileStatement(Statement* statement) {
 }
 
 static void transpileFunction(PlangFunction* func) {
-    sbAppendSpan(sb, func->returnType.structName);
+    transpileType(func->returnType);
     sbAppend(sb, " ");
     sbAppendSpan(sb, func->name);
     sbAppend(sb, "() {");
