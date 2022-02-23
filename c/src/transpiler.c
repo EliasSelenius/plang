@@ -3,6 +3,8 @@
 #include "essh-string.h"
 #include "darray.h"
 
+void transpileBlock(Codeblock* scope);
+
 static StringBuilder* sb;
 static u32 tabing = 0;
 static char* tabs[] = {
@@ -80,7 +82,11 @@ static void transpileStatement(Statement* statement) {
 
         } break;
         case Statement_If: {
-
+            If_While_Statement* sta = (If_While_Statement*)statement->node;
+            sbAppend(sb, "if (");
+            transpileExpression(sta->condition);
+            sbAppend(sb, ") ");
+            transpileBlock(&sta->scope);
         } break;
         case Statement_While: {
 
@@ -88,23 +94,27 @@ static void transpileStatement(Statement* statement) {
     }
 }
 
-static void transpileFunction(PlangFunction* func) {
-    transpileType(func->returnType);
-    sbAppend(sb, " ");
-    sbAppendSpan(sb, func->name);
-    sbAppend(sb, "() {");
+static void transpileBlock(Codeblock* scope) {
+    sbAppend(sb, "{");
     tabing++;
 
-    for (u32 i = 0; i < darrayLength(func->scope.statements); i++) {
+    for (u32 i = 0; i < darrayLength(scope->statements); i++) {
         newline();
-        transpileStatement(&func->scope.statements[i]);
+        transpileStatement(&scope->statements[i]);
     }
 
     tabing--;
     newline();
 
     sbAppend(sb, "}\n");
-    
+}
+
+static void transpileFunction(PlangFunction* func) {
+    transpileType(func->returnType);
+    sbAppend(sb, " ");
+    sbAppendSpan(sb, func->name);
+    sbAppend(sb, "() ");
+    transpileBlock(&func->scope);
 }
 
 static void transpileStruct(PlangStruct* stru) {

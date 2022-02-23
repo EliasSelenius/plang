@@ -29,4 +29,8 @@ void main() {
     let msg = "Hello, World!";
 
     let b = true;
+
+    if (true) {
+
+    }
 }

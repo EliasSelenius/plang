@@ -234,6 +234,8 @@ failCase:
     return NULL;
 }
 
+void expectBlock(Codeblock* scope);
+
 static If_While_Statement* parseIfStatement() {
     if (tokens[token_index].type != Tok_Keyword_If) return NULL;
     token_index++;
@@ -253,11 +255,15 @@ static bool parseStatement(Statement* statement) {
 
     if ( (statement->node = parseVarDecl()) ) {
         statement->statementType = Statement_Declaration;
-    } else {
+        semicolon();
+    } 
+    else if ( (statement->node = parseIfStatement()) ) {
+        statement->statementType = Statement_If;
+    }
+    else {
         return false;
     }
 
-    semicolon();
 
     return true;
 }
@@ -359,23 +365,6 @@ static bool parseStruct() {
     return true;
 }
 
-void printAST(PlangFunction* func) {
-    
-    printf("function name: %.*s\n", func->name.length, func->name.start);
-
-    Statement* statements = func->scope.statements;
-    u32 len = darrayLength(statements);
-    for (u32 i = 0; i < len; i++) {
-        switch (statements[i].statementType) {
-            case Statement_Declaration: {
-                VarDecl* vd = statements[i].node;
-                printf("|%.*s| |%.*s|\n", vd->type.structName.length,
-                                    vd->type.structName.start,
-                                    vd->name.length, vd->name.start);
-            } break;
-        }
-    }
-}
 
 void parse() {
 

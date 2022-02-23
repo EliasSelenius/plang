@@ -61,11 +61,6 @@ typedef struct VarDecl {
     Expression* assignmentOrNull;
 } VarDecl;
 
-typedef struct If_While_Statement {
-    Expression* condition;
-    Codeblock scope;
-} If_While_Statement;
-
 typedef enum StatementType {
     Statement_Declaration,
     Statement_Assignment,
@@ -85,6 +80,10 @@ typedef struct Codeblock {
     Statement* statements; // darray
 } Codeblock;
 
+typedef struct If_While_Statement {
+    Expression* condition;
+    Codeblock scope;
+} If_While_Statement;
 
 typedef struct PlangFunction {
     StrSpan name;

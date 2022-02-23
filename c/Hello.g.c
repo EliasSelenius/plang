@@ -16,4 +16,7 @@ void main() {
     Bar30** bar = malloc(sizeof(Bar30*));
     char* msg = "Hello, World!";
     bool b = true;
+    if (true) {
+    }
+
 }
