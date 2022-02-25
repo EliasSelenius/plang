@@ -59,6 +59,7 @@ void lex(char* input) {
 
             TokenType tokType = Tok_Word;
 
+            // TODO: this can be faster some day
             // Keywords
             if (spanEquals(word, "struct")) tokType = Tok_Keyword_Struct;
             else if (spanEquals(word, "alloc")) tokType = Tok_Keyword_Alloc;
@@ -67,6 +68,11 @@ void lex(char* input) {
             else if (spanEquals(word, "while")) tokType = Tok_Keyword_While;
             else if (spanEquals(word, "true")) tokType = Tok_Keyword_True;
             else if (spanEquals(word, "false")) tokType = Tok_Keyword_False;
+            else if (spanEquals(word, "null")) tokType = Tok_Keyword_Null;
+            else if (spanEquals(word, "continue")) tokType = Tok_Keyword_Continue;
+            else if (spanEquals(word, "break")) tokType = Tok_Keyword_Break;
+            else if (spanEquals(word, "return")) tokType = Tok_Keyword_Return;
+
 
             tokens[tokens_length++] = (Token) {
                 .type = tokType,

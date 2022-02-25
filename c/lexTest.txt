@@ -1,5 +1,4 @@
 
-
 int* foo() {
 }
 
@@ -18,19 +17,46 @@ struct Bar30 {
     Foo foo;
 }
 
+Foo* getAfoo() {
+    let a = 10;
+
+    Foo* foos;
+
+    return foos;
+}
+
 
 void main() {
+    
     // Or here
-    let a = 5;
-    let foo = alloc Foo;
 
-    let bar = alloc Bar30*;
+
+    let p = null;
+    let a = 5;
+    let foo = alloc Foo[(1024 + 2 * a) / 10];
+
+    let bar = alloc Bar30[alloc Test + "Hey"];
 
     let msg = "Hello, World!";
 
     let b = true;
 
-    if (true) {
+    Foo* foo;
 
+    while (b) {
+        if (true) {
+            while (fawd) {
+
+            }
+            if (1) {
+
+            }
+        }
     }
+
+    if (b) {
+        return 10;
+    }
+
+    let c = 10;
 }

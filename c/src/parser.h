@@ -23,7 +23,8 @@ typedef enum ExprType {
     ExprType_Bool,
     ExprType_Variable,
     ExprType_Arithmetic,
-    ExprType_Alloc
+    ExprType_Alloc,
+    ExprType_Null
 } ExprType;
 
 // TODO: maybe create an expression type that have no need for unions
@@ -46,7 +47,7 @@ typedef struct Expression {
 
 
 typedef struct AllocExpression {
-    Expression* size;
+    Expression* sizeExpr;
     PlangType type;
 } AllocExpression;
 
@@ -66,7 +67,11 @@ typedef enum StatementType {
     Statement_Assignment,
     
     Statement_If,
-    Statement_While
+    Statement_While,
+
+    Statement_Continue,
+    Statement_Break,
+    Statement_Return
 } StatementType;
 
 typedef struct Statement {

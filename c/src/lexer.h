@@ -15,6 +15,10 @@ typedef enum TokenType {
     Tok_Keyword_While,
     Tok_Keyword_True,
     Tok_Keyword_False,
+    Tok_Keyword_Null,
+    Tok_Keyword_Continue,
+    Tok_Keyword_Break,
+    Tok_Keyword_Return,
 
     Tok_Number,
     Tok_String,

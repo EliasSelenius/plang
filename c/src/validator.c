@@ -37,12 +37,37 @@ static PlangType getExpressedType(Expression* expr) {
             res.numPointers++;
             return res;
         } break;
+        case ExprType_Null: {
+            return (PlangType) {
+                .structName = spFrom("void"),
+                .numPointers = 1
+            };
+        } break;
     }
 
     return (PlangType) {
         .structName = spFrom("err_no_type"),
         .numPointers = 0
     };
+}
+
+
+/*
+    TODO:
+*/
+static void validateExpression(Expression* expr) {
+    switch (expr->expressionType) {
+    
+        /*
+        ExprType_Number,
+        ExprType_String,
+        ExprType_Bool,
+        ExprType_Variable, // is variable declared?
+        ExprType_Arithmetic, // is a valid operator operands pair?
+        ExprType_Alloc, // recurse on possibe size-subexpression
+        ExprType_Null
+        */
+    }
 }
 
 
@@ -74,6 +99,18 @@ static void validateFunction(PlangFunction* func) {
             } break;
             case Statement_While: {
                 // TODO: recurse
+            } break;
+
+            case Statement_Break: {
+                // TODO: is inside loop?
+            } break;
+
+            case Statement_Continue: {
+                // TODO: is inside loop?
+            } break;
+
+            case Statement_Return: {
+                // TODO: return type missmatch?
             } break;
         }
     }

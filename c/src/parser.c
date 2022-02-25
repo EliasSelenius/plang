@@ -6,12 +6,16 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+void expectBlock(Codeblock* scope);
+Expression* parseExpression();
+Expression* expectExpression();
+
 static u32 token_index;
 
 PlangFunction* functions = NULL;
 PlangStruct* structs = NULL;
 
-Expression* parseExpression();
+
 
 
 /*
@@ -113,6 +117,9 @@ static Expression* parseLeafExpression() {
             eType = ExprType_Bool;
         } break;
 
+        case Tok_Keyword_Null: {
+            eType = ExprType_Null;
+        } break;
 
         case Tok_OpenParen: {
             Expression* e = parseExpression();
@@ -123,12 +130,19 @@ static Expression* parseLeafExpression() {
         case Tok_Keyword_Alloc: {
             AllocExpression* allocExpr = malloc(sizeof(AllocExpression));
             allocExpr->type = expectType();
-            allocExpr->size = NULL;
-            // TODO: optional array allocation
+            allocExpr->sizeExpr = NULL;
+            
+            if (tokens[token_index].type == Tok_OpenSquare) {
+                token_index++;
+                allocExpr->sizeExpr = expectExpression();
+                expect(Tok_CloseSquare);
+            }
 
             Expression* expr = malloc(sizeof(Expression));
             expr->node = allocExpr;
             expr->expressionType = ExprType_Alloc;
+
+
             return expr;        
         } break;
 
@@ -219,8 +233,9 @@ static VarDecl* parseVarDecl() {
     if (!nextToken(Tok_Word)) goto failCase;
 
     Expression* assign = NULL;
-    if (nextToken(Tok_Assign)) {
-        assign = expectExpression();        
+    if (tokens[token_index].type == Tok_Assign) {
+        token_index++;
+        assign = expectExpression();
     }
 
     VarDecl* res = malloc(sizeof(VarDecl));
@@ -234,10 +249,13 @@ failCase:
     return NULL;
 }
 
-void expectBlock(Codeblock* scope);
 
-static If_While_Statement* parseIfStatement() {
-    if (tokens[token_index].type != Tok_Keyword_If) return NULL;
+static bool parse_If_While_Statement(Statement* statement) {
+
+    if (tokens[token_index].type == Tok_Keyword_If) statement->statementType = Statement_If;
+    else if (tokens[token_index].type == Tok_Keyword_While) statement->statementType = Statement_While;
+    else return false;
+    
     token_index++;
 
     If_While_Statement* res = malloc(sizeof(If_While_Statement));
@@ -248,7 +266,9 @@ static If_While_Statement* parseIfStatement() {
 
     expectBlock(&res->scope);
 
-    return res;
+    statement->node = res;
+
+    return true;
 }
 
 static bool parseStatement(Statement* statement) {
@@ -257,8 +277,24 @@ static bool parseStatement(Statement* statement) {
         statement->statementType = Statement_Declaration;
         semicolon();
     } 
-    else if ( (statement->node = parseIfStatement()) ) {
-        statement->statementType = Statement_If;
+    else if ( parse_If_While_Statement(statement) );
+    else if (tokens[token_index].type == Tok_Keyword_Continue) {
+        statement->statementType = Statement_Continue;
+        statement->node = NULL;
+        token_index++;
+        semicolon();
+    }
+    else if (tokens[token_index].type == Tok_Keyword_Break) {
+        statement->statementType = Statement_Break;
+        statement->node = NULL;
+        token_index++;
+        semicolon();
+    }
+    else if (tokens[token_index].type == Tok_Keyword_Return) {
+        token_index++;
+        statement->statementType = Statement_Return;
+        statement->node = parseExpression();
+        semicolon();
     }
     else {
         return false;

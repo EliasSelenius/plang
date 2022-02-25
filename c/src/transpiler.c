@@ -4,6 +4,8 @@
 #include "darray.h"
 
 void transpileBlock(Codeblock* scope);
+void filewrite(const char* filename, char* content);
+
 
 static StringBuilder* sb;
 static u32 tabing = 0;
@@ -44,6 +46,10 @@ static void transpileExpression(Expression* expr) {
             sbAppend(sb, ")");
         } break;
 
+        case ExprType_Null: {
+            sbAppend(sb, "0");
+        } break;
+
         case ExprType_Bool:
         case ExprType_String:
         case ExprType_Number:
@@ -55,7 +61,15 @@ static void transpileExpression(Expression* expr) {
             AllocExpression* allocExpr = ((AllocExpression*)expr->node);
             sbAppend(sb, "malloc(sizeof(");
             transpileType(allocExpr->type);
-            sbAppend(sb, "))");
+            sbAppend(sb, ")");
+
+            if (allocExpr->sizeExpr) {
+                sbAppend(sb, " * ");
+                transpileExpression(allocExpr->sizeExpr);
+            }
+
+            sbAppend(sb, ")");
+
         } break;
     }
 
@@ -89,7 +103,25 @@ static void transpileStatement(Statement* statement) {
             transpileBlock(&sta->scope);
         } break;
         case Statement_While: {
+            If_While_Statement* sta = (If_While_Statement*)statement->node;
+            sbAppend(sb, "while (");
+            transpileExpression(sta->condition);
+            sbAppend(sb, ") ");
+            transpileBlock(&sta->scope);
+        } break;
 
+        case Statement_Break: sbAppend(sb, "break;"); break;
+        case Statement_Continue: sbAppend(sb, "continue;"); break;
+
+        case Statement_Return: {
+            if (statement->node) {
+                sbAppend(sb, "return ");
+                transpileExpression(statement->node);
+                sbAppend(sb, ";");
+            } else {
+                sbAppend(sb, "return;");
+            }
+            
         } break;
     }
 }
@@ -106,7 +138,7 @@ static void transpileBlock(Codeblock* scope) {
     tabing--;
     newline();
 
-    sbAppend(sb, "}\n");
+    sbAppend(sb, "}");
 }
 
 static void transpileFunction(PlangFunction* func) {
@@ -115,6 +147,7 @@ static void transpileFunction(PlangFunction* func) {
     sbAppendSpan(sb, func->name);
     sbAppend(sb, "() ");
     transpileBlock(&func->scope);
+    newline();
 }
 
 static void transpileStruct(PlangStruct* stru) {
@@ -139,7 +172,6 @@ static void transpileStruct(PlangStruct* stru) {
     sbAppendSpan(sb, stru->name);
     sbAppend(sb, ";\n");
 }
-
 
 
 void transpile() {

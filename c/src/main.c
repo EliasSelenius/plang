@@ -10,37 +10,66 @@
 #include "essh-string.h"
 
 
+/*
+
+
+    TODO list:
+        *- boolean operators and comparisons 
+        - function pointers
+        - function overloads
+        - return type inference
+        - subfunctions
+        *- clasic for loop: for (int i = 0; i < 10; i++)
+        - for in range loop: for i in 0..10
+        - loop block: loop { } == while (true) { }
+        - modules or namespaces ?
+        *- else if
+        *- better number literal type inference: 10 => int, 10.0 => f64, 10f => f32 ?
+        - function arguments
+        *- deref structs/pointers: foo.bar
+        *- indexing pointers: p[2]
+        - ternary operator
+        *- assignments
+        - allow underscores in number literals
+
+    InProgress:
+
+
+    DONE list:
+        *- while
+        - return statement
+        *- break, continue
+        - null literal
+
+*/
+
 void transpile();
 
 
 char* fileread(const char* filename, u32* strLength) {
-    FILE* file = fopen(filename, "r");
-
-    if (file == NULL) {
+    FILE* file;
+    if ( fopen_s(&file, filename, "r") ) {
         printf("Could not read file: %s\n", filename);
-        perror("fileread() error");
+        return NULL;
     }
 
     fseek(file, 0, SEEK_END);
     *strLength = ftell(file);
     rewind(file);
 
-
     char* res = calloc(*strLength + 1, sizeof(char));
     fread(res, 1, *strLength, file);
 
-    //printf("file:%s has length: %d, and strlen = %llu\n", filename, *strLength, strlen(res));
-
     fclose(file);
-
+    
     return res;
 }
 
 void filewrite(const char* filename, char* content) {
-    FILE* file = fopen(filename, "w");
-
-    if (file == NULL) {
+    FILE* file;
+    if ( fopen_s(&file, filename, "w") ) {
         printf("Could not write to file: %s\n", filename);
+        return;
     }
 
     fprintf(file, "%s", content);
