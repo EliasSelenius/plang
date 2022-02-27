@@ -23,19 +23,20 @@
         - for in range loop: for i in 0..10
         - loop block: loop { } == while (true) { }
         - modules or namespaces ?
-        *- else if
         *- better number literal type inference: 10 => int, 10.0 => f64, 10f => f32 ?
-        - function arguments
         *- deref structs/pointers: foo.bar
         *- indexing pointers: p[2]
         - ternary operator
-        *- assignments
         - allow underscores in number literals
+        *- function call 
+        *- function arguments
 
     InProgress:
 
 
     DONE list:
+        *- else if
+        *- assignments
         *- while
         - return statement
         *- break, continue

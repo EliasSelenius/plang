@@ -61,6 +61,14 @@ static void expect(TokenType type) {
     token_index++;
 }
 
+static void unexpectedToken() {
+    printf("Error Ln%d. Unexpected token \"%.*s\".\n",
+        tokens[token_index].line,
+        tokens[token_index].value.length,
+        tokens[token_index].value.start);
+    token_index++;
+}
+
 
 // returns false if the token can not be interpreted as a type
 static bool parseType(PlangType* type) {
@@ -250,25 +258,29 @@ failCase:
 }
 
 
-static bool parse_If_While_Statement(Statement* statement) {
-
-    if (tokens[token_index].type == Tok_Keyword_If) statement->statementType = Statement_If;
-    else if (tokens[token_index].type == Tok_Keyword_While) statement->statementType = Statement_While;
-    else return false;
+static IfStatement* expectIfStatement() {
+    IfStatement* res = malloc(sizeof(IfStatement));
+    res->next = NULL;
     
-    token_index++;
-
-    If_While_Statement* res = malloc(sizeof(If_While_Statement));
-
     expect(Tok_OpenParen);
     res->condition = expectExpression();
     expect(Tok_CloseParen);
 
     expectBlock(&res->scope);
 
-    statement->node = res;
+    if (tokens[token_index].type == Tok_Keyword_Else) {
+        token_index++;
+        if (tokens[token_index].type == Tok_Keyword_If) {
+            token_index++;
+            res->next = expectIfStatement();
+        } else {
+            res->next = malloc(sizeof(IfStatement));
+            res->next->condition = NULL;
+            expectBlock(&res->next->scope);
+        }
+    }
 
-    return true;
+    return res;
 }
 
 static bool parseStatement(Statement* statement) {
@@ -276,8 +288,51 @@ static bool parseStatement(Statement* statement) {
     if ( (statement->node = parseVarDecl()) ) {
         statement->statementType = Statement_Declaration;
         semicolon();
-    } 
-    else if ( parse_If_While_Statement(statement) );
+    }
+    else if (tokens[token_index].type == Tok_Word) {
+        Assignement ass;
+        ass.assignee = tokens[token_index].value;
+        token_index++;
+        switch (tokens[token_index].type) {
+            case Tok_Assign:
+            case Tok_PlusEquals:
+            case Tok_MinusEquals:
+            case Tok_MulEquals:
+            case Tok_DivEquals:
+                ass.assignmentOper = tokens[token_index].type;
+
+                token_index++;
+                ass.expr = expectExpression();
+                semicolon();
+
+                statement->statementType = Statement_Assignment;
+                Assignement* ap = statement->node = malloc(sizeof(Assignement));
+                *ap = ass;
+            break;
+            default:
+                token_index--;
+                return false;
+        }
+    }
+    else if (tokens[token_index].type == Tok_Keyword_While) {
+        token_index++;
+        statement->statementType = Statement_While;
+
+        WhileStatement* res = malloc(sizeof(WhileStatement));
+
+        expect(Tok_OpenParen);
+        res->condition = expectExpression();
+        expect(Tok_CloseParen);
+
+        expectBlock(&res->scope);
+
+        statement->node = res;
+    }
+    else if (tokens[token_index].type == Tok_Keyword_If) {
+        token_index++;
+        statement->statementType = Statement_If;
+        statement->node = expectIfStatement();
+    }    
     else if (tokens[token_index].type == Tok_Keyword_Continue) {
         statement->statementType = Statement_Continue;
         statement->node = NULL;
@@ -329,12 +384,27 @@ failCase:
 }
 
 static void expectBlock(Codeblock* scope) {
-    if (!parseBlock(scope)) {
+    /*if (!parseBlock(scope)) {
         printf("Error Ln%d. Expected block, but got \"%.*s\" instead.\n",
             tokens[token_index].line,
             tokens[token_index].value.length,
             tokens[token_index].value.start);
+    }*/
+
+    expect(Tok_OpenCurl);
+
+    scope->statements = darrayCreate(Statement);
+
+    Statement statement;
+    while (tokens[token_index].type != Tok_CloseCurl) {
+        if (!parseStatement(&statement)) {
+            unexpectedToken();
+        }
+
+        darrayAdd(scope->statements, statement);
     }
+
+    token_index++;
 }
 
 static bool parseFunction() {
@@ -357,7 +427,8 @@ static bool parseFunction() {
     assertToken(Tok_CloseParen)
 
     // body
-    if (!parseBlock(&func.scope)) goto failCase;
+    // if (!parseBlock(&func.scope)) goto failCase;
+    expectBlock(&func.scope);
 
     darrayAdd(functions, func);
     return true;

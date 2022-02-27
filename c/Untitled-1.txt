@@ -1,0 +1,27 @@
+
+module io;
+
+char* fileread(char* filename) {
+
+}
+
+void filewrite(char* filename, char* content) {
+    
+}
+
+bool open(char* name, out File file);
+void close(File* file);
+
+struct File {
+    u32 size;
+}
+
+
+void test() {
+ 
+    if (io:open("file.txt", out File file)) {
+
+        io:close(file);
+    }
+
+}

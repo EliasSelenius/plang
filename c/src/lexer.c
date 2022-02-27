@@ -65,6 +65,7 @@ void lex(char* input) {
             else if (spanEquals(word, "alloc")) tokType = Tok_Keyword_Alloc;
             else if (spanEquals(word, "let")) tokType = Tok_Keyword_Let;
             else if (spanEquals(word, "if")) tokType = Tok_Keyword_If;
+            else if (spanEquals(word, "else")) tokType = Tok_Keyword_Else;
             else if (spanEquals(word, "while")) tokType = Tok_Keyword_While;
             else if (spanEquals(word, "true")) tokType = Tok_Keyword_True;
             else if (spanEquals(word, "false")) tokType = Tok_Keyword_False;

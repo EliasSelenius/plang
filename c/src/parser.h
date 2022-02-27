@@ -1,8 +1,8 @@
 #pragma once
 
 #include "types.h"
-
 #include "essh-string.h"
+#include "lexer.h"
 
 void parse();
 
@@ -80,15 +80,28 @@ typedef struct Statement {
 } Statement;
 
 
+typedef struct Assignement {
+    StrSpan assignee;
+    // = += -= *= /=
+    TokenType assignmentOper;
+    Expression* expr;
+} Assignement;
+
 typedef struct Codeblock {
     struct Codeblock* parentScope;
     Statement* statements; // darray
 } Codeblock;
 
-typedef struct If_While_Statement {
+typedef struct WhileStatement {
     Expression* condition;
     Codeblock scope;
-} If_While_Statement;
+} WhileStatement;
+
+typedef struct IfStatement {
+    Expression* condition;
+    Codeblock scope;
+    struct IfStatement* next;
+} IfStatement;
 
 typedef struct PlangFunction {
     StrSpan name;

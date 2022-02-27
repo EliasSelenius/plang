@@ -1,0 +1,34 @@
+
+struct vec3 {
+    float x;
+    float y;
+    float z;
+}
+
+struct quat {
+    float x;
+    float y;
+    float z;
+    float w;
+}
+
+struct Transform {
+    vec3 position;
+    quat rotation;
+}
+
+struct Gameobject {
+    Gameobject* parent;
+    using Transform transform;
+}
+
+void addChild(using Gameobject* parent, Gameobject* child) {
+    child.parent = parent;
+    parent.x = 10;
+}
+
+void main() {
+    Gameobject* p = alloc Gameobject;
+    p.addChild(alloc Gameobject);
+
+}

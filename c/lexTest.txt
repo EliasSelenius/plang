@@ -26,37 +26,23 @@ Foo* getAfoo() {
 }
 
 
+
 void main() {
-    
-    // Or here
 
-
-    let p = null;
-    let a = 5;
-    let foo = alloc Foo[(1024 + 2 * a) / 10];
-
-    let bar = alloc Bar30[alloc Test + "Hey"];
-
-    let msg = "Hello, World!";
-
-    let b = true;
+    let x = 10;
+    x *= 2;
+    x -= 4;
+    x /= 2;
+    x += 2;
 
     Foo* foo;
 
-    while (b) {
-        if (true) {
-            while (fawd) {
-
-            }
-            if (1) {
-
-            }
-        }
+    if (true) {
+        foo = null;
+    } else if ("Hello") {
+        foo = alloc Foo;
+    } else {
+        foo = 10 + 2;
     }
 
-    if (b) {
-        return 10;
-    }
-
-    let c = 10;
 }

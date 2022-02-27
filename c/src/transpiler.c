@@ -75,6 +75,20 @@ static void transpileExpression(Expression* expr) {
 
 }
 
+static void transpileIfStatement(IfStatement* ifst) {
+    if (ifst->condition) {
+        sbAppend(sb, "if (");
+        transpileExpression(ifst->condition);
+        sbAppend(sb, ") ");
+    }
+
+    transpileBlock(&ifst->scope);
+
+    if (ifst->next) {
+        sbAppend(sb, " else ");
+        transpileIfStatement(ifst->next);
+    }
+}
 
 static void transpileStatement(Statement* statement) {
     switch (statement->statementType) {
@@ -93,17 +107,26 @@ static void transpileStatement(Statement* statement) {
             sbAppend(sb, ";");
         } break;
         case Statement_Assignment: {
+            Assignement* ass = statement->node;
+            sbAppendSpan(sb, ass->assignee);
 
+            switch (ass->assignmentOper) {
+                case Tok_Assign: sbAppend(sb, " = "); break;
+                case Tok_PlusEquals: sbAppend(sb, " += "); break;
+                case Tok_MinusEquals: sbAppend(sb, " -= "); break;
+                case Tok_MulEquals: sbAppend(sb, " *= "); break;
+                case Tok_DivEquals: sbAppend(sb, " /= "); break;
+                default: break;
+            }
+
+            transpileExpression(ass->expr);
+            sbAppend(sb, ";");            
         } break;
         case Statement_If: {
-            If_While_Statement* sta = (If_While_Statement*)statement->node;
-            sbAppend(sb, "if (");
-            transpileExpression(sta->condition);
-            sbAppend(sb, ") ");
-            transpileBlock(&sta->scope);
+            transpileIfStatement(statement->node);
         } break;
         case Statement_While: {
-            If_While_Statement* sta = (If_While_Statement*)statement->node;
+            WhileStatement* sta = (WhileStatement*)statement->node;
             sbAppend(sb, "while (");
             transpileExpression(sta->condition);
             sbAppend(sb, ") ");

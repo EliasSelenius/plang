@@ -16,23 +16,17 @@ Foo* getAfoo() {
     return foos;
 }
 void main() {
-    void* p = 0;
-    int a = 5;
-    Foo* foo = malloc(sizeof(Foo) * ((1024 + 2 * a) / 10));
-    Bar30* bar = malloc(sizeof(Bar30) * (malloc(sizeof(Test)) + "Hey"));
-    char* msg = "Hello, World!";
-    bool b = true;
+    int x = 10;
+    x *= 2;
+    x -= 4;
+    x /= 2;
+    x += 2;
     Foo* foo;
-    while (b) {
-        if (true) {
-            while (fawd) {
-            }
-            if (1) {
-            }
-        }
+    if (true) {
+        foo = 0;
+    } else if ("Hello") {
+        foo = malloc(sizeof(Foo));
+    } else {
+        foo = (10 + 2);
     }
-    if (b) {
-        return 10;
-    }
-    int c = 10;
 }
