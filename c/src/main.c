@@ -24,8 +24,6 @@
         - loop block: loop { } == while (true) { }
         - modules or namespaces ?
         *- better number literal type inference: 10 => int, 10.0 => f64, 10f => f32 ?
-        *- deref structs/pointers: foo.bar
-        *- indexing pointers: p[2]
         - ternary operator
         - allow underscores in number literals
         *- function call 
@@ -35,6 +33,8 @@
 
 
     DONE list:
+        *- deref structs/pointers: foo.bar
+        *- indexing: p[2]
         *- else if
         *- assignments
         *- while

@@ -4,6 +4,14 @@
 #include "parser.h"
 #include "darray.h"
 
+static Field* getField(PlangStruct* stru, StrSpan name) {
+    for (u32 i = 0; i < darrayLength(stru->fields); i++) {
+        if (spanEqualsSpan(stru->fields[i].name, name)) return &stru->fields[i];
+    }
+
+    return 0;
+}
+
 static PlangType getExpressedType(Expression* expr) {
     switch (expr->expressionType) {
         case ExprType_Number: {
@@ -71,9 +79,9 @@ static void validateExpression(Expression* expr) {
 }
 
 
-static void validateFunction(PlangFunction* func) {
-    for (u32 i = 0; i < darrayLength(func->scope.statements); i++) {
-        Statement* sta = &func->scope.statements[i];
+static void validateScope(Codeblock* scope) {
+    for (u32 i = 0; i < darrayLength(scope->statements); i++) {
+        Statement* sta = &scope->statements[i];
         switch (sta->statementType) {
             case Statement_Declaration: {
                 // TODO: is already declared?
@@ -95,10 +103,20 @@ static void validateFunction(PlangFunction* func) {
                 // TODO: type missmatch?
             } break;
             case Statement_If: {
-                // TODO: recurse
+                // TODO: check if condition is a boolean expression
+                IfStatement* ifsta = sta->node;
+                validateScope(&ifsta->scope);
+
+                while (ifsta->next) {
+                    ifsta = ifsta->next;
+                    validateScope(&ifsta->scope);
+                }
+
             } break;
             case Statement_While: {
-                // TODO: recurse
+                WhileStatement* whileSta = sta->node;
+                // TODO: check if condition is a boolean expression
+                validateScope(&whileSta->scope);
             } break;
 
             case Statement_Break: {
@@ -114,6 +132,10 @@ static void validateFunction(PlangFunction* func) {
             } break;
         }
     }
+}
+
+static void validateFunction(PlangFunction* func) {
+    validateScope(&func->scope);
 }
 
 void validate() {

@@ -100,6 +100,30 @@ static PlangType expectType() {
 }
 
 
+static ValuePath* parseValue() {
+    if (tokens[token_index].type != Tok_Word) return NULL;
+
+    ValuePath* res = malloc(sizeof(ValuePath));
+    res->name = tokens[token_index].value;
+    res->next = NULL;
+    res->index = NULL;
+    token_index++;
+
+    if (tokens[token_index].type == Tok_OpenSquare) {
+        token_index++;
+        res->index = expectExpression();
+        expect(Tok_CloseSquare);
+    }
+
+    if (tokens[token_index].type == Tok_Period) {
+        token_index++;
+        res->next = parseValue();
+    }
+
+    return res;
+}
+
+
 inline bool isOperator(TokenType type) {
     return type >= Tok_Plus && type <= Tok_Div;
 }
@@ -111,7 +135,11 @@ static Expression* parseLeafExpression() {
 
     switch (token->type) {
         case Tok_Word: {
-            eType = ExprType_Variable;
+            token_index--;
+            Expression* expr = malloc(sizeof(Expression));
+            expr->expressionType = ExprType_Variable;
+            expr->node = parseValue();
+            return expr;
         } break;
         case Tok_Number: {
             eType = ExprType_Number;
@@ -261,7 +289,7 @@ failCase:
 static IfStatement* expectIfStatement() {
     IfStatement* res = malloc(sizeof(IfStatement));
     res->next = NULL;
-    
+
     expect(Tok_OpenParen);
     res->condition = expectExpression();
     expect(Tok_CloseParen);
@@ -291,8 +319,7 @@ static bool parseStatement(Statement* statement) {
     }
     else if (tokens[token_index].type == Tok_Word) {
         Assignement ass;
-        ass.assignee = tokens[token_index].value;
-        token_index++;
+        ass.assignee = parseValue();
         switch (tokens[token_index].type) {
             case Tok_Assign:
             case Tok_PlusEquals:

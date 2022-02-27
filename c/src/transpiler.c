@@ -5,6 +5,7 @@
 
 void transpileBlock(Codeblock* scope);
 void filewrite(const char* filename, char* content);
+void transpileValuePath(ValuePath* value);
 
 
 static StringBuilder* sb;
@@ -52,9 +53,12 @@ static void transpileExpression(Expression* expr) {
 
         case ExprType_Bool:
         case ExprType_String:
-        case ExprType_Number:
-        case ExprType_Variable: {
+        case ExprType_Number: {
             sbAppendSpan(sb, expr->value);
+        } break;
+
+        case ExprType_Variable: {
+            transpileValuePath(expr->node);
         } break;
 
         case ExprType_Alloc: {
@@ -73,6 +77,20 @@ static void transpileExpression(Expression* expr) {
         } break;
     }
 
+}
+
+static void transpileValuePath(ValuePath* value) {
+    sbAppendSpan(sb, value->name);
+    if (value->index) {
+        sbAppend(sb, "[");
+        transpileExpression(value->index);
+        sbAppend(sb, "]");
+    }
+
+    if (value->next) {
+        sbAppend(sb, ".");
+        transpileValuePath(value->next);
+    }
 }
 
 static void transpileIfStatement(IfStatement* ifst) {
@@ -108,7 +126,7 @@ static void transpileStatement(Statement* statement) {
         } break;
         case Statement_Assignment: {
             Assignement* ass = statement->node;
-            sbAppendSpan(sb, ass->assignee);
+            transpileValuePath(ass->assignee);
 
             switch (ass->assignmentOper) {
                 case Tok_Assign: sbAppend(sb, " = "); break;

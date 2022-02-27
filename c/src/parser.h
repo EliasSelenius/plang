@@ -52,6 +52,12 @@ typedef struct AllocExpression {
 } AllocExpression;
 
 
+typedef struct ValuePath {
+    StrSpan name;
+    Expression* index;
+    struct ValuePath* next;
+} ValuePath;
+
 
 // ----Statements----------------------------------------------
 
@@ -81,7 +87,7 @@ typedef struct Statement {
 
 
 typedef struct Assignement {
-    StrSpan assignee;
+    ValuePath* assignee;
     // = += -= *= /=
     TokenType assignmentOper;
     Expression* expr;

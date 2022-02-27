@@ -16,17 +16,6 @@ Foo* getAfoo() {
     return foos;
 }
 void main() {
-    int x = 10;
-    x *= 2;
-    x -= 4;
-    x /= 2;
-    x += 2;
-    Foo* foo;
-    if (true) {
-        foo = 0;
-    } else if ("Hello") {
-        foo = malloc(sizeof(Foo));
-    } else {
-        foo = (10 + 2);
-    }
+    Foo* foo = malloc(sizeof(Foo) * 10);
+    foo[0].string = "Hello";
 }
