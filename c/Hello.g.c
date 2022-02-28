@@ -4,6 +4,7 @@ typedef struct Test {
 } Test;
 typedef struct Foo {
     char* string;
+    Test test;
 } Foo;
 typedef struct Bar30 {
     Foo foo;
@@ -16,6 +17,5 @@ Foo* getAfoo() {
     return foos;
 }
 void main() {
-    Foo* foo = malloc(sizeof(Foo) * 10);
-    foo[0].string = "Hello";
+    err_no_type f = foo.name;
 }

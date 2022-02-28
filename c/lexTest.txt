@@ -11,6 +11,7 @@ struct Test {
 
 struct Foo {
     char* string;
+    Test test;
 }
 
 struct Bar30 {
@@ -26,10 +27,8 @@ Foo* getAfoo() {
 }
 
 
-
 void main() {
 
-    let foo = alloc Foo[10];
-    foo[0].string = "Hello";
+    let f = foo.name;
 
 }
