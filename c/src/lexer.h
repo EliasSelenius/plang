@@ -30,6 +30,8 @@ typedef enum TokenType {
     Tok_Comma,
     Tok_Period,
     Tok_Semicolon,
+    Tok_Colon,
+    Tok_QuestionMark,
 
     Tok_OpenCurl,
     Tok_CloseCurl,

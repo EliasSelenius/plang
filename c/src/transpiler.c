@@ -75,6 +75,15 @@ static void transpileExpression(Expression* expr) {
             sbAppend(sb, ")");
 
         } break;
+
+        case ExprType_Ternary: {
+            TernaryExpression* ter = expr->node;
+            transpileExpression(ter->condition);
+            sbAppend(sb, " ? ");
+            transpileExpression(ter->thenExpr);
+            sbAppend(sb, " : ");
+            transpileExpression(ter->elseExpr);
+        } break;
     }
 
 }

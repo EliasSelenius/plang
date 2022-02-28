@@ -24,7 +24,8 @@ typedef enum ExprType {
     ExprType_Variable,
     ExprType_Arithmetic,
     ExprType_Alloc,
-    ExprType_Null
+    ExprType_Null,
+    ExprType_Ternary
 } ExprType;
 
 // TODO: maybe create an expression type that have no need for unions
@@ -58,6 +59,11 @@ typedef struct ValuePath {
     struct ValuePath* next;
 } ValuePath;
 
+typedef struct TernaryExpression {
+    Expression* condition;
+    Expression* thenExpr;
+    Expression* elseExpr;
+} TernaryExpression;
 
 // ----Statements----------------------------------------------
 

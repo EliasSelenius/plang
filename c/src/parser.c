@@ -194,6 +194,22 @@ static Expression* parseLeafExpression() {
     return expr;
 }
 
+static Expression* testForTernary(Expression* expr) {
+    if (tokens[token_index].type != Tok_QuestionMark) return expr;
+    token_index++;
+
+    TernaryExpression* ter = malloc(sizeof(TernaryExpression));
+    ter->condition = expr;
+    ter->thenExpr = expectExpression();
+    expect(Tok_Colon);
+    ter->elseExpr = expectExpression();
+
+    Expression* res = malloc(sizeof(Expression));
+    res->node = ter;
+    res->expressionType = ExprType_Ternary;
+    return res;
+}
+
 // returns NULL if it fails to parse an expression
 static Expression* parseExpression() {
 
@@ -215,7 +231,7 @@ static Expression* parseExpression() {
         temp[i++] = parseLeafExpression();
     }
 
-    if (i == 1) return leafExpr;
+    if (i == 1) return testForTernary(leafExpr);
 
 
     Expression* expr = malloc(sizeof(Expression));
@@ -233,7 +249,8 @@ static Expression* parseExpression() {
     // TODO: I'd like to know why this didnt work
     // while (i > 0) expr->subExpressions[--i] = temp[i];
 
-    return expr;
+
+    return testForTernary(expr);
 }
 
 static Expression* expectExpression() {

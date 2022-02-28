@@ -182,6 +182,8 @@ void lex(char* input) {
         test_char(',', Tok_Comma);
         test_char('.', Tok_Period);
         test_char(';', Tok_Semicolon);
+        test_char(':', Tok_Colon);
+        test_char('?', Tok_QuestionMark);
 
         test_char('{', Tok_OpenCurl);
         test_char('}', Tok_CloseCurl);

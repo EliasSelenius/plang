@@ -24,7 +24,6 @@
         - loop block: loop { } == while (true) { }
         - modules or namespaces ?
         *- better number literal type inference: 10 => int, 10.0 => f64, 10f => f32 ?
-        - ternary operator
         - allow underscores in number literals
         *- function call 
         *- function arguments
@@ -33,6 +32,7 @@
 
 
     DONE list:
+        - ternary operator
         *- deref structs/pointers: foo.bar
         *- indexing: p[2]
         *- else if
@@ -90,6 +90,7 @@ typedef struct PlangFile {
 
 
 int main(int argc, char* argv[]) {
+
 
     u32 filesize;
     char* text = fileread("lexTest.txt", &filesize);
