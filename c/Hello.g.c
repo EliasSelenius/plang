@@ -17,5 +17,6 @@ Foo* getAfoo() {
     return foos;
 }
 void main() {
-    err_no_type f = foo.name;
+    Foo* foo;
+    err_no_type i = foo.bar;
 }

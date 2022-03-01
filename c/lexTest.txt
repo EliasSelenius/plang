@@ -28,7 +28,8 @@ Foo* getAfoo() {
 
 
 void main() {
+    Foo* foo;
 
-    let f = foo.name;
+    let i = foo.bar;
 
 }

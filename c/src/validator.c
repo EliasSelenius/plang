@@ -77,14 +77,39 @@ static PlangType getExpressedType(Expression* expr) {
     };
 }
 
+typedef struct Variable {
+    StrSpan name;
+    PlangType type;
+} Variable;
+
+static Variable* variables;
+
+static PlangType* getDeclaredVariable(StrSpan name) {
+    
+    u32 len = darrayLength(variables);
+    for (u32 i = 0; i < len; i++) {
+        if (spanEqualsSpan(name, variables[i].name)) {
+            return &variables[i].type;
+        }
+    }
+
+    return 0;
+}
+
 static void validateValue(ValuePath* var) {
     // is this a valid value? like a local, a function arguemnt or a global 
 
+    PlangType* rootType = getDeclaredVariable(var->name);
+    if (!rootType) {
+        printf("Error. Variable \"%.*s\" is not declared.\n", 
+            var->name.length,
+            var->name.start);
+        return;
+    }
 
-    ValuePath* value = var;
-
-    PlangStruct* stru = getStructByName(spFrom("Foo"));
+    PlangStruct* stru = getStructByName(rootType->structName);
     
+    ValuePath* value = var;
     do {
         
         // does it use indexing? if so is it valid? and recurse on index expression
@@ -163,13 +188,22 @@ static void validateScope(Codeblock* scope) {
     scope->parentScope = parentScope;
     currentScope = scope;
 
+    u32 vars_start_index = darrayLength(variables);
+
     for (u32 i = 0; i < darrayLength(scope->statements); i++) {
         Statement* sta = &scope->statements[i];
         switch (sta->statementType) {
             case Statement_Declaration: {
-                // TODO: is already declared?
-                
+
                 VarDecl* decl = (VarDecl*)sta->node;
+
+                // Check wheter there already is a variable with this name
+                if (getDeclaredVariable(decl->name)) {
+                    printf("Error. Variable \"%.*s\" is already declared.\n", 
+                        decl->name.length,
+                        decl->name.start);
+                }
+                        
                 if (decl->mustInferType) {
                     if (decl->assignmentOrNull) {
                         validateExpression(decl->assignmentOrNull);
@@ -181,6 +215,12 @@ static void validateScope(Codeblock* scope) {
                     validateType(decl->type.structName);
                     // TODO: type missmatch? 
                 }
+
+                Variable var;
+                var.name = decl->name;
+                var.type = decl->type;
+                
+                darrayAdd(variables, var);
 
             } break;
             case Statement_Assignment: {
@@ -221,6 +261,8 @@ static void validateScope(Codeblock* scope) {
         }
     }
 
+    darrayHead(variables)->length = vars_start_index;
+
     currentScope = parentScope;
 }
 
@@ -230,8 +272,13 @@ static void validateFunction(PlangFunction* func) {
 }
 
 void validate() {
+
+    variables = darrayCreate(Variable);
+
     for (u32 i = 0; i < darrayLength(functions); i++) {
         validateFunction(&functions[i]);
     }
+
+    darrayDelete(variables);
 }
 
