@@ -335,14 +335,16 @@ static bool parseStatement(Statement* statement) {
         semicolon();
     }
     else if (tokens[token_index].type == Tok_Word) {
-        Assignement ass;
-        ass.assignee = parseValue();
+
+        ValuePath* valuePath = parseValue();
         switch (tokens[token_index].type) {
             case Tok_Assign:
             case Tok_PlusEquals:
             case Tok_MinusEquals:
             case Tok_MulEquals:
-            case Tok_DivEquals:
+            case Tok_DivEquals: {
+                Assignement ass;
+                ass.assignee = valuePath;
                 ass.assignmentOper = tokens[token_index].type;
 
                 token_index++;
@@ -352,9 +354,21 @@ static bool parseStatement(Statement* statement) {
                 statement->statementType = Statement_Assignment;
                 Assignement* ap = statement->node = malloc(sizeof(Assignement));
                 *ap = ass;
-            break;
+            } break;
+
+            case Tok_OpenParen: {
+                token_index++;
+                FuncCall* func = malloc(sizeof(FuncCall));
+                func->valuePath = valuePath;
+
+                statement->statementType = Statement_FuncCall;
+                statement->node = func;
+                expect(Tok_CloseParen);
+                semicolon();
+            } break;
+            
             default:
-                token_index--;
+                token_index--; // why the fuck?
                 return false;
         }
     }

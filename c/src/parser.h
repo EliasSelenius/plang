@@ -25,7 +25,8 @@ typedef enum ExprType {
     ExprType_Arithmetic,
     ExprType_Alloc,
     ExprType_Null,
-    ExprType_Ternary
+    ExprType_Ternary,
+    ExprType_FuncCall
 } ExprType;
 
 // TODO: maybe create an expression type that have no need for unions
@@ -65,6 +66,12 @@ typedef struct TernaryExpression {
     Expression* elseExpr;
 } TernaryExpression;
 
+typedef struct FuncCall {
+    // StrSpan name;
+    ValuePath* valuePath;
+    Expression** args; // darray of Expression pointers
+} FuncCall;
+
 // ----Statements----------------------------------------------
 
 typedef struct VarDecl {
@@ -77,7 +84,8 @@ typedef struct VarDecl {
 typedef enum StatementType {
     Statement_Declaration,
     Statement_Assignment,
-    
+    Statement_FuncCall,
+
     Statement_If,
     Statement_While,
 

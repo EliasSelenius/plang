@@ -50,6 +50,19 @@ static PlangType getExpressedType(Expression* expr) {
         } break;
         case ExprType_Variable: {
             // TODO: fetch type of var.
+            /*
+            ValuePath* value = expr->node;
+            PlangType* type = getDeclaredVariable(value->name);
+
+            while (value) {
+                if (value->index) {
+                    type->numPointers--;
+                }
+
+                value = value->next;
+            }
+            */
+
         } break;
         case ExprType_Arithmetic: {
 

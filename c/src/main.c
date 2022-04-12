@@ -91,6 +91,9 @@ typedef struct PlangFile {
 
 int main(int argc, char* argv[]) {
 
+    for (u32 i = 0; i < argc; i++) {
+        printf("    %d. %s\n", i, argv[i]);
+    }
 
     u32 filesize;
     char* text = fileread("lexTest.txt", &filesize);
@@ -112,6 +115,9 @@ int main(int argc, char* argv[]) {
 
     printf("Transpile...\n");
     transpile();
+
+    printf("Compile...\n");
+    system("clang output.g.c -o output.exe");
 
     return 0;
 }

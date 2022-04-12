@@ -173,6 +173,12 @@ static void transpileStatement(Statement* statement) {
             }
             
         } break;
+
+        case Statement_FuncCall: {
+            FuncCall* func = statement->node;
+            transpileValuePath(func->valuePath);
+            sbAppend(sb, "();");
+        } break;
     }
 }
 
@@ -239,6 +245,6 @@ void transpile() {
     }
 
 
-    filewrite("Hello.g.c", sb->content);
+    filewrite("output.g.c", sb->content);
     sbDestroy(sb);
 }

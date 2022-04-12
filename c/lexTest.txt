@@ -1,5 +1,6 @@
 
 int* foo() {
+    return null;
 }
 
 struct Test {
@@ -27,9 +28,10 @@ Foo* getAfoo() {
 }
 
 
-void main() {
-    Foo* foo;
+int main() {
+    getAfoo();
 
-    let i = foo.bar;
+    printf("Hello, World!");
 
+    return 0;
 }

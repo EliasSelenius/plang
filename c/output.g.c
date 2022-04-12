@@ -10,13 +10,15 @@ typedef struct Bar30 {
     Foo foo;
 } Bar30;
 int* foo() {
+    return 0;
 }
 Foo* getAfoo() {
     int a = 10;
     Foo* foos;
     return foos;
 }
-void main() {
-    Foo* foo;
-    err_no_type i = foo.bar;
+int main() {
+    d.f.t[2]();
+    getAfoo();
+    return 0;
 }
