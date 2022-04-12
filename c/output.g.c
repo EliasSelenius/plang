@@ -1,3 +1,10 @@
+// Structs
+
+// Forward declarations
+int main();
+void sayFoo();
+
+// Implementations
 int main() {
     printf("Hello, This is printf() from %s\n", "plang");
     sayFoo();

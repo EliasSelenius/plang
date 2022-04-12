@@ -14,7 +14,8 @@
 
 
     TODO list:
-        *- boolean operators and comparisons 
+        *- boolean operators
+        *- boolean comparisons 
         - function pointers
         - function overloads
         - return type inference
@@ -25,13 +26,15 @@
         - modules or namespaces ?
         *- better number literal type inference: 10 => int, 10.0 => f64, 10f => f32 ?
         - allow underscores in number literals
+        *- declare statement (declare function signature without implementation)
+
+    InProgress:
         *- function call 
         *- function arguments
 
-    InProgress:
-
 
     DONE list:
+        *- transpile forward declarations
         - ternary operator
         *- deref structs/pointers: foo.bar
         *- indexing: p[2]
