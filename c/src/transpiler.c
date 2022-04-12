@@ -177,7 +177,17 @@ static void transpileStatement(Statement* statement) {
         case Statement_FuncCall: {
             FuncCall* func = statement->node;
             transpileValuePath(func->valuePath);
-            sbAppend(sb, "();");
+            sbAppend(sb, "(");
+            if (func->args) {
+                transpileExpression(func->args[0]);
+                
+                u32 len = darrayLength(func->args);
+                for (u32 i = 1; i < len; i++) {
+                    sbAppend(sb, ", ");
+                    transpileExpression(func->args[i]);
+                }
+            }
+            sbAppend(sb, ");");
         } break;
     }
 }

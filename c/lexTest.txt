@@ -1,37 +1,13 @@
 
-int* foo() {
-    return null;
-}
-
-struct Test {
-    // TEst
-
-    float x;
-    double y;
-}
-
-struct Foo {
-    char* string;
-    Test test;
-}
-
-struct Bar30 {
-    Foo foo;
-}
-
-Foo* getAfoo() {
-    let a = 10;
-
-    Foo* foos;
-
-    return foos;
-}
-
 
 int main() {
-    getAfoo();
+    printf("Hello, This is printf() from %s\n", "plang");
 
-    printf("Hello, World!");
+    sayFoo();
 
     return 0;
+}
+
+void sayFoo() {
+    printf("foo\n");
 }

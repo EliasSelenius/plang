@@ -269,6 +269,14 @@ static Expression* expectExpression() {
 
 #define nextToken(tok) (tokens[token_index++].type == tok)
 
+inline bool tok(TokenType type) {
+    if (tokens[token_index].type == type) {
+        token_index++;
+        return true;
+    }
+    return false;
+}
+
 static VarDecl* parseVarDecl() {
     u32 startingIndex = token_index;
     bool useTypeInference = false;
@@ -363,6 +371,20 @@ static bool parseStatement(Statement* statement) {
 
                 statement->statementType = Statement_FuncCall;
                 statement->node = func;
+                
+                Expression* expr = parseExpression();
+                if (expr) {
+                    func->args = darrayCreate(Expression*);
+                    darrayAdd(func->args, expr);
+
+                    while (tok(Tok_Comma)) {
+                        expr = expectExpression();
+                        darrayAdd(func->args, expr);
+                    }
+                } else {
+                    func->args = null;
+                }
+
                 expect(Tok_CloseParen);
                 semicolon();
             } break;

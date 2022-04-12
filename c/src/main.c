@@ -117,7 +117,13 @@ int main(int argc, char* argv[]) {
     transpile();
 
     printf("Compile...\n");
-    system("clang output.g.c -o output.exe");
+    int code = system("clang output.g.c -o output.exe");
+    if (code == 0) {
+        system("output.exe");
+    } else {
+        printf("clang return code: %d\n", code);
+    }
+
 
     return 0;
 }
