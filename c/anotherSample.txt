@@ -1,0 +1,56 @@
+struct Transform {
+    vec3 pos;
+    quat rot;
+}
+
+struct Rigidbody {
+    vec3 vel;
+    vec3 avel;
+    f32 mass;
+}
+
+let render(with Mesh* mesh, with Transform tr) {
+    // ...
+}
+
+struct BoatClass {
+    with Mesh* mesh;
+    char* name;
+    vec3[] buoyantPoints;
+}
+
+struct Boat {
+    with BoatClass* class;
+    with Transform tr;
+    with Rigidbody rb;
+}
+
+let addForce(with Rigidbody rb, vec3 force) {
+    rb.vel += force / rb.mass;
+}
+
+let updatePhysics(with Rigidbody rb, with Transform t, float dt) {
+    t.pos += rb.vel * dt;
+}
+
+let main() {
+
+    Boat* b = alloc Boat;
+    
+    b.class = alloc BoatClass {
+        name = "Frigate",
+        mesh = loadMesh("FrigateModel.obj"),
+        buoyantPoints = alloc vec3[] {
+            vec3(1, 2, 3),
+            vec3(3, 2, 1)
+        }
+    };
+
+
+    b.addForce(vec3(0, 1, 2));
+    b.updatePhysics(deltatime);
+
+
+    b.render();
+    render(b.class.mesh, b.tr);
+}

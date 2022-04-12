@@ -1,0 +1,29 @@
+
+struct Rigidbody {
+    vec3 pos;
+    vec3 vel;
+    vec3 angVel;
+}
+
+void addForce(using Rigidbody* rb, vec3 force) {
+
+}
+
+struct ShipType {
+    Mesh* mesh;
+    int maxHealth;
+}
+
+struct Ship {
+    using ShipType* shipType;
+    using Rigidbody rb;
+
+    int currentHealth;
+}
+
+
+void main() {
+    Ship ship;
+    ship.addForce(vec3(1, 0, 0));
+    if (ship.currentHealth > ship.maxHealth)
+}
