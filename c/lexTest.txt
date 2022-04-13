@@ -7,16 +7,18 @@
 int main() {
     //printf("Hello, This is printf() from %s\n", "plang");
 
-    sayFoo(alloc Foo);
+    sayFoo(12, "d");
 
     Entity fs;
     fs.name = "dkwa";
 
 
+/*
     //let f = alloc Foo;
     let i = g;
     let f = 0;
     let g;
+*/
 
     return 0;
 }
@@ -42,6 +44,6 @@ void yes(int i, char* str) {
     //return foo.bar;
 }
 
-void sayFoo() {
+void sayFoo(int i, char* str) {
     //printf("foo\n");
 }

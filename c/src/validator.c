@@ -206,9 +206,16 @@ static bool validateValue(ValuePath* var) {
 
 inline void validateType(StrSpan typename) {
     // TODO: primitive types
-    if (!getStructByName(typename)) {
-        error("Type \"%.*s\" does not exist.", typename.length, typename.start);
-    } 
+
+    if (spanEquals(typename, "char"));
+    else if (spanEquals(typename, "int"));
+    else if (spanEquals(typename, "float"));
+    else {
+        if (!getStructByName(typename)) {
+            error("Type \"%.*s\" does not exist.", typename.length, typename.start);
+        } 
+    }
+
 }
 
 static bool validateExpression(Expression* expr) {
@@ -251,6 +258,49 @@ static bool validateExpression(Expression* expr) {
     return true;
 }
 
+static void validateFuncCall(FuncCall* call) {
+    
+    if (call->valuePath->next || call->valuePath->index) {
+        printf("Feature not implemented yet.\n");
+        return;
+    }
+
+    StrSpan name = call->valuePath->name;
+    call->function = getFunctionByName(name);
+    if (!call->function) {
+        error("Function \"%.*s\" does not exist.", name.length, name.start);
+        return;
+    }
+
+    u32 argLen = call->args ? darrayLength(call->args) : 0;
+    u32 expArgLen = call->function->arguments ? darrayLength(call->function->arguments) : 0;
+
+    if (argLen != expArgLen) {
+        // TODO: print proper types with pointers
+        error("Unexpected number of arguments passed to \"%.*s\", expected %d, but got %d.", 
+            call->function->name.length, call->function->name.start,
+            expArgLen, argLen);
+
+        for (u32 i = 0; i < argLen; i++) {
+            validateExpression(call->args[i]);
+        }
+
+        return;
+    }
+    
+    for (u32 i = 0; i < argLen; i++) {
+        if (validateExpression(call->args[i])) {
+            PlangType passedArg = getExpressedType(call->args[i]);
+            PlangType expectedArg = call->function->arguments[i].type;
+
+            if (!typeEquals(passedArg, expectedArg)) {
+                error("Argument type missmatch, expression of type %.*s cannot be passed to argument of type %.*s",
+                    passedArg.structName.length, passedArg.structName.start,
+                    expectedArg.structName.length, expectedArg.structName.start);
+            }
+        }
+    }
+}
 
 static void validateScope(Codeblock* scope) {
     Codeblock* parentScope = currentScope;
@@ -340,20 +390,7 @@ static void validateScope(Codeblock* scope) {
 
             case Statement_FuncCall: {
                 FuncCall* call = sta->node;
-
-                if (call->valuePath->next || call->valuePath->index) {
-                    printf("Feature not implemented yet.\n");
-                    break;
-                }
-
-                StrSpan name = call->valuePath->name;
-                call->function = getFunctionByName(name);
-                if (!call->function) {
-                    error("Function \"%.*s\" does not exist.", name.length, name.start);
-                    break;
-                }
-
-                
+                validateFuncCall(call);
             } break;
         }
     }
@@ -365,15 +402,37 @@ static void validateScope(Codeblock* scope) {
 
 static void validateFunction(PlangFunction* func) {
     function = func;
+
+    
+    if (func->arguments) {
+        u32 len = darrayLength(func->arguments);
+        for (u32 i = 0; i < len; i++) {
+            validateType(func->arguments[i].type.structName);
+        }
+    }
+
     currentScope = null;
     validateScope(&func->scope);
 }
 
+static void validateStruct(PlangStruct* stru) {
+    u32 fieldLen = darrayLength(stru->fields);
+    for (u32 i = 0; i < fieldLen; i++) {
+        validateType(stru->fields[i].type.structName);
+    }    
+}
+
 u32 validate() {
+
+    u32 struLen = darrayLength(structs);
+    for (u32 i = 0; i < struLen; i++) {
+        validateStruct(&structs[i]);
+    }
 
     variables = darrayCreate(Variable);
 
-    for (u32 i = 0; i < darrayLength(functions); i++) {
+    u32 funcLen = darrayLength(functions);
+    for (u32 i = 0; i < funcLen; i++) {
         validateFunction(&functions[i]);
     }
 

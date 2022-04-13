@@ -3,16 +3,18 @@ typedef struct Entity {
     char* name;
     float x;
     float y;
+    Test* test;
 } Entity;
 
 // Forward declarations
 int main();
 Entity* makeEntity(char* name);
 void yes(int i, char* str);
-void sayFoo();
+void sayFoo(int i, char* str);
 
 // Implementations
 int main() {
+    sayFoo(12, "d");
     Entity fs;
     fs.name = "dkwa";
     return 0;
@@ -26,5 +28,5 @@ Entity* makeEntity(char* name) {
 }
 void yes(int i, char* str) {
 }
-void sayFoo() {
+void sayFoo(int i, char* str) {
 }

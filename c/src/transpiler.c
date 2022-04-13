@@ -24,7 +24,6 @@ inline void newline() {
 }
 
 static void transpileType(PlangType type) {
-    // TODO: transpile pointers
     sbAppendSpan(sb, type.structName);
     u32 np = type.numPointers;
     while (np-- > 0) {
