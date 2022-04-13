@@ -5,15 +5,41 @@
 #include "darray.h"
 
 #include <stdio.h>
+#include <stdarg.h>
 
-void validateExpression(Expression* expr);
+
+typedef struct Variable {
+    StrSpan name;
+    PlangType* type;
+} Variable;
+
+static PlangFunction* function;
+static Variable* variables;
+static Codeblock* currentScope;
+static u32 numberOfErrors = 0;
+
+bool validateExpression(Expression* expr);
+
+
+inline void error(char* format, ...) {
+    printf("Error: ");
+
+    va_list args;
+    va_start(args, format);
+    vprintf(format, args);
+    va_end(args);
+    
+    printf("\n");
+
+    numberOfErrors++;
+} 
 
 static Field* getField(PlangStruct* stru, StrSpan name) {
     for (u32 i = 0; i < darrayLength(stru->fields); i++) {
         if (spanEqualsSpan(stru->fields[i].name, name)) return &stru->fields[i];
     }
 
-    return 0;
+    return null;
 }
 
 static PlangStruct* getStructByName(StrSpan name) {
@@ -23,12 +49,25 @@ static PlangStruct* getStructByName(StrSpan name) {
         if (spanEqualsSpan(structs[i].name, name)) return &structs[i];
     }
 
-    return NULL;
+    return null;
+}
+
+static PlangFunction* getFunctionByName(StrSpan name) {
+    u32 len = darrayLength(functions);
+    for (u32 i = 0; i < len; i++) {
+        if (spanEqualsSpan(name, functions[i].name)) return &functions[i];
+    }
+
+    return null;
+}
+
+inline bool typeEquals(PlangType a, PlangType b) {
+    return spanEqualsSpan(a.structName, b.structName) && a.numPointers == b.numPointers;
 }
 
 static PlangType getExpressedType(Expression* expr) {
     switch (expr->expressionType) {
-        case ExprType_Number: {
+        case ExprType_Number_Literal: {
             // TODO: different number types by literal suffix
 
             return (PlangType) { 
@@ -36,32 +75,27 @@ static PlangType getExpressedType(Expression* expr) {
                 .numPointers = 0
             };
         } break;
-        case ExprType_String: {
+        case ExprType_String_Literal: {
             return (PlangType) {
                 .structName = spFrom("char"),
                 .numPointers = 1
             };
         } break;
-        case ExprType_Bool: {
+        case ExprType_Bool_Literal: {
             return (PlangType) {
                 .structName = spFrom("bool"),
                 .numPointers = 0
             };
         } break;
         case ExprType_Variable: {
-            // TODO: fetch type of var.
-            /*
+
             ValuePath* value = expr->node;
-            PlangType* type = getDeclaredVariable(value->name);
+            while (value->next) value = value->next;
+            
+            PlangType type = *value->type;
 
-            while (value) {
-                if (value->index) {
-                    type->numPointers--;
-                }
-
-                value = value->next;
-            }
-            */
+            if (value->index) type.numPointers--;
+            return type;
 
         } break;
         case ExprType_Arithmetic: {
@@ -84,44 +118,58 @@ static PlangType getExpressedType(Expression* expr) {
         } break;
     }
 
+    // This is not supposed to ever hapen
+    printf("getExpressedType could not determine type of expession, this is a bug!\n");
+    numberOfErrors++;
     return (PlangType) {
         .structName = spFrom("err_no_type"),
         .numPointers = 0
     };
 }
 
-typedef struct Variable {
-    StrSpan name;
-    PlangType type;
-} Variable;
-
-static Variable* variables;
 
 static PlangType* getDeclaredVariable(StrSpan name) {
     
+    // look for local var
     u32 len = darrayLength(variables);
     for (u32 i = 0; i < len; i++) {
         if (spanEqualsSpan(name, variables[i].name)) {
-            return &variables[i].type;
+            return variables[i].type;
         }
     }
 
-    return 0;
+    // look for func argument
+    if (function->arguments) {
+        len = darrayLength(function->arguments);
+        for (u32 i = 0; i < len; i++) {
+            FuncArg* arg = &function->arguments[i];
+            if (spanEqualsSpan(name, arg->name)) {
+                return &arg->type;
+            }
+        }
+    }
+
+    return null;
 }
 
-static void validateValue(ValuePath* var) {
+static bool validateValue(ValuePath* var) {
     // is this a valid value? like a local, a function arguemnt or a global 
 
     PlangType* rootType = getDeclaredVariable(var->name);
+    var->type = rootType;
     if (!rootType) {
-        printf("Error. Variable \"%.*s\" is not declared.\n", 
+        error("Variable \"%.*s\" is not declared.",
             var->name.length,
             var->name.start);
-        return;
+
+        return false;
     }
 
     PlangStruct* stru = getStructByName(rootType->structName);
-    
+    if (!stru) {
+        return false;
+    }
+
     ValuePath* value = var;
     do {
         
@@ -133,37 +181,43 @@ static void validateValue(ValuePath* var) {
             // TODO: is allowed to index on this type?
         }
 
+
         // is it being dereferenced? if so does the field exist?
         if (value->next) {
             Field* field = getField(stru, value->next->name);
             if (!field) {
-                printf("Error. Field \"%.*s\" does not exist on type \"%.*s\".\n",
+                error("Field \"%.*s\" does not exist on type \"%.*s\".",
                     value->next->name.length, value->next->name.start,
                     stru->name.length, stru->name.start);
+
                 break;
             }
+
             stru = getStructByName(field->type.structName);
+
+            value->next->type = &field->type;
         }
 
         value = value->next;
     } while (value);
 
+    return true;
 }
 
 inline void validateType(StrSpan typename) {
     // TODO: primitive types
     if (!getStructByName(typename)) {
-        printf("Error. type \"%.*s\" does not exist.\n", typename.length, typename.start);
+        error("Type \"%.*s\" does not exist.", typename.length, typename.start);
     } 
 }
 
-static void validateExpression(Expression* expr) {
+static bool validateExpression(Expression* expr) {
     switch (expr->expressionType) {
     
         
         case ExprType_Variable: {
             ValuePath* var = expr->node;
-            validateValue(var);
+            return validateValue(var);
         } break;
         case ExprType_Arithmetic: {
             // is a valid operator operands pair?
@@ -187,15 +241,17 @@ static void validateExpression(Expression* expr) {
 
         } break;
 
-        // ExprType_Number,
-        // ExprType_String,
-        // ExprType_Bool,
+        // ExprType_Number_Literal,
+        // ExprType_String_Literal,
+        // ExprType_Bool_Literal,
         // ExprType_Null,
         default: break;
     }
+
+    return true;
 }
 
-static Codeblock* currentScope;
+
 static void validateScope(Codeblock* scope) {
     Codeblock* parentScope = currentScope;
     scope->parentScope = parentScope;
@@ -212,17 +268,18 @@ static void validateScope(Codeblock* scope) {
 
                 // Check wheter there already is a variable with this name
                 if (getDeclaredVariable(decl->name)) {
-                    printf("Error. Variable \"%.*s\" is already declared.\n", 
+                    error("Variable \"%.*s\" is already declared.", 
                         decl->name.length,
                         decl->name.start);
                 }
                         
                 if (decl->mustInferType) {
                     if (decl->assignmentOrNull) {
-                        validateExpression(decl->assignmentOrNull);
-                        decl->type = getExpressedType(decl->assignmentOrNull);
+                        if (validateExpression(decl->assignmentOrNull)) {
+                            decl->type = getExpressedType(decl->assignmentOrNull);
+                        }
                     } else {
-                        // TODO: error message: var must be assigned to to be infered
+                        error("Variable \"%.*s\" must be assigned to, to be type inferred.", decl->name.length, decl->name.start);
                     }
                 } else {
                     validateType(decl->type.structName);
@@ -231,7 +288,7 @@ static void validateScope(Codeblock* scope) {
 
                 Variable var;
                 var.name = decl->name;
-                var.type = decl->type;
+                var.type = &decl->type;
                 
                 darrayAdd(variables, var);
 
@@ -269,7 +326,34 @@ static void validateScope(Codeblock* scope) {
             } break;
 
             case Statement_Return: {
-                // TODO: return type missmatch?
+                // TODO: void functions
+                Expression* returnExpr = sta->node;
+                // if (returnExpr)
+                if (validateExpression(returnExpr)) {
+                    PlangType returnType = getExpressedType(returnExpr);
+                    if (!typeEquals(returnType, function->returnType)) {
+                        error("Return type missmatch in function \"%.*s\".", function->name.length, function->name.start);
+                    }
+                }
+
+            } break;
+
+            case Statement_FuncCall: {
+                FuncCall* call = sta->node;
+
+                if (call->valuePath->next || call->valuePath->index) {
+                    printf("Feature not implemented yet.\n");
+                    break;
+                }
+
+                StrSpan name = call->valuePath->name;
+                call->function = getFunctionByName(name);
+                if (!call->function) {
+                    error("Function \"%.*s\" does not exist.", name.length, name.start);
+                    break;
+                }
+
+                
             } break;
         }
     }
@@ -280,11 +364,12 @@ static void validateScope(Codeblock* scope) {
 }
 
 static void validateFunction(PlangFunction* func) {
-    currentScope = 0;
+    function = func;
+    currentScope = null;
     validateScope(&func->scope);
 }
 
-void validate() {
+u32 validate() {
 
     variables = darrayCreate(Variable);
 
@@ -293,5 +378,7 @@ void validate() {
     }
 
     darrayDelete(variables);
+
+    return numberOfErrors;
 }
 

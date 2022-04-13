@@ -1,3 +1,4 @@
 #pragma once
+#include "types.h"
 
-void validate();
+u32 validate();

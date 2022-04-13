@@ -6,7 +6,7 @@
 
 void parse();
 
-
+typedef struct PlangFunction PlangFunction;
 
 typedef struct PlangType {
     StrSpan structName;
@@ -18,9 +18,9 @@ typedef struct PlangType {
 
 
 typedef enum ExprType {
-    ExprType_Number,
-    ExprType_String,
-    ExprType_Bool,
+    ExprType_Number_Literal,
+    ExprType_String_Literal,
+    ExprType_Bool_Literal,
     ExprType_Variable,
     ExprType_Arithmetic,
     ExprType_Alloc,
@@ -55,6 +55,12 @@ typedef struct AllocExpression {
 
 
 typedef struct ValuePath {
+    
+    /*
+        the type of the variable that name refers to.
+    */
+    PlangType* type;
+
     StrSpan name;
     Expression* index;
     struct ValuePath* next;
@@ -68,6 +74,7 @@ typedef struct TernaryExpression {
 
 typedef struct FuncCall {
     // StrSpan name;
+    PlangFunction* function;
     ValuePath* valuePath;
     Expression** args; // darray of Expression pointers
 } FuncCall;
@@ -123,11 +130,18 @@ typedef struct IfStatement {
     struct IfStatement* next;
 } IfStatement;
 
+typedef struct FuncArg {
+    PlangType type;
+    StrSpan name;
+} FuncArg;
+
 typedef struct PlangFunction {
     StrSpan name;
     PlangType returnType;
+    FuncArg* arguments; // darray
     Codeblock scope;
 } PlangFunction;
+
 
 typedef struct Field {
     PlangType type;

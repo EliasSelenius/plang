@@ -3,6 +3,8 @@
 #include "essh-string.h"
 #include "darray.h"
 
+#include <stdio.h>
+
 void transpileBlock(Codeblock* scope);
 void filewrite(const char* filename, char* content);
 void transpileValuePath(ValuePath* value);
@@ -51,9 +53,9 @@ static void transpileExpression(Expression* expr) {
             sbAppend(sb, "0");
         } break;
 
-        case ExprType_Bool:
-        case ExprType_String:
-        case ExprType_Number: {
+        case ExprType_Bool_Literal:
+        case ExprType_String_Literal:
+        case ExprType_Number_Literal: {
             sbAppendSpan(sb, expr->value);
         } break;
 
@@ -90,14 +92,23 @@ static void transpileExpression(Expression* expr) {
 
 static void transpileValuePath(ValuePath* value) {
     sbAppendSpan(sb, value->name);
+    
+    u32 numPointers = value->type->numPointers;
+
     if (value->index) {
+        numPointers--;
+
         sbAppend(sb, "[");
         transpileExpression(value->index);
         sbAppend(sb, "]");
     }
 
+
     if (value->next) {
-        sbAppend(sb, ".");
+        if (numPointers == 0) sbAppend(sb, ".");
+        else if (numPointers == 1) sbAppend(sb, "->");
+        else printf("transpileValuePath could not transpile valuepath, this is a bug! the validator should have made sure this never happened\n");
+
         transpileValuePath(value->next);
     }
 }
@@ -176,7 +187,7 @@ static void transpileStatement(Statement* statement) {
 
         case Statement_FuncCall: {
             FuncCall* func = statement->node;
-            transpileValuePath(func->valuePath);
+            sbAppendSpan(sb, func->function->name);
             sbAppend(sb, "(");
             if (func->args) {
                 transpileExpression(func->args[0]);
@@ -211,7 +222,25 @@ static void transpileFunctionSignature(PlangFunction* func) {
     transpileType(func->returnType);
     sbAppend(sb, " ");
     sbAppendSpan(sb, func->name);
-    sbAppend(sb, "()");
+    sbAppend(sb, "(");
+    if (func->arguments) {
+
+        FuncArg arg = func->arguments[0];
+        transpileType(arg.type);
+        sbAppend(sb, " ");
+        sbAppendSpan(sb, arg.name);
+
+        u32 len = darrayLength(func->arguments);
+        for (u32 i = 1; i < len; i++) {
+            sbAppend(sb, ", ");
+
+            arg = func->arguments[i];
+            transpileType(arg.type);
+            sbAppend(sb, " ");
+            sbAppendSpan(sb, arg.name);
+        }
+    }
+    sbAppend(sb, ")");
 }
 
 static void transpileFunction(PlangFunction* func) {

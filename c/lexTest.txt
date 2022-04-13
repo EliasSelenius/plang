@@ -1,13 +1,47 @@
 
+/*  TODOs:
+    underscores in identifiers
+*/
+
 
 int main() {
-    printf("Hello, This is printf() from %s\n", "plang");
+    //printf("Hello, This is printf() from %s\n", "plang");
 
-    sayFoo();
+    sayFoo(alloc Foo);
+
+    Entity fs;
+    fs.name = "dkwa";
+
+
+    //let f = alloc Foo;
+    let i = g;
+    let f = 0;
+    let g;
 
     return 0;
 }
 
+
+
+struct Entity {
+    char* name;
+    float x;
+    float y;
+}
+
+
+Entity* makeEntity(char* name) {
+    let e = alloc Entity;
+    e.name = name;
+    e.x = 0;
+    e.y = 0;
+    return e;
+}
+
+void yes(int i, char* str) {
+    //return foo.bar;
+}
+
 void sayFoo() {
-    printf("foo\n");
+    //printf("foo\n");
 }

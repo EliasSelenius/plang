@@ -121,7 +121,12 @@ int main(int argc, char* argv[]) {
     parse();
     
     printf("Validate...\n");
-    validate();
+    u32 numErrors = validate();
+
+    if (numErrors) {
+        printf("There were %d errors.\nFix errors and try again.\n", numErrors);
+        return 0;
+    }
 
     printf("Transpile...\n");
     transpile();

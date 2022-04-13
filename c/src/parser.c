@@ -105,8 +105,9 @@ static ValuePath* parseValue() {
 
     ValuePath* res = malloc(sizeof(ValuePath));
     res->name = tokens[token_index].value;
-    res->next = NULL;
-    res->index = NULL;
+    res->type = null;
+    res->next = null;
+    res->index = null;
     token_index++;
 
     if (tokens[token_index].type == Tok_OpenSquare) {
@@ -142,15 +143,15 @@ static Expression* parseLeafExpression() {
             return expr;
         } break;
         case Tok_Number: {
-            eType = ExprType_Number;
+            eType = ExprType_Number_Literal;
         } break;
         case Tok_String: {
-            eType = ExprType_String;
+            eType = ExprType_String_Literal;
         } break;
 
         case Tok_Keyword_False:
         case Tok_Keyword_True: {
-            eType = ExprType_Bool;
+            eType = ExprType_Bool_Literal;
         } break;
 
         case Tok_Keyword_Null: {
@@ -368,6 +369,7 @@ static bool parseStatement(Statement* statement) {
                 token_index++;
                 FuncCall* func = malloc(sizeof(FuncCall));
                 func->valuePath = valuePath;
+                func->function = null;
 
                 statement->statementType = Statement_FuncCall;
                 statement->node = func;
@@ -492,6 +494,7 @@ static bool parseFunction() {
 
 
     PlangFunction func;
+    func.arguments = null;
 
     // type
     if (!parseType(&func.returnType)) goto failCase;
@@ -503,7 +506,21 @@ static bool parseFunction() {
 
     // args
     assertToken(Tok_OpenParen)
-    // TODO: function arguments
+    
+    FuncArg arg;
+    if (parseType(&arg.type)) {
+        arg.name = identifier();
+        
+        func.arguments = darrayCreate(FuncArg);
+        darrayAdd(func.arguments, arg);
+        
+        while (tok(Tok_Comma)) {
+            arg.type = expectType();
+            arg.name = identifier();
+            darrayAdd(func.arguments, arg);
+        }
+    }
+
     assertToken(Tok_CloseParen)
 
     // body
