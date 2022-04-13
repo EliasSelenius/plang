@@ -10,6 +10,7 @@
 #include "essh-string.h"
 
 
+
 /*
 
 
@@ -27,6 +28,7 @@
         *- better number literal type inference: 10 => int, 10.0 => f64, 10f => f32 ?
         - allow underscores in number literals
         *- declare statement (declare function signature without implementation)
+        *- global variables
 
     InProgress:
         *- function call 
@@ -81,22 +83,27 @@ void filewrite(const char* filename, char* content) {
     fclose(file);
 }
 
-typedef struct PlangFile {
-    char* path;
+// typedef struct PlangFile {
+//     char* path;
     
-    Token* tokens; // darray
+//     Token* tokens; // darray
 
-    PlangFunction* functions; // darray
-    PlangStruct* structs; // darray
+//     PlangFunction* functions; // darray
+//     PlangStruct* structs; // darray
 
-} PlangFile;
+// } PlangFile;
 
+
+void startPerf();
+i64 endPerf();
 
 int main(int argc, char* argv[]) {
 
     for (u32 i = 0; i < argc; i++) {
         printf("    %d. %s\n", i, argv[i]);
     }
+
+    startPerf();
 
     u32 filesize;
     char* text = fileread("lexTest.txt", &filesize);
@@ -118,6 +125,9 @@ int main(int argc, char* argv[]) {
 
     printf("Transpile...\n");
     transpile();
+
+    i64 t = endPerf();
+    printf("Done in %lldus.\n", t);
 
     printf("Compile...\n");
     int code = system("clang output.g.c -o output.exe");
