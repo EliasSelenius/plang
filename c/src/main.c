@@ -31,11 +31,11 @@
         *- global variables
 
     InProgress:
-        *- function call 
-        *- function arguments
 
 
     DONE list:
+        *- function call 
+        *- function arguments
         *- transpile forward declarations
         - ternary operator
         *- deref structs/pointers: foo.bar

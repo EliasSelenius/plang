@@ -8,7 +8,7 @@
 void transpileBlock(Codeblock* scope);
 void filewrite(const char* filename, char* content);
 void transpileValuePath(ValuePath* value);
-
+void transpileExpression(Expression* expr);
 
 static StringBuilder* sb;
 static u32 tabing = 0;
@@ -29,6 +29,21 @@ static void transpileType(PlangType type) {
     while (np-- > 0) {
         sbAppend(sb, "*");
     }
+}
+
+static void transpileFuncCall(FuncCall* func) {
+    sbAppendSpan(sb, func->function->name);
+    sbAppend(sb, "(");
+    if (func->args) {
+        transpileExpression(func->args[0]);
+        
+        u32 len = darrayLength(func->args);
+        for (u32 i = 1; i < len; i++) {
+            sbAppend(sb, ", ");
+            transpileExpression(func->args[i]);
+        }
+    }
+    sbAppend(sb, ")");
 }
 
 static void transpileExpression(Expression* expr) {
@@ -84,6 +99,10 @@ static void transpileExpression(Expression* expr) {
             transpileExpression(ter->thenExpr);
             sbAppend(sb, " : ");
             transpileExpression(ter->elseExpr);
+        } break;
+
+        case ExprType_FuncCall: {
+            transpileFuncCall(expr->node);
         } break;
     }
 
@@ -185,19 +204,8 @@ static void transpileStatement(Statement* statement) {
         } break;
 
         case Statement_FuncCall: {
-            FuncCall* func = statement->node;
-            sbAppendSpan(sb, func->function->name);
-            sbAppend(sb, "(");
-            if (func->args) {
-                transpileExpression(func->args[0]);
-                
-                u32 len = darrayLength(func->args);
-                for (u32 i = 1; i < len; i++) {
-                    sbAppend(sb, ", ");
-                    transpileExpression(func->args[i]);
-                }
-            }
-            sbAppend(sb, ");");
+            transpileFuncCall(statement->node);
+            sbAppend(sb, ";");
         } break;
     }
 }

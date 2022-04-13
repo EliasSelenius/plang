@@ -100,8 +100,21 @@ static PlangType expectType() {
 }
 
 
+#define assertToken(tok) if (tokens[token_index++].type != tok) goto failCase;
+
+#define nextToken(tok) (tokens[token_index++].type == tok)
+
+inline bool tok(TokenType type) {
+    if (tokens[token_index].type == type) {
+        token_index++;
+        return true;
+    }
+    return false;
+}
+
+
 static ValuePath* parseValue() {
-    if (tokens[token_index].type != Tok_Word) return NULL;
+    if (tokens[token_index].type != Tok_Word) return null;
 
     ValuePath* res = malloc(sizeof(ValuePath));
     res->name = tokens[token_index].value;
@@ -124,6 +137,28 @@ static ValuePath* parseValue() {
     return res;
 }
 
+static FuncCall* expectFuncCallArgs(ValuePath* valuePath) {
+    FuncCall* func = malloc(sizeof(FuncCall));
+    func->valuePath = valuePath;
+    func->function = null;
+
+    Expression* expr = parseExpression();
+    if (expr) {
+        func->args = darrayCreate(Expression*);
+        darrayAdd(func->args, expr);
+
+        while (tok(Tok_Comma)) {
+            expr = expectExpression();
+            darrayAdd(func->args, expr);
+        }
+    } else {
+        func->args = null;
+    }
+
+    expect(Tok_CloseParen);
+
+    return func;
+}
 
 inline bool isOperator(TokenType type) {
     return type >= Tok_Plus && type <= Tok_Div;
@@ -138,8 +173,16 @@ static Expression* parseLeafExpression() {
         case Tok_Word: {
             token_index--;
             Expression* expr = malloc(sizeof(Expression));
-            expr->expressionType = ExprType_Variable;
-            expr->node = parseValue();
+            ValuePath* valuePath = parseValue();
+
+            if (tok(Tok_OpenParen)) {
+                expr->expressionType = ExprType_FuncCall;
+                expr->node = expectFuncCallArgs(valuePath);
+            } else {
+                expr->expressionType = ExprType_Variable;
+                expr->node = valuePath;
+            }
+
             return expr;
         } break;
         case Tok_Number: {
@@ -266,18 +309,6 @@ static Expression* expectExpression() {
 }
 
 
-#define assertToken(tok) if (tokens[token_index++].type != tok) goto failCase;
-
-#define nextToken(tok) (tokens[token_index++].type == tok)
-
-inline bool tok(TokenType type) {
-    if (tokens[token_index].type == type) {
-        token_index++;
-        return true;
-    }
-    return false;
-}
-
 static VarDecl* parseVarDecl() {
     u32 startingIndex = token_index;
     bool useTypeInference = false;
@@ -337,6 +368,7 @@ static IfStatement* expectIfStatement() {
     return res;
 }
 
+
 static bool parseStatement(Statement* statement) {
 
     if ( (statement->node = parseVarDecl()) ) {
@@ -367,27 +399,8 @@ static bool parseStatement(Statement* statement) {
 
             case Tok_OpenParen: {
                 token_index++;
-                FuncCall* func = malloc(sizeof(FuncCall));
-                func->valuePath = valuePath;
-                func->function = null;
-
                 statement->statementType = Statement_FuncCall;
-                statement->node = func;
-                
-                Expression* expr = parseExpression();
-                if (expr) {
-                    func->args = darrayCreate(Expression*);
-                    darrayAdd(func->args, expr);
-
-                    while (tok(Tok_Comma)) {
-                        expr = expectExpression();
-                        darrayAdd(func->args, expr);
-                    }
-                } else {
-                    func->args = null;
-                }
-
-                expect(Tok_CloseParen);
+                statement->node = expectFuncCallArgs(valuePath);                
                 semicolon();
             } break;
             

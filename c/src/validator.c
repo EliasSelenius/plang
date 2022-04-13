@@ -116,6 +116,10 @@ static PlangType getExpressedType(Expression* expr) {
             TernaryExpression* ter = expr->node;
             return getExpressedType(ter->thenExpr);
         } break;
+        case ExprType_FuncCall: {
+            FuncCall* call = expr->node;
+            return call->function->returnType;
+        } break;
     }
 
     // This is not supposed to ever hapen
@@ -210,52 +214,13 @@ inline void validateType(StrSpan typename) {
     if (spanEquals(typename, "char"));
     else if (spanEquals(typename, "int"));
     else if (spanEquals(typename, "float"));
+    else if (spanEquals(typename, "void"));
     else {
         if (!getStructByName(typename)) {
             error("Type \"%.*s\" does not exist.", typename.length, typename.start);
         } 
     }
 
-}
-
-static bool validateExpression(Expression* expr) {
-    switch (expr->expressionType) {
-    
-        
-        case ExprType_Variable: {
-            ValuePath* var = expr->node;
-            return validateValue(var);
-        } break;
-        case ExprType_Arithmetic: {
-            // is a valid operator operands pair?
-        } break;
-        case ExprType_Alloc: {
-            AllocExpression* alloc = expr->node;
-            validateType(alloc->type.structName);
-
-            // recurse on possibe size-subexpression
-            if (alloc->sizeExpr) validateExpression(alloc->sizeExpr);
-
-        } break;
-        case ExprType_Ternary: {
-            TernaryExpression* ter = expr->node;
-            validateExpression(ter->condition);
-            validateExpression(ter->thenExpr);
-            validateExpression(ter->elseExpr);
-
-            // TODO: is condition a valid boolean expression
-            // TODO: does thenExpr and elseExpr have a common type? 
-
-        } break;
-
-        // ExprType_Number_Literal,
-        // ExprType_String_Literal,
-        // ExprType_Bool_Literal,
-        // ExprType_Null,
-        default: break;
-    }
-
-    return true;
 }
 
 static void validateFuncCall(FuncCall* call) {
@@ -301,6 +266,50 @@ static void validateFuncCall(FuncCall* call) {
         }
     }
 }
+
+static bool validateExpression(Expression* expr) {
+    switch (expr->expressionType) {
+    
+        
+        case ExprType_Variable: {
+            ValuePath* var = expr->node;
+            return validateValue(var);
+        } break;
+        case ExprType_Arithmetic: {
+            // is a valid operator operands pair?
+        } break;
+        case ExprType_Alloc: {
+            AllocExpression* alloc = expr->node;
+            validateType(alloc->type.structName);
+
+            // recurse on possibe size-subexpression
+            if (alloc->sizeExpr) validateExpression(alloc->sizeExpr);
+
+        } break;
+        case ExprType_Ternary: {
+            TernaryExpression* ter = expr->node;
+            validateExpression(ter->condition);
+            validateExpression(ter->thenExpr);
+            validateExpression(ter->elseExpr);
+
+            // TODO: is condition a valid boolean expression
+            // TODO: does thenExpr and elseExpr have a common type? 
+
+        } break;
+        case ExprType_FuncCall: {
+            validateFuncCall(expr->node);
+        } break;
+
+        // ExprType_Number_Literal,
+        // ExprType_String_Literal,
+        // ExprType_Bool_Literal,
+        // ExprType_Null,
+        default: break;
+    }
+
+    return true;
+}
+
 
 static void validateScope(Codeblock* scope) {
     Codeblock* parentScope = currentScope;
@@ -403,13 +412,14 @@ static void validateScope(Codeblock* scope) {
 static void validateFunction(PlangFunction* func) {
     function = func;
 
-    
     if (func->arguments) {
         u32 len = darrayLength(func->arguments);
         for (u32 i = 0; i < len; i++) {
             validateType(func->arguments[i].type.structName);
         }
     }
+
+    validateType(func->returnType.structName);
 
     currentScope = null;
     validateScope(&func->scope);
