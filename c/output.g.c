@@ -1,27 +1,27 @@
+#include <stdlib.h>
 // Structs
 typedef struct Entity {
     char* name;
     float x;
     float y;
 } Entity;
-typedef struct Foo {
-    int number;
-} Foo;
+typedef struct Test {
+    float x;
+    float y;
+} Test;
 
 // Forward declarations
 int main();
-Entity* makeEntity(char* name);
+Entity* make_entity(char* name);
 void yes(int i, char* str);
-Foo sayFoo(int i, char* str);
+void sayFoo(int i, char* str);
+int get(int my_number);
 
 // Implementations
 int main() {
-    Foo f = sayFoo(12, "d");
-    Entity fs;
-    fs.name = "dkwa";
     return 0;
 }
-Entity* makeEntity(char* name) {
+Entity* make_entity(char* name) {
     Entity* e = malloc(sizeof(Entity));
     e->name = name;
     e->x = 0;
@@ -30,5 +30,9 @@ Entity* makeEntity(char* name) {
 }
 void yes(int i, char* str) {
 }
-Foo sayFoo(int i, char* str) {
+void sayFoo(int i, char* str) {
+    return;
+}
+int get(int my_number) {
+    return my_number;
 }

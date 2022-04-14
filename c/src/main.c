@@ -109,22 +109,24 @@ int main(int argc, char* argv[]) {
     char* text = fileread("lexTest.txt", &filesize);
 
     printf("Tokenize...\n");
-    lex(text);
-
-    /*for (u32 i = 0; i < tokens_length; i++) {
-        Token token = tokens[i];
-
-        printf("Token %d: |%.*s|\n", token.type, token.value.length, token.value.start);
-    }*/
+    u32 numErrors = lex(text);
+    if (numErrors) {
+        printf("There were %d errors during tokenizing.\nFix errors and try again.\n", numErrors);
+        return 0;
+    }
 
     printf("Parse...\n");
-    parse();
-    
+    numErrors = parse();
+    if (numErrors) {
+        printf("There were %d errors during parsing.\nFix errors and try again.\n", numErrors);
+        return 0;
+    }
+
     printf("Validate...\n");
-    u32 numErrors = validate();
+    numErrors = validate();
 
     if (numErrors) {
-        printf("There were %d errors.\nFix errors and try again.\n", numErrors);
+        printf("There were %d errors during validation.\nFix errors and try again.\n", numErrors);
         return 0;
     }
 
@@ -133,6 +135,7 @@ int main(int argc, char* argv[]) {
 
     i64 t = endPerf();
     printf("Done in %lldus.\n", t);
+
 
     printf("Compile...\n");
     int code = system("clang output.g.c -o output.exe");

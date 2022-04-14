@@ -25,7 +25,8 @@ static void appendToken(TokenType type) {
 }
 
 
-void lex(char* input) {
+u32 lex(char* input) {
+    u32 numberOfErrors = 0;
 
     cursor = input - 1;
 
@@ -47,9 +48,9 @@ void lex(char* input) {
         }
 
         // Word
-        if (isLetter(*cursor)) {
+        if (isLetter(*cursor) || (*cursor == '_')) {
             char* wordStart = cursor;
-            while (isLetter(*++cursor) || isDigit(*cursor));
+            while (isLetter(*++cursor) || isDigit(*cursor) || (*cursor == '_'));
             cursor--;
 
             StrSpan word = (StrSpan) {
@@ -219,7 +220,8 @@ void lex(char* input) {
 
         // Error: token not recognized
         printf("Error: Token %c is not recognized. At line %d\n", *cursor, current_line);
-
+        numberOfErrors++;
     }
     
+    return numberOfErrors;
 }

@@ -4,9 +4,13 @@
 #include "essh-string.h"
 #include "lexer.h"
 
-void parse();
+u32 parse();
 
 typedef struct PlangFunction PlangFunction;
+
+typedef struct Node {
+    u32 lineNumber;
+} Node;
 
 typedef struct PlangType {
     StrSpan structName;

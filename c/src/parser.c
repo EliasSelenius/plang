@@ -6,29 +6,35 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#include <stdarg.h>
+
 void expectBlock(Codeblock* scope);
 Expression* parseExpression();
 Expression* expectExpression();
 
 static u32 token_index;
 
-PlangFunction* functions = NULL;
-PlangStruct* structs = NULL;
+PlangFunction* functions = null;
+PlangStruct* structs = null;
 
+static u32 numberOfErrors;
+static void error(char* format, ...) {
+    printf("Error Ln%d: ", tokens[token_index].line);
 
+    va_list args;
+    va_start(args, format);
+    vprintf(format, args);
+    va_end(args);
 
+    printf("\n");
+    numberOfErrors++;
+}
 
-/*
-inline void printError(char* format, char* msg) {
-    printf("Error Ln%d. ", tokens[token_index].line);
-    printf(format, msg);
-}*/
 
 // asserts the existence of a semicolon
 inline void semicolon() {
-    if (tokens[token_index].type != Tok_Semicolon) {        
-        printf("Error Ln%d. Expected semicolon, but got \"%.*s\" instead.\n", 
-            tokens[token_index].line,
+    if (tokens[token_index].type != Tok_Semicolon) {     
+        error("Expected semicolon, but got \"%.*s\" instead.",
             tokens[token_index].value.length,
             tokens[token_index].value.start);
         return;
@@ -39,10 +45,9 @@ inline void semicolon() {
 static StrSpan identifier() {
     Token* token = &tokens[token_index];
     if (token->type != Tok_Word) {
-        printf("Error Ln%d. \"%.*s\" is not a valid identifier.\n",
-            token->line,
+        error("\"%.*s\" is not a valid identifier.",
             token->value.length,
-            token->value.start);
+            token->value.start); 
     }
     token_index++;
     return token->value;
@@ -51,21 +56,22 @@ static StrSpan identifier() {
 static void expect(TokenType type) {
     if (tokens[token_index].type != type) {
         // TODO: get TokenType as string
-        printf("Error Ln%d. Expected token type %d, but got \"%.*s\" instead.\n",
-            tokens[token_index].line,
+        error("Expected token type %d, but got \"%.*s\" instead.",
             type,
             tokens[token_index].value.length,
             tokens[token_index].value.start);
+
         return;
     }
     token_index++;
 }
 
 static void unexpectedToken() {
-    printf("Error Ln%d. Unexpected token \"%.*s\".\n",
-        tokens[token_index].line,
+
+    error("Unexpected token \"%.*s\".",
         tokens[token_index].value.length,
         tokens[token_index].value.start);
+
     token_index++;
 }
 
@@ -91,8 +97,7 @@ static bool parseType(PlangType* type) {
 static PlangType expectType() {
     PlangType res = {0};
     if (!parseType(&res)) {
-        printf("Error Ln%d. Expected type, but got \"%.*s\" instead.\n",
-            tokens[token_index].line,
+        error("Expected type, but got \"%.*s\" instead.",
             tokens[token_index].value.length,
             tokens[token_index].value.start);
     }
@@ -299,11 +304,11 @@ static Expression* parseExpression() {
 
 static Expression* expectExpression() {
     Expression* res = parseExpression();
-    if (res == NULL) {
-        printf("Error Ln%d. Expected expression, but got \"%.*s\" instead.\n",
-            tokens[token_index].line,
+    if (res == null) {
+        error("Expected expression, but got \"%.*s\" instead.",
             tokens[token_index].value.length,
             tokens[token_index].value.start);
+        token_index++;
     }
     return res;
 }
@@ -479,12 +484,6 @@ failCase:
 }
 
 static void expectBlock(Codeblock* scope) {
-    /*if (!parseBlock(scope)) {
-        printf("Error Ln%d. Expected block, but got \"%.*s\" instead.\n",
-            tokens[token_index].line,
-            tokens[token_index].value.length,
-            tokens[token_index].value.start);
-    }*/
 
     expect(Tok_OpenCurl);
 
@@ -502,88 +501,30 @@ static void expectBlock(Codeblock* scope) {
     token_index++;
 }
 
-static bool parseFunction() {
-    u32 startingIndex = token_index;
-
-
-    PlangFunction func;
-    func.arguments = null;
-
-    // type
-    if (!parseType(&func.returnType)) goto failCase;
-
-    // name
-    Token* nameToken = &tokens[token_index++];
-    if (nameToken->type != Tok_Word) goto failCase;    
-    func.name = nameToken->value;
-
-    // args
-    assertToken(Tok_OpenParen)
-    
-    FuncArg arg;
-    if (parseType(&arg.type)) {
-        arg.name = identifier();
-        
-        func.arguments = darrayCreate(FuncArg);
-        darrayAdd(func.arguments, arg);
-        
-        while (tok(Tok_Comma)) {
-            arg.type = expectType();
-            arg.name = identifier();
-            darrayAdd(func.arguments, arg);
-        }
-    }
-
-    assertToken(Tok_CloseParen)
-
-    // body
-    // if (!parseBlock(&func.scope)) goto failCase;
-    expectBlock(&func.scope);
-
-    darrayAdd(functions, func);
-    return true;
-failCase:
-    token_index = startingIndex;
-    return false;
-}
-
-static bool parseStruct() {
-
-    if (tokens[token_index].type != Tok_Keyword_Struct) return false;
-    token_index++;
-
+static void expectStruct() {
     PlangStruct stru;
-
     stru.name = identifier();
-
-    if (tokens[token_index++].type != Tok_OpenCurl) {
-        printf("Expected open curlybracket.\n");
-    }
-
     stru.fields = darrayCreate(Field);
+
+    expect(Tok_OpenCurl);
 
     do {
         Field field;
-        if (!parseType(&field.type)) {
-            printf("Expected type\n");
-        }
-
+        field.type = expectType();
         field.name = identifier();
-
         semicolon();
 
         darrayAdd(stru.fields, field);
 
     } while (tokens[token_index].type != Tok_CloseCurl);
+    
     token_index++;
 
     darrayAdd(structs, stru);
-
-    return true;
 }
 
 
-void parse() {
+u32 parse() {
 
     // TODO: PlangFile
     functions = darrayCreate(PlangFunction);
@@ -591,10 +532,64 @@ void parse() {
 
     token_index = 0;
     while (token_index < tokens_length) {
-        if (parseFunction()) continue;
-        if (parseStruct()) continue;
 
-        printf("Error while parsing. At line %d\n", tokens[token_index].line);
-        break;
+        switch (tokens[token_index].type) {
+            case Tok_Keyword_Struct: {
+                // struct
+                token_index++;
+                expectStruct();
+            } break;
+            
+            
+            case Tok_Word: {
+                // function / global variable
+
+                PlangType type = expectType();
+                StrSpan name = identifier();
+
+                if (tok(Tok_OpenParen)) {
+                    // function
+
+                    PlangFunction func;
+                    func.returnType = type;
+                    func.name = name;
+                    func.arguments = null;
+
+                    FuncArg arg;
+                    if (parseType(&arg.type)) {
+                        arg.name = identifier();
+                        
+                        func.arguments = darrayCreate(FuncArg);
+                        darrayAdd(func.arguments, arg);
+                        
+                        while (tok(Tok_Comma)) {
+                            arg.type = expectType();
+                            arg.name = identifier();
+                            darrayAdd(func.arguments, arg);
+                        }
+                    }
+
+                    expect(Tok_CloseParen);
+                    
+                    expectBlock(&func.scope);
+                    darrayAdd(functions, func);
+
+                } else {
+                    // global variable
+                    semicolon();
+                    printf("global variables are not implemented yet.\n");
+                }
+            } break;
+            
+            default: {
+                // error("Did not expect token \"%.*s\" here.",
+                //     tokens[token_index].value.length,
+                //     tokens[token_index].value.start);
+                // token_index++;
+                unexpectedToken();
+            } break;
+        }
     }
+
+    return numberOfErrors;
 }

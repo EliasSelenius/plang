@@ -74,4 +74,4 @@ typedef struct Token {
 extern Token tokens[100000];
 extern u32 tokens_length;
 
-void lex(char* input);
+u32 lex(char* input);

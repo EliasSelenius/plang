@@ -1,29 +1,10 @@
 
-/*  TODOs:
-    underscores in identifiers
-*/
 
 
 int main() {
-    //printf("Hello, This is printf() from %s\n", "plang");
-
-    let f = sayFoo(12, "d");
-
-    Entity fs;
-    fs.name = "dkwa";
-
-
-/*
-    //let f = alloc Foo;
-    let i = g;
-    let f = 0;
-    let g;
-*/
-
+    // printf("Hello, This is printf() from %s\n", "plang");
     return 0;
 }
-
-
 
 struct Entity {
     char* name;
@@ -31,12 +12,7 @@ struct Entity {
     float y;
 }
 
-struct Foo {
-    int number;
-}
-
-
-Entity* makeEntity(char* name) {
+Entity* make_entity(char* name) {
     let e = alloc Entity;
     e.name = name;
     e.x = 0;
@@ -45,9 +21,19 @@ Entity* makeEntity(char* name) {
 }
 
 void yes(int i, char* str) {
-    //return foo.bar;
 }
 
-Foo sayFoo(int i, char* str) {
-    //printf("foo\n");
+void sayFoo(int i, char* str) {
+    return;
+}
+
+int get(int my_number) {
+    return my_number;
+}
+
+
+
+struct Test {
+    float x;
+    float y;
 }

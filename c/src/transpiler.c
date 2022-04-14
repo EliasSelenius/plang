@@ -286,6 +286,8 @@ void transpile() {
     StringBuilder builder = sbCreate();
     sb = &builder;
 
+    sbAppend(sb, "#include <stdlib.h>\n");
+
     sbAppend(sb, "// Structs\n");
     u32 structsLen = darrayLength(structs);
     for (u32 i = 0; i < structsLen; i++) {

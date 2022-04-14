@@ -170,40 +170,43 @@ static bool validateValue(ValuePath* var) {
     }
 
     PlangStruct* stru = getStructByName(rootType->structName);
-    if (!stru) {
-        return false;
-    }
+    if (stru) {
 
-    ValuePath* value = var;
-    do {
-        
-        // does it use indexing? if so is it valid? and recurse on index expression
-        if (value->index) {
-            validateExpression(value->index);
-            // TODO: is integer expression
+        ValuePath* value = var;
+        do {
+            
+            // does it use indexing? if so is it valid? and recurse on index expression
+            if (value->index) {
+                validateExpression(value->index);
+                // TODO: is integer expression
 
-            // TODO: is allowed to index on this type?
-        }
-
-
-        // is it being dereferenced? if so does the field exist?
-        if (value->next) {
-            Field* field = getField(stru, value->next->name);
-            if (!field) {
-                error("Field \"%.*s\" does not exist on type \"%.*s\".",
-                    value->next->name.length, value->next->name.start,
-                    stru->name.length, stru->name.start);
-
-                break;
+                // TODO: is allowed to index on this type?
             }
 
-            stru = getStructByName(field->type.structName);
 
-            value->next->type = &field->type;
-        }
+            // is it being dereferenced? if so does the field exist?
+            if (value->next) {
+                Field* field = getField(stru, value->next->name);
+                if (!field) {
+                    error("Field \"%.*s\" does not exist on type \"%.*s\".",
+                        value->next->name.length, value->next->name.start,
+                        stru->name.length, stru->name.start);
 
-        value = value->next;
-    } while (value);
+                    break;
+                }
+
+                stru = getStructByName(field->type.structName);
+
+                value->next->type = &field->type;
+            }
+
+            value = value->next;
+        } while (value);
+
+    } else {
+        
+    }
+
 
     return true;
 }
@@ -385,13 +388,21 @@ static void validateScope(Codeblock* scope) {
             } break;
 
             case Statement_Return: {
-                // TODO: void functions
                 Expression* returnExpr = sta->node;
-                // if (returnExpr)
-                if (validateExpression(returnExpr)) {
-                    PlangType returnType = getExpressedType(returnExpr);
-                    if (!typeEquals(returnType, function->returnType)) {
-                        error("Return type missmatch in function \"%.*s\".", function->name.length, function->name.start);
+                if (returnExpr) {
+                    if (validateExpression(returnExpr)) {
+                        PlangType returnType = getExpressedType(returnExpr);
+                        if (!typeEquals(returnType, function->returnType)) {
+                            error("Return type missmatch in function \"%.*s\".", function->name.length, function->name.start);
+                        }
+                    }
+                } else {
+                    if (function->returnType.numPointers == 0 && spanEquals(function->returnType.structName, "void"));
+                    else {
+                        // TODO: proper type string in print
+                        error("Function \"%.*s\" returns %.*s, but return statement does not return any value.",
+                            function->name.length, function->name.start,
+                            function->returnType.structName.length, function->returnType.structName.start);
                     }
                 }
 
