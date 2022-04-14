@@ -225,7 +225,7 @@ static void transpileBlock(Codeblock* scope) {
     sbAppend(sb, "}");
 }
 
-static void transpileFunctionSignature(PlangFunction* func) {
+static void transpileFunctionSignature(FuncDeclaration* func) {
     transpileType(func->returnType);
     sbAppend(sb, " ");
     sbAppendSpan(sb, func->name);
@@ -251,7 +251,7 @@ static void transpileFunctionSignature(PlangFunction* func) {
 }
 
 static void transpileFunction(PlangFunction* func) {
-    transpileFunctionSignature(func);
+    transpileFunctionSignature(&func->decl);
     sbAppend(sb, " ");
     transpileBlock(&func->scope);
     newline();
@@ -286,7 +286,8 @@ void transpile() {
     StringBuilder builder = sbCreate();
     sb = &builder;
 
-    sbAppend(sb, "#include <stdlib.h>\n");
+    sbAppend(sb, "#include <stdlib.h>\n"); // malloc
+    sbAppend(sb, "#include <stdio.h>\n"); // printf
 
     sbAppend(sb, "// Structs\n");
     u32 structsLen = darrayLength(structs);
@@ -297,7 +298,7 @@ void transpile() {
     sbAppend(sb, "\n// Forward declarations\n");
     u32 functionsLen = darrayLength(functions);
     for (u32 i = 0; i < functionsLen; i++) {
-        transpileFunctionSignature(&functions[i]);
+        transpileFunctionSignature(&functions[i].decl);
         sbAppend(sb, ";\n");
     }
     

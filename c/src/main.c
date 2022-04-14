@@ -27,13 +27,13 @@
         - modules or namespaces ?
         *- better number literal type inference: 10 => int, 10.0 => f64, 10f => f32 ?
         - allow underscores in number literals
-        *- declare statement (declare function signature without implementation)
         *- global variables
 
     InProgress:
 
 
     DONE list:
+        *- declare statement (declare function signature without implementation)
         *- function call 
         *- function arguments
         *- transpile forward declarations

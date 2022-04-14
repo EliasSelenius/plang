@@ -55,7 +55,19 @@ static PlangStruct* getStructByName(StrSpan name) {
 static PlangFunction* getFunctionByName(StrSpan name) {
     u32 len = darrayLength(functions);
     for (u32 i = 0; i < len; i++) {
-        if (spanEqualsSpan(name, functions[i].name)) return &functions[i];
+        if (spanEqualsSpan(name, functions[i].decl.name)) return &functions[i];
+    }
+
+    return null;
+}
+
+static FuncDeclaration* getFuncDecl(StrSpan name) {
+    PlangFunction* func = getFunctionByName(name);
+    if (func) return &func->decl;
+
+    u32 len = darrayLength(functionDeclarations);
+    for (u32 i = 0; i < len; i++) {
+        if (spanEqualsSpan(name, functionDeclarations[i].name)) return &functionDeclarations[i];
     }
 
     return null;
@@ -143,10 +155,10 @@ static PlangType* getDeclaredVariable(StrSpan name) {
     }
 
     // look for func argument
-    if (function->arguments) {
-        len = darrayLength(function->arguments);
+    if (function->decl.arguments) {
+        len = darrayLength(function->decl.arguments);
         for (u32 i = 0; i < len; i++) {
-            FuncArg* arg = &function->arguments[i];
+            FuncArg* arg = &function->decl.arguments[i];
             if (spanEqualsSpan(name, arg->name)) {
                 return &arg->type;
             }
@@ -234,7 +246,7 @@ static void validateFuncCall(FuncCall* call) {
     }
 
     StrSpan name = call->valuePath->name;
-    call->function = getFunctionByName(name);
+    call->function = getFuncDecl(name);
     if (!call->function) {
         error("Function \"%.*s\" does not exist.", name.length, name.start);
         return;
@@ -392,17 +404,17 @@ static void validateScope(Codeblock* scope) {
                 if (returnExpr) {
                     if (validateExpression(returnExpr)) {
                         PlangType returnType = getExpressedType(returnExpr);
-                        if (!typeEquals(returnType, function->returnType)) {
-                            error("Return type missmatch in function \"%.*s\".", function->name.length, function->name.start);
+                        if (!typeEquals(returnType, function->decl.returnType)) {
+                            error("Return type missmatch in function \"%.*s\".", function->decl.name.length, function->decl.name.start);
                         }
                     }
                 } else {
-                    if (function->returnType.numPointers == 0 && spanEquals(function->returnType.structName, "void"));
+                    if (function->decl.returnType.numPointers == 0 && spanEquals(function->decl.returnType.structName, "void"));
                     else {
                         // TODO: proper type string in print
                         error("Function \"%.*s\" returns %.*s, but return statement does not return any value.",
-                            function->name.length, function->name.start,
-                            function->returnType.structName.length, function->returnType.structName.start);
+                            function->decl.name.length, function->decl.name.start,
+                            function->decl.returnType.structName.length, function->decl.returnType.structName.start);
                     }
                 }
 
@@ -423,14 +435,14 @@ static void validateScope(Codeblock* scope) {
 static void validateFunction(PlangFunction* func) {
     function = func;
 
-    if (func->arguments) {
-        u32 len = darrayLength(func->arguments);
+    if (func->decl.arguments) {
+        u32 len = darrayLength(func->decl.arguments);
         for (u32 i = 0; i < len; i++) {
-            validateType(func->arguments[i].type.structName);
+            validateType(func->decl.arguments[i].type.structName);
         }
     }
 
-    validateType(func->returnType.structName);
+    validateType(func->decl.returnType.structName);
 
     currentScope = null;
     validateScope(&func->scope);

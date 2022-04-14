@@ -15,6 +15,7 @@ Expression* expectExpression();
 static u32 token_index;
 
 PlangFunction* functions = null;
+FuncDeclaration* functionDeclarations = null;
 PlangStruct* structs = null;
 
 static u32 numberOfErrors;
@@ -523,11 +524,29 @@ static void expectStruct() {
     darrayAdd(structs, stru);
 }
 
+static void expectFuncArgList(FuncArg** arguments) {
+    FuncArg arg;
+    if (parseType(&arg.type)) {
+        arg.name = identifier();
+        
+        *arguments = darrayCreate(FuncArg);
+        darrayAdd(*arguments, arg);
+        
+        while (tok(Tok_Comma)) {
+            arg.type = expectType();
+            arg.name = identifier();
+            darrayAdd(*arguments, arg);
+        }
+    }
+
+    expect(Tok_CloseParen);
+}
 
 u32 parse() {
 
     // TODO: PlangFile
     functions = darrayCreate(PlangFunction);
+    functionDeclarations = darrayCreate(FuncDeclaration);
     structs = darrayCreate(PlangStruct);
 
     token_index = 0;
@@ -551,25 +570,11 @@ u32 parse() {
                     // function
 
                     PlangFunction func;
-                    func.returnType = type;
-                    func.name = name;
-                    func.arguments = null;
+                    func.decl.returnType = type;
+                    func.decl.name = name;
+                    func.decl.arguments = null;
 
-                    FuncArg arg;
-                    if (parseType(&arg.type)) {
-                        arg.name = identifier();
-                        
-                        func.arguments = darrayCreate(FuncArg);
-                        darrayAdd(func.arguments, arg);
-                        
-                        while (tok(Tok_Comma)) {
-                            arg.type = expectType();
-                            arg.name = identifier();
-                            darrayAdd(func.arguments, arg);
-                        }
-                    }
-
-                    expect(Tok_CloseParen);
+                    expectFuncArgList(&func.decl.arguments);
                     
                     expectBlock(&func.scope);
                     darrayAdd(functions, func);
@@ -579,6 +584,19 @@ u32 parse() {
                     semicolon();
                     printf("global variables are not implemented yet.\n");
                 }
+            } break;
+
+            case Tok_Keyword_Declare: {
+                // function declaration
+                token_index++;
+                FuncDeclaration funcDecl;
+                funcDecl.returnType = expectType();
+                funcDecl.name = identifier();
+                expect(Tok_OpenParen);
+                expectFuncArgList(&funcDecl.arguments);
+                semicolon();
+
+                darrayAdd(functionDeclarations, funcDecl);
             } break;
             
             default: {

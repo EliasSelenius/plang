@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdio.h>
 // Structs
 typedef struct Entity {
     char* name;
@@ -19,6 +20,7 @@ int get(int my_number);
 
 // Implementations
 int main() {
+    printf("Hello, World!");
     return 0;
 }
 Entity* make_entity(char* name) {
@@ -29,6 +31,7 @@ Entity* make_entity(char* name) {
     return e;
 }
 void yes(int i, char* str) {
+    char* s = "dwadwaddd";
 }
 void sayFoo(int i, char* str) {
     return;

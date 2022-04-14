@@ -1,8 +1,12 @@
 
 
 
+declare void printf(char* str);
+
 int main() {
+    printf("Hello, World!");
     // printf("Hello, This is printf() from %s\n", "plang");
+
     return 0;
 }
 
@@ -21,6 +25,7 @@ Entity* make_entity(char* name) {
 }
 
 void yes(int i, char* str) {
+    let s = "dwadwaddd";
 }
 
 void sayFoo(int i, char* str) {

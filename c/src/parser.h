@@ -7,6 +7,7 @@
 u32 parse();
 
 typedef struct PlangFunction PlangFunction;
+typedef struct FuncDeclaration FuncDeclaration;
 
 typedef struct Node {
     u32 lineNumber;
@@ -78,7 +79,7 @@ typedef struct TernaryExpression {
 
 typedef struct FuncCall {
     // StrSpan name;
-    PlangFunction* function;
+    FuncDeclaration* function;
     ValuePath* valuePath;
     Expression** args; // darray of Expression pointers
 } FuncCall;
@@ -139,10 +140,14 @@ typedef struct FuncArg {
     StrSpan name;
 } FuncArg;
 
-typedef struct PlangFunction {
+typedef struct FuncDeclaration {
     StrSpan name;
     PlangType returnType;
     FuncArg* arguments; // darray
+} FuncDeclaration;
+
+typedef struct PlangFunction {
+    FuncDeclaration decl;
     Codeblock scope;
 } PlangFunction;
 
@@ -158,4 +163,5 @@ typedef struct PlangStruct {
 } PlangStruct;
 
 extern PlangFunction* functions;
+extern FuncDeclaration* functionDeclarations;
 extern PlangStruct* structs;

@@ -74,7 +74,7 @@ u32 lex(char* input) {
             else if (spanEquals(word, "continue")) tokType = Tok_Keyword_Continue;
             else if (spanEquals(word, "break")) tokType = Tok_Keyword_Break;
             else if (spanEquals(word, "return")) tokType = Tok_Keyword_Return;
-
+            else if (spanEquals(word, "declare")) tokType = Tok_Keyword_Declare;
 
             tokens[tokens_length++] = (Token) {
                 .type = tokType,
@@ -117,6 +117,7 @@ u32 lex(char* input) {
                 if (*cursor == '\n') {
                     // TODO: consider whether we want to allow multi-line strings
                     printf("Error: Strings cannot contain new-lines. At line %d\n", current_line);
+                    numberOfErrors++;
                     current_line++;
                 }
             }
