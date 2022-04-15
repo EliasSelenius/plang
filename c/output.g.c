@@ -3,8 +3,8 @@
 // Structs
 typedef struct Entity {
     char* name;
-    float x;
-    float y;
+    int x;
+    int y;
 } Entity;
 typedef struct Test {
     float x;
@@ -21,12 +21,7 @@ int get(int my_number);
 // Implementations
 int main() {
     printf("Hello, World!");
-    Entity e;
-    e = malloc(sizeof(Entity));
-    int* i = malloc(sizeof(int));
-    i[21] = 123;
-    yes(12, "dwa");
-    e = make_entity("John");
+    Entity* e = make_entity("John");
     return 0;
 }
 Entity* make_entity(char* name) {

@@ -7,21 +7,11 @@ int main() {
     printf("Hello, World!");
     // printf("Hello, This is printf() from %s\n", "plang");
 
-    Entity e;
-    e = alloc Entity;
-
-
-    int* i = alloc int;
-
-    i[21] = 123;
 
     // g_Name = "Hello";
     // foo = 12;
 
-    yes(12, "dwa");
-
-
-    e = make_entity("John");
+    let e = make_entity("John");
 
 
     // if (true) {
@@ -41,8 +31,8 @@ int main() {
 
 struct Entity {
     char* name;
-    float x;
-    float y;
+    int x;
+    int y;
 }
 
 Entity* make_entity(char* name) {

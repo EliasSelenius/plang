@@ -77,6 +77,15 @@ inline bool typeEquals(PlangType a, PlangType b) {
     return spanEqualsSpan(a.structName, b.structName) && a.numPointers == b.numPointers;
 }
 
+static PlangType getExpressedTypeValuePath(ValuePath* value) {
+    while (value->next) value = value->next;
+    
+    PlangType type = *value->type;
+
+    if (value->index) type.numPointers--;
+    return type;
+}
+
 static PlangType getExpressedType(Expression* expr) {
     switch (expr->expressionType) {
         case ExprType_Number_Literal: {
@@ -100,15 +109,8 @@ static PlangType getExpressedType(Expression* expr) {
             };
         } break;
         case ExprType_Variable: {
-
             ValuePath* value = expr->node;
-            while (value->next) value = value->next;
-            
-            PlangType type = *value->type;
-
-            if (value->index) type.numPointers--;
-            return type;
-
+            return getExpressedTypeValuePath(value);
         } break;
         case ExprType_Arithmetic: {
 
@@ -364,8 +366,11 @@ static void validateScope(Codeblock* scope) {
                     if (decl->mustInferType) {
                         decl->type = assType;
                     } else {
-                        // TODO: type missmatch
                         validateType(decl->type.structName);
+
+                        if (!typeEquals(decl->type, assType)) {
+                            error("Type missmatch in declaration.");
+                        }
                     }
 
                 } else {
@@ -382,10 +387,16 @@ static void validateScope(Codeblock* scope) {
             } break;
             case Statement_Assignment: {
                 Assignement* ass = (Assignement*)sta;
-                validateValue(ass->assignee);
-                validateExpression(ass->expr);
+                bool assigneeValid = validateValue(ass->assignee);
+                bool exprValid = validateExpression(ass->expr);
+                if (assigneeValid && exprValid) {
+                    PlangType asseeType = getExpressedTypeValuePath(ass->assignee);
+                    PlangType exprType = getExpressedType(ass->expr);
+                    if (!typeEquals(asseeType, exprType)) {
+                        error("Type missmatch in assignment.");
+                    }
+                }
 
-                // TODO: type missmatch?
             } break;
             case Statement_If: {
                 // TODO: check if condition is a boolean expression

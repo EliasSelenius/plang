@@ -36,6 +36,7 @@
 
 
     DONE list:
+        - type missmatch in assignments and declarations
         *- declare statement (declare function signature without implementation)
         *- function call 
         *- function arguments
