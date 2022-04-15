@@ -86,6 +86,7 @@ typedef enum StatementType {
     Statement_Assignment,
     Statement_FuncCall,
 
+    Statement_Scope,
     Statement_If,
     Statement_While,
 
@@ -119,6 +120,11 @@ typedef struct Codeblock {
     struct Codeblock* parentScope;
     Statement** statements; // darray
 } Codeblock;
+
+typedef struct Scope {
+    Statement base;
+    Codeblock codeblock;
+} Scope;
 
 typedef struct WhileStatement {
     Statement base;

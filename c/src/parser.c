@@ -442,6 +442,13 @@ static Statement* expectStatement() {
         } break;
         
 
+        case Tok_OpenCurl: {
+            Scope* scope = malloc(sizeof(Scope));
+            scope->base.statementType = Statement_Scope;
+            expectBlock(&scope->codeblock);
+
+            res = (Statement*)scope;
+        } break;
         case Tok_Keyword_While: {
             token_index++;
 
@@ -482,11 +489,15 @@ static Statement* expectStatement() {
             semicolon();
         } break;
 
+        default: {
+            unexpectedToken();
+            return null;
+        }
     }
 
-    if (res) {
-        res->nodebase.lineNumber = startingLineNum;
-    }
+    // res should never be null up to this point
+
+    res->nodebase.lineNumber = startingLineNum;
 
     return res;
 }

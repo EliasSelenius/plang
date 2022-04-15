@@ -28,14 +28,15 @@
         *- better number literal type inference: 10 => int, 10.0 => f64, 10f => f32 ?
         - allow underscores in number literals
         *- global variables
-        - scopes
         *- switch statements
         - line numbers in validation errors
+        - omit curl brackets in if/while etc. for single statement block  
 
     InProgress:
 
 
     DONE list:
+        - scopes
         - type missmatch in assignments and declarations
         *- declare statement (declare function signature without implementation)
         *- function call 

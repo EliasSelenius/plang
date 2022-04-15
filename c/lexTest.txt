@@ -8,6 +8,17 @@ int main() {
 
     Entity* e = make_entity("John");
 
+    {
+        Entity* g;
+        let i = 1;
+        { // io
+            if (true) {
+
+            }
+            i = 0;
+        }
+        g = e;
+    }
 
     // if (true) {
     //     while (false) {

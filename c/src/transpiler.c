@@ -178,6 +178,10 @@ static void transpileStatement(Statement* statement) {
             transpileExpression(ass->expr);
             sbAppend(sb, ";");            
         } break;
+
+        case Statement_Scope: {
+            transpileBlock(&((Scope*)statement)->codeblock);
+        } break;
         case Statement_If: {
             transpileIfStatement((IfStatement*)statement);
         } break;

@@ -401,7 +401,11 @@ static void validateScope(Codeblock* scope) {
                         error("Type missmatch in assignment.");
                     }
                 }
+            } break;
 
+
+            case Statement_Scope: {
+                validateScope(&((Scope*)sta)->codeblock);
             } break;
             case Statement_If: {
                 // TODO: check if condition is a boolean expression
@@ -423,11 +427,9 @@ static void validateScope(Codeblock* scope) {
             case Statement_Break: {
                 // TODO: is inside loop?
             } break;
-
             case Statement_Continue: {
                 // TODO: is inside loop?
             } break;
-
             case Statement_Return: {
                 ReturnStatement* retSta = (ReturnStatement*)sta;
 

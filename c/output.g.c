@@ -22,6 +22,16 @@ int get(int my_number);
 int main() {
     printf("Hello, Plang!");
     Entity* e = make_entity("John");
+    {
+        Entity* g;
+        int i = 1;
+        {
+            if (true) {
+            }
+            i = 0;
+        }
+        g = e;
+    }
     return 0;
 }
 Entity* make_entity(char* name) {
