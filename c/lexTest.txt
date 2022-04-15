@@ -1,17 +1,12 @@
 
-
-
 declare void printf(char* str);
 
 int main() {
-    printf("Hello, World!");
+    printf("Hello, Plang!");
     // printf("Hello, This is printf() from %s\n", "plang");
 
 
-    // g_Name = "Hello";
-    // foo = 12;
-
-    let e = make_entity("John");
+    Entity* e = make_entity("John");
 
 
     // if (true) {

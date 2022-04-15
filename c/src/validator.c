@@ -16,13 +16,17 @@ typedef struct Variable {
 static PlangFunction* function;
 static Variable* variables;
 static Codeblock* currentScope;
+static Statement* currentStatement;
 static u32 numberOfErrors = 0;
 
 bool validateExpression(Expression* expr);
 
 
 inline void error(char* format, ...) {
-    printf("Error: ");
+    // TODO: better line of not only statements
+    u32 lineNum = 0;
+    if (currentStatement) lineNum = currentStatement->nodebase.lineNumber;  
+    printf("Error Ln%d: ", lineNum);
 
     va_list args;
     va_start(args, format);
@@ -337,6 +341,7 @@ static void validateScope(Codeblock* scope) {
 
     for (u32 i = 0; i < darrayLength(scope->statements); i++) {
         Statement* sta = scope->statements[i];
+        currentStatement = sta;
         switch (sta->statementType) {
             case Statement_Declaration: {
 
@@ -451,6 +456,8 @@ static void validateScope(Codeblock* scope) {
             } break;
         }
     }
+
+    currentStatement = null;
 
     darrayHead(variables)->length = vars_start_index;
 

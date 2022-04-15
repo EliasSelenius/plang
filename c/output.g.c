@@ -20,7 +20,7 @@ int get(int my_number);
 
 // Implementations
 int main() {
-    printf("Hello, World!");
+    printf("Hello, Plang!");
     Entity* e = make_entity("John");
     return 0;
 }

@@ -400,6 +400,8 @@ static VarDecl* expectVarDecl() {
 static Statement* expectStatement() {
     Statement* res = null;
 
+    u32 startingLineNum = tokens[token_index].line;
+
     switch (tokens[token_index].type) {
         case Tok_Keyword_Let: {
             res = (Statement*)expectVarDecl();
@@ -480,6 +482,10 @@ static Statement* expectStatement() {
             semicolon();
         } break;
 
+    }
+
+    if (res) {
+        res->nodebase.lineNumber = startingLineNum;
     }
 
     return res;
