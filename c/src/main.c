@@ -28,6 +28,9 @@
         *- better number literal type inference: 10 => int, 10.0 => f64, 10f => f32 ?
         - allow underscores in number literals
         *- global variables
+        - scopes
+        *- switch statements
+        - line numbers in validation errors
 
     InProgress:
 

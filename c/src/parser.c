@@ -2,10 +2,8 @@
 #include "lexer.h"
 #include "darray.h"
 
-// included for NULL
-#include <stdlib.h>
-#include <stdio.h>
-
+#include <stdlib.h> // malloc
+#include <stdio.h>  // printf
 #include <stdarg.h>
 
 void expectBlock(Codeblock* scope);
@@ -17,6 +15,7 @@ static u32 token_index;
 PlangFunction* functions = null;
 FuncDeclaration* functionDeclarations = null;
 PlangStruct* structs = null;
+VarDecl* globalVariables = null;
 
 static u32 numberOfErrors;
 static void error(char* format, ...) {
@@ -129,22 +128,19 @@ static ValuePath* parseValue() {
     res->index = null;
     token_index++;
 
-    if (tokens[token_index].type == Tok_OpenSquare) {
-        token_index++;
+    if (tok(Tok_OpenSquare)) {
         res->index = expectExpression();
         expect(Tok_CloseSquare);
     }
 
-    if (tokens[token_index].type == Tok_Period) {
-        token_index++;
+    if (tok(Tok_Period)) {
         res->next = parseValue();
     }
 
     return res;
 }
 
-static FuncCall* expectFuncCallArgs(ValuePath* valuePath) {
-    FuncCall* func = malloc(sizeof(FuncCall));
+static void expectFuncCallArgs(FuncCall* func, ValuePath* valuePath) {
     func->valuePath = valuePath;
     func->function = null;
 
@@ -162,8 +158,6 @@ static FuncCall* expectFuncCallArgs(ValuePath* valuePath) {
     }
 
     expect(Tok_CloseParen);
-
-    return func;
 }
 
 inline bool isOperator(TokenType type) {
@@ -182,8 +176,11 @@ static Expression* parseLeafExpression() {
             ValuePath* valuePath = parseValue();
 
             if (tok(Tok_OpenParen)) {
+                FuncCall* func = malloc(sizeof(FuncCall));
+                expectFuncCallArgs(func, valuePath);
+
                 expr->expressionType = ExprType_FuncCall;
-                expr->node = expectFuncCallArgs(valuePath);
+                expr->node = func;
             } else {
                 expr->expressionType = ExprType_Variable;
                 expr->node = valuePath;
@@ -216,7 +213,7 @@ static Expression* parseLeafExpression() {
         case Tok_Keyword_Alloc: {
             AllocExpression* allocExpr = malloc(sizeof(AllocExpression));
             allocExpr->type = expectType();
-            allocExpr->sizeExpr = NULL;
+            allocExpr->sizeExpr = null;
             
             if (tokens[token_index].type == Tok_OpenSquare) {
                 token_index++;
@@ -234,7 +231,7 @@ static Expression* parseLeafExpression() {
 
         default: {
             token_index--;
-            return NULL;
+            return null;
         }
     }
 
@@ -260,11 +257,11 @@ static Expression* testForTernary(Expression* expr) {
     return res;
 }
 
-// returns NULL if it fails to parse an expression
+// returns null if it fails to parse an expression
 static Expression* parseExpression() {
 
     Expression* leafExpr = parseLeafExpression();
-    if (!leafExpr) return NULL;
+    if (!leafExpr) return null;
 
     u32 i = 0;
     
@@ -331,7 +328,7 @@ static VarDecl* parseVarDecl() {
     Token nameToken = tokens[token_index];
     if (!nextToken(Tok_Word)) goto failCase;
 
-    Expression* assign = NULL;
+    Expression* assign = null;
     if (tokens[token_index].type == Tok_Assign) {
         token_index++;
         assign = expectExpression();
@@ -345,13 +342,14 @@ static VarDecl* parseVarDecl() {
     return res;
 failCase:
     token_index = startingIndex;
-    return NULL;
+    return null;
 }
 
 
 static IfStatement* expectIfStatement() {
     IfStatement* res = malloc(sizeof(IfStatement));
-    res->next = NULL;
+    res->base.statementType = Statement_If;
+    res->next = null;
 
     expect(Tok_OpenParen);
     res->condition = expectExpression();
@@ -359,23 +357,138 @@ static IfStatement* expectIfStatement() {
 
     expectBlock(&res->scope);
 
-    if (tokens[token_index].type == Tok_Keyword_Else) {
-        token_index++;
-        if (tokens[token_index].type == Tok_Keyword_If) {
-            token_index++;
+    if (tok(Tok_Keyword_Else)) {
+        if (tok(Tok_Keyword_If)) {
+            // TODO: line number
             res->next = expectIfStatement();
         } else {
-            res->next = malloc(sizeof(IfStatement));
-            res->next->condition = NULL;
-            expectBlock(&res->next->scope);
+            IfStatement* elseStatement = malloc(sizeof(IfStatement));
+            elseStatement->base.statementType = Statement_If;
+            elseStatement->condition = null;
+            expectBlock(&elseStatement->scope);
+
+            res->next = elseStatement;
         }
     }
 
     return res;
 }
 
+static VarDecl* expectVarDecl() {
+    VarDecl* decl = malloc(sizeof(VarDecl));
+    decl->base.statementType = Statement_Declaration;
 
+    if (tok(Tok_Keyword_Let)) {
+        decl->mustInferType = true;
+    } else {
+        decl->mustInferType = false;
+        decl->type = expectType();
+    }
+
+    decl->name = identifier();
+
+    decl->assignmentOrNull = null;
+    if (tok(Tok_Assign)) {
+        decl->assignmentOrNull = expectExpression();
+    } else if (decl->mustInferType) {
+        error("Variable \"%.*s\" must be assigned to, to be type inferred.", decl->name.length, decl->name.start);
+    }
+
+    return decl;
+}
+
+static Statement* expectStatement() {
+    Statement* res = null;
+
+    switch (tokens[token_index].type) {
+        case Tok_Keyword_Let: {
+            res = (Statement*)expectVarDecl();
+            semicolon();
+        } break;
+        case Tok_Word: {
+            TokenType nextToken = tokens[token_index + 1].type;
+            if (nextToken == Tok_Mul || nextToken == Tok_Word) {
+                // var decl
+                res = (Statement*)expectVarDecl();
+            } else {
+                // assignment or funcCall
+
+                ValuePath* valuePath = parseValue();
+
+                if (tok(Tok_OpenParen)) {
+                    // funcCall
+
+                    FuncCallStatement* funcCall = malloc(sizeof(FuncCallStatement));
+                    funcCall->base.statementType = Statement_FuncCall;
+                    expectFuncCallArgs(&funcCall->call, valuePath);
+                    res = (Statement*)funcCall;
+
+                } else {
+                    // assignment
+
+                    Assignement* ass = malloc(sizeof(Assignement));
+                    ass->base.statementType = Statement_Assignment;
+                    ass->assignee = valuePath;
+                    // TODO: verify tokentype here
+                    ass->assignmentOper = tokens[token_index++].type;
+                    ass->expr = expectExpression();
+                    res = (Statement*)ass;
+                }
+            }
+
+            semicolon();
+        } break;
+        
+
+        case Tok_Keyword_While: {
+            token_index++;
+
+            WhileStatement* whileStatement = malloc(sizeof(WhileStatement));
+            whileStatement->base.statementType = Statement_While;
+
+            expect(Tok_OpenParen);
+            whileStatement->condition = expectExpression();
+            expect(Tok_CloseParen);
+
+            expectBlock(&whileStatement->scope);
+
+            res = (Statement*)whileStatement;
+        } break;
+        case Tok_Keyword_If: {
+            token_index++;
+            res = (Statement*)expectIfStatement();
+        } break;
+
+
+        case Tok_Keyword_Continue: {
+            res = malloc(sizeof(Statement));
+            res->statementType = Statement_Continue;
+            token_index++;
+            semicolon();
+        } break;
+        case Tok_Keyword_Break: {
+            res = malloc(sizeof(Statement));
+            res->statementType = Statement_Break;
+            token_index++;
+            semicolon();
+        } break;
+        case Tok_Keyword_Return: {
+            res = malloc(sizeof(ReturnStatement));
+            res->statementType = Statement_Return;
+            token_index++;
+            ((ReturnStatement*)res)->returnExpr = parseExpression();
+            semicolon();
+        } break;
+
+    }
+
+    return res;
+}
+
+
+/*
 static bool parseStatement(Statement* statement) {
+
 
     if ( (statement->node = parseVarDecl()) ) {
         statement->statementType = Statement_Declaration;
@@ -436,13 +549,13 @@ static bool parseStatement(Statement* statement) {
     }    
     else if (tokens[token_index].type == Tok_Keyword_Continue) {
         statement->statementType = Statement_Continue;
-        statement->node = NULL;
+        statement->node = null;
         token_index++;
         semicolon();
     }
     else if (tokens[token_index].type == Tok_Keyword_Break) {
         statement->statementType = Statement_Break;
-        statement->node = NULL;
+        statement->node = null;
         token_index++;
         semicolon();
     }
@@ -459,47 +572,24 @@ static bool parseStatement(Statement* statement) {
 
     return true;
 }
+*/
 
-static bool parseBlock(Codeblock* scope) {
-    u32 startingIndex = token_index;
-
-    assertToken(Tok_OpenCurl)
-
-
-    scope->statements = darrayCreate(Statement);
-    
-    
-    Statement statement;
-    while (parseStatement(&statement)) {
-
-        darrayAdd(scope->statements, statement);
-    }
-    
-
-    assertToken(Tok_CloseCurl)
-
-    return true;
-failCase:
-    token_index = startingIndex;
-    return false;
-}
 
 static void expectBlock(Codeblock* scope) {
 
     expect(Tok_OpenCurl);
 
-    scope->statements = darrayCreate(Statement);
+    scope->statements = darrayCreate(Statement*);
 
-    Statement statement;
-    while (tokens[token_index].type != Tok_CloseCurl) {
-        if (!parseStatement(&statement)) {
-            unexpectedToken();
+    while (!tok(Tok_CloseCurl)) {
+        Statement* statement = expectStatement();
+        if (statement) {
+            darrayAdd(scope->statements, statement);
+        } else {
+            // there must have been an error. increment index to avoid infinite loop.
+            token_index++;
         }
-
-        darrayAdd(scope->statements, statement);
     }
-
-    token_index++;
 }
 
 static void expectStruct() {
@@ -548,6 +638,7 @@ u32 parse() {
     functions = darrayCreate(PlangFunction);
     functionDeclarations = darrayCreate(FuncDeclaration);
     structs = darrayCreate(PlangStruct);
+    globalVariables = darrayCreate(VarDecl);
 
     token_index = 0;
     while (token_index < tokens_length) {
@@ -581,6 +672,9 @@ u32 parse() {
 
                 } else {
                     // global variable
+                    VarDecl decl;
+                    
+
                     semicolon();
                     printf("global variables are not implemented yet.\n");
                 }

@@ -334,11 +334,11 @@ static void validateScope(Codeblock* scope) {
     u32 vars_start_index = darrayLength(variables);
 
     for (u32 i = 0; i < darrayLength(scope->statements); i++) {
-        Statement* sta = &scope->statements[i];
+        Statement* sta = scope->statements[i];
         switch (sta->statementType) {
             case Statement_Declaration: {
 
-                VarDecl* decl = (VarDecl*)sta->node;
+                VarDecl* decl = (VarDecl*)sta;
 
                 // Check wheter there already is a variable with this name
                 if (getDeclaredVariable(decl->name)) {
@@ -346,19 +346,32 @@ static void validateScope(Codeblock* scope) {
                         decl->name.length,
                         decl->name.start);
                 }
-                        
-                if (decl->mustInferType) {
-                    if (decl->assignmentOrNull) {
-                        if (validateExpression(decl->assignmentOrNull)) {
-                            decl->type = getExpressedType(decl->assignmentOrNull);
-                        }
+                
+                /*
+                    assign
+
+                    yes       o     o
+                    no        x     o
+
+                    infer    yes    no      
+                */
+
+                if (decl->assignmentOrNull) {
+                    PlangType assType;
+                    if (validateExpression(decl->assignmentOrNull)) assType = getExpressedType(decl->assignmentOrNull);
+                    else break; // if type could not be determined then we should not continue, act as if this statement does not exist 
+
+                    if (decl->mustInferType) {
+                        decl->type = assType;
                     } else {
-                        error("Variable \"%.*s\" must be assigned to, to be type inferred.", decl->name.length, decl->name.start);
+                        // TODO: type missmatch
+                        validateType(decl->type.structName);
                     }
+
                 } else {
                     validateType(decl->type.structName);
-                    // TODO: type missmatch? 
                 }
+
 
                 Variable var;
                 var.name = decl->name;
@@ -368,7 +381,7 @@ static void validateScope(Codeblock* scope) {
 
             } break;
             case Statement_Assignment: {
-                Assignement* ass = sta->node;
+                Assignement* ass = (Assignement*)sta;
                 validateValue(ass->assignee);
                 validateExpression(ass->expr);
 
@@ -376,7 +389,7 @@ static void validateScope(Codeblock* scope) {
             } break;
             case Statement_If: {
                 // TODO: check if condition is a boolean expression
-                IfStatement* ifsta = sta->node;
+                IfStatement* ifsta = (IfStatement*)sta;
                 validateScope(&ifsta->scope);
 
                 while (ifsta->next) {
@@ -386,7 +399,7 @@ static void validateScope(Codeblock* scope) {
 
             } break;
             case Statement_While: {
-                WhileStatement* whileSta = sta->node;
+                WhileStatement* whileSta = (WhileStatement*)sta;
                 // TODO: check if condition is a boolean expression
                 validateScope(&whileSta->scope);
             } break;
@@ -400,10 +413,11 @@ static void validateScope(Codeblock* scope) {
             } break;
 
             case Statement_Return: {
-                Expression* returnExpr = sta->node;
-                if (returnExpr) {
-                    if (validateExpression(returnExpr)) {
-                        PlangType returnType = getExpressedType(returnExpr);
+                ReturnStatement* retSta = (ReturnStatement*)sta;
+
+                if (retSta->returnExpr) {
+                    if (validateExpression(retSta->returnExpr)) {
+                        PlangType returnType = getExpressedType(retSta->returnExpr);
                         if (!typeEquals(returnType, function->decl.returnType)) {
                             error("Return type missmatch in function \"%.*s\".", function->decl.name.length, function->decl.name.start);
                         }
@@ -421,8 +435,8 @@ static void validateScope(Codeblock* scope) {
             } break;
 
             case Statement_FuncCall: {
-                FuncCall* call = sta->node;
-                validateFuncCall(call);
+                FuncCallStatement* call = (FuncCallStatement*)sta;
+                validateFuncCall(&call->call);
             } break;
         }
     }

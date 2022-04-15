@@ -77,21 +77,9 @@ typedef struct TernaryExpression {
     Expression* elseExpr;
 } TernaryExpression;
 
-typedef struct FuncCall {
-    // StrSpan name;
-    FuncDeclaration* function;
-    ValuePath* valuePath;
-    Expression** args; // darray of Expression pointers
-} FuncCall;
 
 // ----Statements----------------------------------------------
 
-typedef struct VarDecl {
-    PlangType type;
-    StrSpan name;
-    bool mustInferType;
-    Expression* assignmentOrNull;
-} VarDecl;
 
 typedef enum StatementType {
     Statement_Declaration,
@@ -107,12 +95,20 @@ typedef enum StatementType {
 } StatementType;
 
 typedef struct Statement {
+    Node nodebase;
     StatementType statementType;
-    void* node;
 } Statement;
 
+typedef struct VarDecl {
+    Statement base;
+    PlangType type;
+    StrSpan name;
+    bool mustInferType;
+    Expression* assignmentOrNull;
+} VarDecl;
 
 typedef struct Assignement {
+    Statement base;
     ValuePath* assignee;
     // = += -= *= /=
     TokenType assignmentOper;
@@ -121,19 +117,28 @@ typedef struct Assignement {
 
 typedef struct Codeblock {
     struct Codeblock* parentScope;
-    Statement* statements; // darray
+    Statement** statements; // darray
 } Codeblock;
 
 typedef struct WhileStatement {
+    Statement base;
     Expression* condition;
     Codeblock scope;
 } WhileStatement;
 
 typedef struct IfStatement {
-    Expression* condition;
+    Statement base;
+    Expression* condition; // if condition is null, this is an else-statement
     Codeblock scope;
     struct IfStatement* next;
 } IfStatement;
+
+typedef struct ReturnStatement {
+    Statement base;
+    Expression* returnExpr;
+} ReturnStatement;
+
+// ----Functions----------------------------------------------
 
 typedef struct FuncArg {
     PlangType type;
@@ -151,6 +156,22 @@ typedef struct PlangFunction {
     Codeblock scope;
 } PlangFunction;
 
+typedef struct FuncCall {
+    FuncDeclaration* function;
+    ValuePath* valuePath;
+    Expression** args; // darray of Expression pointers
+} FuncCall;
+
+// typedef struct FuncCallExpression {
+//     FuncCall call;
+// } FuncCallExpression;
+
+typedef struct FuncCallStatement {
+    Statement base;
+    FuncCall call;
+} FuncCallStatement;
+
+// ----Struct----------------------------------------------
 
 typedef struct Field {
     PlangType type;
@@ -162,6 +183,8 @@ typedef struct PlangStruct {
     Field* fields; // darray
 } PlangStruct;
 
+
 extern PlangFunction* functions;
 extern FuncDeclaration* functionDeclarations;
 extern PlangStruct* structs;
+extern VarDecl* globalVariables;

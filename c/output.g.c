@@ -21,6 +21,12 @@ int get(int my_number);
 // Implementations
 int main() {
     printf("Hello, World!");
+    Entity e;
+    e = malloc(sizeof(Entity));
+    int* i = malloc(sizeof(int));
+    i[21] = 123;
+    yes(12, "dwa");
+    e = make_entity("John");
     return 0;
 }
 Entity* make_entity(char* name) {

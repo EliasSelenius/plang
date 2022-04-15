@@ -149,7 +149,7 @@ static void transpileIfStatement(IfStatement* ifst) {
 static void transpileStatement(Statement* statement) {
     switch (statement->statementType) {
         case Statement_Declaration: {
-            VarDecl* decl = (VarDecl*)statement->node;
+            VarDecl* decl = (VarDecl*)statement;
 
             transpileType(decl->type);
             sbAppend(sb, " ");
@@ -163,7 +163,7 @@ static void transpileStatement(Statement* statement) {
             sbAppend(sb, ";");
         } break;
         case Statement_Assignment: {
-            Assignement* ass = statement->node;
+            Assignement* ass = (Assignement*)statement;
             transpileValuePath(ass->assignee);
 
             switch (ass->assignmentOper) {
@@ -179,10 +179,10 @@ static void transpileStatement(Statement* statement) {
             sbAppend(sb, ";");            
         } break;
         case Statement_If: {
-            transpileIfStatement(statement->node);
+            transpileIfStatement((IfStatement*)statement);
         } break;
         case Statement_While: {
-            WhileStatement* sta = (WhileStatement*)statement->node;
+            WhileStatement* sta = (WhileStatement*)statement;
             sbAppend(sb, "while (");
             transpileExpression(sta->condition);
             sbAppend(sb, ") ");
@@ -193,9 +193,10 @@ static void transpileStatement(Statement* statement) {
         case Statement_Continue: sbAppend(sb, "continue;"); break;
 
         case Statement_Return: {
-            if (statement->node) {
+            ReturnStatement* retSta = (ReturnStatement*)statement;
+            if (retSta->returnExpr) {
                 sbAppend(sb, "return ");
-                transpileExpression(statement->node);
+                transpileExpression(retSta->returnExpr);
                 sbAppend(sb, ";");
             } else {
                 sbAppend(sb, "return;");
@@ -204,7 +205,8 @@ static void transpileStatement(Statement* statement) {
         } break;
 
         case Statement_FuncCall: {
-            transpileFuncCall(statement->node);
+            FuncCallStatement* funcCallSta = (FuncCallStatement*)statement;
+            transpileFuncCall(&funcCallSta->call);
             sbAppend(sb, ";");
         } break;
     }
@@ -216,7 +218,7 @@ static void transpileBlock(Codeblock* scope) {
 
     for (u32 i = 0; i < darrayLength(scope->statements); i++) {
         newline();
-        transpileStatement(&scope->statements[i]);
+        transpileStatement(scope->statements[i]);
     }
 
     tabing--;
