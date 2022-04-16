@@ -239,84 +239,6 @@ static Expression* parseLeafExpression() {
     return null;
 }
 
-/*
-static Expression* parseLeafExpression() {
-    Token* token = &tokens[token_index++];
-    ExprType eType;
-
-    switch (token->type) {
-        case Tok_Word: {
-            token_index--;
-            Expression* expr = malloc(sizeof(Expression));
-            ValuePath* valuePath = parseValue();
-
-            if (tok(Tok_OpenParen)) {
-                FuncCall* func = malloc(sizeof(FuncCall));
-                expectFuncCallArgs(func, valuePath);
-
-                expr->expressionType = ExprType_FuncCall;
-                expr->node = func;
-            } else {
-                expr->expressionType = ExprType_Variable;
-                expr->node = valuePath;
-            }
-
-            return expr;
-        } break;
-        case Tok_Number: {
-            eType = ExprType_Literal_Number;
-        } break;
-        case Tok_String: {
-            eType = ExprType_Literal_String;
-        } break;
-
-        case Tok_Keyword_False:
-        case Tok_Keyword_True: {
-            eType = ExprType_Literal_Bool;
-        } break;
-
-        case Tok_Keyword_Null: {
-            eType = ExprType_Literal_Null;
-        } break;
-
-        case Tok_OpenParen: {
-            Expression* e = parseExpression();
-            expect(Tok_CloseParen);
-            return e;
-        } break;
-
-        case Tok_Keyword_Alloc: {
-            AllocExpression* allocExpr = malloc(sizeof(AllocExpression));
-            allocExpr->type = expectType();
-            allocExpr->sizeExpr = null;
-            
-            if (tokens[token_index].type == Tok_OpenSquare) {
-                token_index++;
-                allocExpr->sizeExpr = expectExpression();
-                expect(Tok_CloseSquare);
-            }
-
-            Expression* expr = malloc(sizeof(Expression));
-            expr->node = allocExpr;
-            expr->expressionType = ExprType_Alloc;
-
-
-            return expr;        
-        } break;
-
-        default: {
-            token_index--;
-            return null;
-        }
-    }
-
-    Expression* expr = malloc(sizeof(Expression));
-    expr->value = token->value;
-    expr->expressionType = eType;
-    return expr;
-}
-*/
-
 static Expression* testForTernary(Expression* expr) {
     if (!tok(Tok_QuestionMark)) return expr;
 
@@ -331,24 +253,6 @@ static Expression* testForTernary(Expression* expr) {
 
     return (Expression*)ter;
 }
-
-/*
-static Expression* testForTernary(Expression* expr) {
-    if (tokens[token_index].type != Tok_QuestionMark) return expr;
-    token_index++;
-
-    TernaryExpression* ter = malloc(sizeof(TernaryExpression));
-    ter->condition = expr;
-    ter->thenExpr = expectExpression();
-    expect(Tok_Colon);
-    ter->elseExpr = expectExpression();
-
-    Expression* res = malloc(sizeof(Expression));
-    res->node = ter;
-    res->expressionType = ExprType_Ternary;
-    return res;
-}
-*/
 
 // returns null if it fails to parse an expression
 static Expression* parseExpression() {
@@ -379,51 +283,6 @@ static Expression* parseExpression() {
     
     return testForTernary((Expression*)arith);
 }
-
-/*
-// returns null if it fails to parse an expression
-static Expression* parseExpression() {
-
-    Expression* leafExpr = parseLeafExpression();
-    if (!leafExpr) return null;
-
-    u32 i = 0;
-    
-    Expression* temp[16]; // TODO: these arrays needs to go.
-    temp[i++] = leafExpr;
-
-    StrSpan ops[15];
-
-    while (isOperator(tokens[token_index].type)) {
-        
-        ops[i - 1] = tokens[token_index].value;
-
-        token_index++;
-        temp[i++] = parseLeafExpression();
-    }
-
-    if (i == 1) return testForTernary(leafExpr);
-
-
-    Expression* expr = malloc(sizeof(Expression));
-    expr->expressionType = ExprType_Arithmetic;
-    expr->count = i;
-    expr->operators = malloc(sizeof(StrSpan) * (i - 1));
-    expr->subExpressions = malloc(sizeof(Expression) * i);
-
-    for (u32 j = 0; j < expr->count; j++)
-        expr->subExpressions[j] = temp[j];
-
-    for (u32 j = 0; j < expr->count - 1; j++)
-        expr->operators[j] = ops[j];
-
-    // TODO: I'd like to know why this didnt work
-    // while (i > 0) expr->subExpressions[--i] = temp[i];
-
-
-    return testForTernary(expr);
-}
-*/
 
 static Expression* expectExpression() {
     Expression* res = parseExpression();
