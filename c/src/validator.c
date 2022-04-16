@@ -92,7 +92,7 @@ static PlangType getExpressedTypeValuePath(ValuePath* value) {
 
 static PlangType getExpressedType(Expression* expr) {
     switch (expr->expressionType) {
-        case ExprType_Number_Literal: {
+        case ExprType_Literal_Number: {
             // TODO: different number types by literal suffix
 
             return (PlangType) { 
@@ -100,48 +100,51 @@ static PlangType getExpressedType(Expression* expr) {
                 .numPointers = 0
             };
         } break;
-        case ExprType_String_Literal: {
+        case ExprType_Literal_String: {
             return (PlangType) {
                 .structName = spFrom("char"),
                 .numPointers = 1
             };
         } break;
-        case ExprType_Bool_Literal: {
+        case ExprType_Literal_Bool: {
             return (PlangType) {
                 .structName = spFrom("bool"),
                 .numPointers = 0
             };
         } break;
         case ExprType_Variable: {
-            ValuePath* value = expr->node;
+            ValuePath* value = ((ExpressionProxy*)expr)->node;
             return getExpressedTypeValuePath(value);
         } break;
         case ExprType_Arithmetic: {
-
+            return (PlangType) { 
+                .structName = spFrom("int"),
+                .numPointers = 0
+            };
         } break;
         case ExprType_Alloc: {
-            PlangType res = ((AllocExpression*)expr->node)->type;
+            PlangType res = ((AllocExpression*)expr)->type;
             res.numPointers++;
             return res;
         } break;
-        case ExprType_Null: {
+        case ExprType_Literal_Null: {
             return (PlangType) {
                 .structName = spFrom("void"),
                 .numPointers = 1
             };
         } break;
         case ExprType_Ternary: {
-            TernaryExpression* ter = expr->node;
+            TernaryExpression* ter = (TernaryExpression*)expr;
             return getExpressedType(ter->thenExpr);
         } break;
         case ExprType_FuncCall: {
-            FuncCall* call = expr->node;
-            return call->function->returnType;
+            FuncCallExpression* fc = (FuncCallExpression*)expr;
+            return fc->call.function->returnType;
         } break;
     }
 
     // This is not supposed to ever hapen
-    printf("getExpressedType could not determine type of expession, this is a bug!\n");
+    printf("getExpressedType could not determine type of expression, this is a bug!\n");
     numberOfErrors++;
     return (PlangType) {
         .structName = spFrom("err_no_type"),
@@ -289,26 +292,28 @@ static void validateFuncCall(FuncCall* call) {
 }
 
 static bool validateExpression(Expression* expr) {
-    switch (expr->expressionType) {
-    
-        
+    switch (expr->expressionType) {        
         case ExprType_Variable: {
-            ValuePath* var = expr->node;
+            ExpressionProxy* exp = (ExpressionProxy*)expr;
+            ValuePath* var = exp->node;
             return validateValue(var);
         } break;
+
         case ExprType_Arithmetic: {
             // is a valid operator operands pair?
         } break;
+        
         case ExprType_Alloc: {
-            AllocExpression* alloc = expr->node;
+            AllocExpression* alloc = (AllocExpression*)expr;
             validateType(alloc->type.structName);
 
             // recurse on possibe size-subexpression
             if (alloc->sizeExpr) validateExpression(alloc->sizeExpr);
 
         } break;
+        
         case ExprType_Ternary: {
-            TernaryExpression* ter = expr->node;
+            TernaryExpression* ter = (TernaryExpression*)expr;
             validateExpression(ter->condition);
             validateExpression(ter->thenExpr);
             validateExpression(ter->elseExpr);
@@ -317,14 +322,16 @@ static bool validateExpression(Expression* expr) {
             // TODO: does thenExpr and elseExpr have a common type? 
 
         } break;
+
         case ExprType_FuncCall: {
-            validateFuncCall(expr->node);
+            FuncCallExpression* fc = (FuncCallExpression*)expr;
+            validateFuncCall(&fc->call);
         } break;
 
-        // ExprType_Number_Literal,
-        // ExprType_String_Literal,
-        // ExprType_Bool_Literal,
-        // ExprType_Null,
+        // ExprType_Literal_Number,
+        // ExprType_Literal_String,
+        // ExprType_Literal_Bool,
+        // ExprType_Literal_Null,
         default: break;
     }
 

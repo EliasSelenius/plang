@@ -52,48 +52,48 @@ static void transpileExpression(Expression* expr) {
         case ExprType_Arithmetic: {
             sbAppend(sb, "(");
 
-            transpileExpression(expr->subExpressions[0]);
-            for (u32 i = 1; i < expr->count; i++) {
+            ArithmeticExpression* arith = (ArithmeticExpression*)expr;
+
+            transpileExpression(arith->subExpressions[0]);
+            for (u32 i = 1; i < arith->count; i++) {
                 sbAppend(sb, " ");
-                sbAppendSpan(sb, expr->operators[i - 1]);
+                sbAppendSpan(sb, arith->operators[i - 1]);
                 sbAppend(sb, " ");
-                transpileExpression(expr->subExpressions[i]);
+                transpileExpression(arith->subExpressions[i]);
             }
 
             sbAppend(sb, ")");
         } break;
 
-        case ExprType_Null: {
+        case ExprType_Literal_Null: {
             sbAppend(sb, "0");
         } break;
 
-        case ExprType_Bool_Literal:
-        case ExprType_String_Literal:
-        case ExprType_Number_Literal: {
-            sbAppendSpan(sb, expr->value);
+        case ExprType_Literal_Bool:
+        case ExprType_Literal_String:
+        case ExprType_Literal_Number: {
+            LiteralExpression* lit = (LiteralExpression*)expr;
+            sbAppendSpan(sb, lit->value);
         } break;
 
         case ExprType_Variable: {
-            transpileValuePath(expr->node);
+            transpileValuePath(((ExpressionProxy*)expr)->node);
         } break;
 
         case ExprType_Alloc: {
-            AllocExpression* allocExpr = ((AllocExpression*)expr->node);
+            AllocExpression* allocExpr = (AllocExpression*)expr;
             sbAppend(sb, "malloc(sizeof(");
             transpileType(allocExpr->type);
             sbAppend(sb, ")");
-
             if (allocExpr->sizeExpr) {
                 sbAppend(sb, " * ");
                 transpileExpression(allocExpr->sizeExpr);
             }
-
             sbAppend(sb, ")");
-
         } break;
 
         case ExprType_Ternary: {
-            TernaryExpression* ter = expr->node;
+            TernaryExpression* ter = (TernaryExpression*)expr;
             transpileExpression(ter->condition);
             sbAppend(sb, " ? ");
             transpileExpression(ter->thenExpr);
@@ -102,7 +102,8 @@ static void transpileExpression(Expression* expr) {
         } break;
 
         case ExprType_FuncCall: {
-            transpileFuncCall(expr->node);
+            FuncCallExpression* fc = (FuncCallExpression*)expr;
+            transpileFuncCall(&fc->call);
         } break;
     }
 

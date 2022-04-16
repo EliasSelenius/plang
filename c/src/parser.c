@@ -172,7 +172,74 @@ inline bool isOperator(TokenType type) {
     return type >= Tok_Plus && type <= Tok_Div;
 }
 
+static Expression* createLiteral(ExprType type) {
+    LiteralExpression* lit = malloc(sizeof(LiteralExpression));
+    lit->base.expressionType = type;
+    lit->base.nodebase.lineNumber = tokens[token_index].line;
+    lit->value = tokens[token_index].value;
+    token_index++;
+    return (Expression*)lit;
+}
 
+static Expression* parseLeafExpression() {
+    switch (tokens[token_index].type) {
+        case Tok_Word: {
+            // valuepath or funcCall
+            // TODO: line numbers 
+            ValuePath* value = parseValue();
+            if (tok(Tok_OpenParen)) {
+                // func
+                FuncCallExpression* funcex = malloc(sizeof(FuncCallExpression));
+                funcex->base.expressionType = ExprType_FuncCall;
+
+                expectFuncCallArgs(&funcex->call, value);
+                return (Expression*)funcex;
+            } else {
+                // value
+                ExpressionProxy* exp = malloc(sizeof(ExpressionProxy));
+                exp->base.expressionType = ExprType_Variable;
+
+                exp->node = value;
+                return (Expression*)exp;
+            }
+        }
+
+        case Tok_Keyword_Alloc: {
+            AllocExpression* alloc = malloc(sizeof(AllocExpression));
+            alloc->base.expressionType = ExprType_Alloc;
+            alloc->base.nodebase.lineNumber = tokens[token_index].line;
+
+            token_index++;
+            alloc->type = expectType();
+            alloc->sizeExpr = null;
+            if (tok(Tok_OpenSquare)) {
+                alloc->sizeExpr = expectExpression();
+                expect(Tok_CloseSquare);
+            }
+
+            return (Expression*)alloc;
+        }
+
+        case Tok_OpenParen: {
+            token_index++;
+            Expression* expr = expectExpression();
+            expect(Tok_CloseParen);
+            return expr;
+        }
+
+
+        case Tok_Number:        return createLiteral(ExprType_Literal_Number);
+        case Tok_String:        return createLiteral(ExprType_Literal_String);
+        case Tok_Keyword_True:  return createLiteral(ExprType_Literal_Bool);
+        case Tok_Keyword_False: return createLiteral(ExprType_Literal_Bool);
+        case Tok_Keyword_Null:  return createLiteral(ExprType_Literal_Null);
+
+        default: return null;
+    }
+    return null;
+}
+
+/*
 static Expression* parseLeafExpression() {
     Token* token = &tokens[token_index++];
     ExprType eType;
@@ -197,19 +264,19 @@ static Expression* parseLeafExpression() {
             return expr;
         } break;
         case Tok_Number: {
-            eType = ExprType_Number_Literal;
+            eType = ExprType_Literal_Number;
         } break;
         case Tok_String: {
-            eType = ExprType_String_Literal;
+            eType = ExprType_Literal_String;
         } break;
 
         case Tok_Keyword_False:
         case Tok_Keyword_True: {
-            eType = ExprType_Bool_Literal;
+            eType = ExprType_Literal_Bool;
         } break;
 
         case Tok_Keyword_Null: {
-            eType = ExprType_Null;
+            eType = ExprType_Literal_Null;
         } break;
 
         case Tok_OpenParen: {
@@ -248,7 +315,24 @@ static Expression* parseLeafExpression() {
     expr->expressionType = eType;
     return expr;
 }
+*/
 
+static Expression* testForTernary(Expression* expr) {
+    if (!tok(Tok_QuestionMark)) return expr;
+
+    TernaryExpression* ter = malloc(sizeof(TernaryExpression));
+    ter->base.expressionType = ExprType_Ternary;
+    ter->base.nodebase.lineNumber = expr->nodebase.lineNumber;
+
+    ter->condition = expr;
+    ter->thenExpr = expectExpression();
+    expect(Tok_Colon);
+    ter->elseExpr = expectExpression();
+
+    return (Expression*)ter;
+}
+
+/*
 static Expression* testForTernary(Expression* expr) {
     if (tokens[token_index].type != Tok_QuestionMark) return expr;
     token_index++;
@@ -264,7 +348,39 @@ static Expression* testForTernary(Expression* expr) {
     res->expressionType = ExprType_Ternary;
     return res;
 }
+*/
 
+// returns null if it fails to parse an expression
+static Expression* parseExpression() {
+    Expression* leaf = parseLeafExpression();
+    if (!leaf) return null;
+
+    u32 num = 0;
+    Expression* temp[16]; // TODO: these arrays needs to go.
+    temp[num++] = leaf;
+    StrSpan ops[15];
+
+    while (isOperator(tokens[token_index].type)) {
+        ops[num-1] = tokens[token_index++].value;
+        temp[num++] = parseLeafExpression(); // TODO: test for null
+    }
+
+    if (num == 1) return testForTernary(leaf);
+
+    ArithmeticExpression* arith = malloc(sizeof(ArithmeticExpression));
+    arith->base.expressionType = ExprType_Arithmetic;
+    arith->base.nodebase.lineNumber = leaf->nodebase.lineNumber;
+    arith->count = num;
+    arith->operators = malloc(sizeof(StrSpan) * (num-1));
+    arith->subExpressions = malloc(sizeof(Expression*) * num);
+
+    for (u32 i = 0; i < num-1; i++) arith->operators[i] = ops[i];
+    for (u32 i = 0; i < num; i++) arith->subExpressions[i] = temp[i];
+    
+    return testForTernary((Expression*)arith);
+}
+
+/*
 // returns null if it fails to parse an expression
 static Expression* parseExpression() {
 
@@ -307,6 +423,7 @@ static Expression* parseExpression() {
 
     return testForTernary(expr);
 }
+*/
 
 static Expression* expectExpression() {
     Expression* res = parseExpression();

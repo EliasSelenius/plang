@@ -23,37 +23,60 @@ typedef struct PlangType {
 
 
 typedef enum ExprType {
-    ExprType_Number_Literal,
-    ExprType_String_Literal,
-    ExprType_Bool_Literal,
+    ExprType_Literal_Number,
+    ExprType_Literal_String,
+    ExprType_Literal_Bool,
+    ExprType_Literal_Null,
     ExprType_Variable,
     ExprType_Arithmetic,
     ExprType_Alloc,
-    ExprType_Null,
     ExprType_Ternary,
     ExprType_FuncCall
 } ExprType;
 
 // TODO: maybe create an expression type that have no need for unions
+// typedef struct Expression {
+//     ExprType expressionType;
+//     union {
+//         void* node;
+
+//         // TODO: make this a node
+//         StrSpan value;
+
+//         // TODO: make this a node
+//         struct {
+//             u32 count;
+//             StrSpan* operators;
+//             struct Expression** subExpressions;
+//         };
+//     };
+// } Expression;
+
 typedef struct Expression {
+    Node nodebase;
     ExprType expressionType;
-    union {
-        void* node;
-
-        // TODO: make this a node
-        StrSpan value;
-
-        // TODO: make this a node
-        struct {
-            u32 count;
-            StrSpan* operators;
-            struct Expression** subExpressions;
-        };
-    };
 } Expression;
 
+// used by value path temporarily 
+typedef struct ExpressionProxy {
+    Expression base;
+    void* node;
+} ExpressionProxy;
+
+typedef struct LiteralExpression {
+    Expression base;
+    StrSpan value;
+} LiteralExpression;
+
+typedef struct ArithmeticExpression {
+    Expression base;
+    u32 count;
+    StrSpan* operators; // TODO: maybe use different type than StrSpan
+    Expression** subExpressions;
+} ArithmeticExpression;
 
 typedef struct AllocExpression {
+    Expression base;
     Expression* sizeExpr;
     PlangType type;
 } AllocExpression;
@@ -72,6 +95,7 @@ typedef struct ValuePath {
 } ValuePath;
 
 typedef struct TernaryExpression {
+    Expression base;
     Expression* condition;
     Expression* thenExpr;
     Expression* elseExpr;
@@ -168,9 +192,10 @@ typedef struct FuncCall {
     Expression** args; // darray of Expression pointers
 } FuncCall;
 
-// typedef struct FuncCallExpression {
-//     FuncCall call;
-// } FuncCallExpression;
+typedef struct FuncCallExpression {
+    Expression base;
+    FuncCall call;
+} FuncCallExpression;
 
 typedef struct FuncCallStatement {
     Statement base;
