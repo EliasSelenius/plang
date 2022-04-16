@@ -7,6 +7,9 @@ typedef struct Entity {
     int y;
 } Entity;
 typedef struct Test {
+    Entity* e;
+} Test;
+typedef struct Test {
     float x;
     float y;
 } Test;
@@ -21,9 +24,8 @@ int get(int my_number);
 // Implementations
 int main() {
     printf("Hello, Plang!");
+    Test* test = malloc(sizeof(Test));
     Entity* e = make_entity("John");
-    Entity* f = malloc(sizeof(Entity));
-    e += f;
     {
         Entity* g;
         int i = 1;

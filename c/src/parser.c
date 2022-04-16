@@ -30,6 +30,18 @@ static void error(char* format, ...) {
     numberOfErrors++;
 }
 
+static void errorLine(u32 lineNum, char* format, ...) {
+    printf("Error Ln%d: ", lineNum);
+
+    va_list args;
+    va_start(args, format);
+    vprintf(format, args);
+    va_end(args);
+
+    printf("\n");
+    numberOfErrors++;
+}
+
 
 // asserts the existence of a semicolon
 inline void semicolon() {
@@ -104,10 +116,6 @@ static PlangType expectType() {
     return res;
 }
 
-
-#define assertToken(tok) if (tokens[token_index++].type != tok) goto failCase;
-
-#define nextToken(tok) (tokens[token_index++].type == tok)
 
 inline bool tok(TokenType type) {
     if (tokens[token_index].type == type) {
@@ -312,40 +320,6 @@ static Expression* expectExpression() {
 }
 
 
-static VarDecl* parseVarDecl() {
-    u32 startingIndex = token_index;
-    bool useTypeInference = false;
-    PlangType type;
-    if (!parseType(&type)) {
-        if (tokens[token_index].type == Tok_Keyword_Let) {
-            useTypeInference = true;
-            token_index++;
-        } else {
-            goto failCase;
-        }
-    }
-
-    Token nameToken = tokens[token_index];
-    if (!nextToken(Tok_Word)) goto failCase;
-
-    Expression* assign = null;
-    if (tokens[token_index].type == Tok_Assign) {
-        token_index++;
-        assign = expectExpression();
-    }
-
-    VarDecl* res = malloc(sizeof(VarDecl));
-    res->mustInferType = useTypeInference;
-    res->type = type;
-    res->name = nameToken.value;
-    res->assignmentOrNull = assign;
-    return res;
-failCase:
-    token_index = startingIndex;
-    return null;
-}
-
-
 static IfStatement* expectIfStatement() {
     IfStatement* res = malloc(sizeof(IfStatement));
     res->base.statementType = Statement_If;
@@ -512,96 +486,6 @@ static Statement* expectStatement() {
     return res;
 }
 
-
-/*
-static bool parseStatement(Statement* statement) {
-
-
-    if ( (statement->node = parseVarDecl()) ) {
-        statement->statementType = Statement_Declaration;
-        semicolon();
-    }
-    else if (tokens[token_index].type == Tok_Word) {
-
-        ValuePath* valuePath = parseValue();
-        switch (tokens[token_index].type) {
-            case Tok_Assign:
-            case Tok_PlusEquals:
-            case Tok_MinusEquals:
-            case Tok_MulEquals:
-            case Tok_DivEquals: {
-                Assignement ass;
-                ass.assignee = valuePath;
-                ass.assignmentOper = tokens[token_index].type;
-
-                token_index++;
-                ass.expr = expectExpression();
-                semicolon();
-
-                statement->statementType = Statement_Assignment;
-                Assignement* ap = statement->node = malloc(sizeof(Assignement));
-                *ap = ass;
-            } break;
-
-            case Tok_OpenParen: {
-                token_index++;
-                statement->statementType = Statement_FuncCall;
-                statement->node = expectFuncCallArgs(valuePath);                
-                semicolon();
-            } break;
-            
-            default:
-                token_index--; // why the fuck?
-                return false;
-        }
-    }
-    else if (tokens[token_index].type == Tok_Keyword_While) {
-        token_index++;
-        statement->statementType = Statement_While;
-
-        WhileStatement* res = malloc(sizeof(WhileStatement));
-
-        expect(Tok_OpenParen);
-        res->condition = expectExpression();
-        expect(Tok_CloseParen);
-
-        expectBlock(&res->scope);
-
-        statement->node = res;
-    }
-    else if (tokens[token_index].type == Tok_Keyword_If) {
-        token_index++;
-        statement->statementType = Statement_If;
-        statement->node = expectIfStatement();
-    }    
-    else if (tokens[token_index].type == Tok_Keyword_Continue) {
-        statement->statementType = Statement_Continue;
-        statement->node = null;
-        token_index++;
-        semicolon();
-    }
-    else if (tokens[token_index].type == Tok_Keyword_Break) {
-        statement->statementType = Statement_Break;
-        statement->node = null;
-        token_index++;
-        semicolon();
-    }
-    else if (tokens[token_index].type == Tok_Keyword_Return) {
-        token_index++;
-        statement->statementType = Statement_Return;
-        statement->node = parseExpression();
-        semicolon();
-    }
-    else {
-        return false;
-    }
-
-
-    return true;
-}
-*/
-
-
 static void expectBlock(Codeblock* scope) {
 
     expect(Tok_OpenCurl);
@@ -618,7 +502,7 @@ static void expectBlock(Codeblock* scope) {
     }
 }
 
-static void expectStruct() {
+static PlangStruct expectStruct() {
     PlangStruct stru;
     stru.name = identifier();
     stru.fields = darrayCreate(Field);
@@ -637,7 +521,7 @@ static void expectStruct() {
     
     token_index++;
 
-    darrayAdd(structs, stru);
+    return stru;
 }
 
 static void expectFuncArgList(FuncArg** arguments) {
@@ -672,8 +556,20 @@ u32 parse() {
         switch (tokens[token_index].type) {
             case Tok_Keyword_Struct: {
                 // struct
+                u32 lineNum = tokens[token_index].line;
                 token_index++;
-                expectStruct();
+                PlangStruct stru = expectStruct();
+                stru.nodebase.lineNumber = lineNum;
+                u32 struLen = darrayLength(structs);
+                for (u32 i = 0; i < struLen; i++) {
+                    if (spanEqualsSpan(structs[i].name, stru.name)) {
+                        errorLine(stru.nodebase.lineNumber, "Struct \"%.*s\" is already defined.", stru.name.length, stru.name.start);
+                        break;
+                    }
+                }
+                
+                darrayAdd(structs, stru);
+
             } break;
             
             
@@ -720,10 +616,6 @@ u32 parse() {
             } break;
             
             default: {
-                // error("Did not expect token \"%.*s\" here.",
-                //     tokens[token_index].value.length,
-                //     tokens[token_index].value.start);
-                // token_index++;
                 unexpectedToken();
             } break;
         }

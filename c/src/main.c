@@ -20,7 +20,7 @@
         - function pointers
         - function overloads
         - return type inference
-        - subfunctions
+        - localy defined functions
         - localy defined structs
         *- clasic for loop: for (int i = 0; i < 10; i++)
         - for in range loop: for i in 0..10
@@ -28,12 +28,13 @@
         - modules or namespaces ?
         *- better number literal type inference: 10 => int, 10.0 => f64, 10f => f32 ?
         - allow underscores in number literals
-        *- global variables
         *- switch statements
         - line numbers in validation errors
-        - omit curl brackets in if/while etc. for single statement block  
+        - omit curl brackets in if/while etc. for single statement block
+        *- restructure expression types
 
     InProgress:
+        *- global variables
 
 
     DONE list:

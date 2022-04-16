@@ -185,6 +185,7 @@ typedef struct Field {
 } Field;
 
 typedef struct PlangStruct {
+    Node nodebase;
     StrSpan name;
     Field* fields; // darray
 } PlangStruct;

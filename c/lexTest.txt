@@ -5,12 +5,9 @@ int main() {
     printf("Hello, Plang!");
     // printf("Hello, This is printf() from %s\n", "plang");
 
+    Test* test = alloc Test;
 
     Entity* e = make_entity("John");
-    let f = alloc Entity;
-
-    e += f;
-
     {
         Entity* g;
         let i = 1;
@@ -62,6 +59,10 @@ void sayFoo(int i, char* str) {
 
 int get(int my_number) {
     return my_number;
+}
+
+struct Test {
+    Entity* e; 
 }
 
 struct Test {
