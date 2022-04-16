@@ -34,24 +34,6 @@ typedef enum ExprType {
     ExprType_FuncCall
 } ExprType;
 
-// TODO: maybe create an expression type that have no need for unions
-// typedef struct Expression {
-//     ExprType expressionType;
-//     union {
-//         void* node;
-
-//         // TODO: make this a node
-//         StrSpan value;
-
-//         // TODO: make this a node
-//         struct {
-//             u32 count;
-//             StrSpan* operators;
-//             struct Expression** subExpressions;
-//         };
-//     };
-// } Expression;
-
 typedef struct Expression {
     Node nodebase;
     ExprType expressionType;
@@ -65,7 +47,7 @@ typedef struct ExpressionProxy {
 
 typedef struct LiteralExpression {
     Expression base;
-    StrSpan value;
+    StrSpan value; // TODO: maybe use different type than StrSpan
 } LiteralExpression;
 
 typedef struct ArithmeticExpression {
@@ -184,6 +166,7 @@ typedef struct FuncDeclaration {
 typedef struct PlangFunction {
     FuncDeclaration decl;
     Codeblock scope;
+    bool mustInferReturnType;
 } PlangFunction;
 
 typedef struct FuncCall {

@@ -518,6 +518,48 @@ static void expectFuncArgList(FuncArg** arguments) {
     expect(Tok_CloseParen);
 }
 
+static void funcOrGlobal(bool typeinfer) {
+    PlangType type;
+    if (typeinfer) token_index++;
+    else type = expectType();
+
+    StrSpan name = identifier();
+
+    if (tok(Tok_OpenParen)) {
+        // function
+
+        PlangFunction func;
+        func.mustInferReturnType = typeinfer;
+        func.decl.returnType = type;
+        func.decl.name = name;
+        func.decl.arguments = null;
+
+        expectFuncArgList(&func.decl.arguments);
+        
+        expectBlock(&func.scope);
+        darrayAdd(functions, func);
+
+    } else {
+        // global variable
+        VarDecl decl;
+        decl.assignmentOrNull = null;
+        decl.name = name;
+        decl.mustInferType = typeinfer;        
+        decl.type = type;
+        
+        if (tok(Tok_Assign)) {
+            decl.assignmentOrNull = expectExpression();
+        } else if (typeinfer) {
+            error("Global variable \"%.*s\" must be assigned to, to be type inferred.", decl.name.length, decl.name.start);
+        }
+
+        darrayAdd(globalVariables, decl);
+
+        semicolon();
+        // printf("global variables are not implemented yet.\n");
+    }
+}
+
 u32 parse() {
 
     // TODO: PlangFile
@@ -548,35 +590,8 @@ u32 parse() {
 
             } break;
             
-            
-            case Tok_Word: {
-                // function / global variable
-
-                PlangType type = expectType();
-                StrSpan name = identifier();
-
-                if (tok(Tok_OpenParen)) {
-                    // function
-
-                    PlangFunction func;
-                    func.decl.returnType = type;
-                    func.decl.name = name;
-                    func.decl.arguments = null;
-
-                    expectFuncArgList(&func.decl.arguments);
-                    
-                    expectBlock(&func.scope);
-                    darrayAdd(functions, func);
-
-                } else {
-                    // global variable
-                    VarDecl decl;
-                    
-
-                    semicolon();
-                    printf("global variables are not implemented yet.\n");
-                }
-            } break;
+            case Tok_Keyword_Let: funcOrGlobal(true); break;
+            case Tok_Word: funcOrGlobal(false); break;
 
             case Tok_Keyword_Declare: {
                 // function declaration

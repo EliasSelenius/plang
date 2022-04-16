@@ -174,6 +174,13 @@ static PlangType* getDeclaredVariable(StrSpan name) {
         }
     }
 
+    // look for global var
+    len = darrayLength(globalVariables);
+    for (u32 i = 0; i < len; i++) {
+        if (spanEqualsSpan(name, globalVariables[i].name)) return &globalVariables[i].type;
+    }
+
+
     return null;
 }
 
@@ -476,14 +483,16 @@ static void validateScope(Codeblock* scope) {
 static void validateFunction(PlangFunction* func) {
     function = func;
 
-    if (func->decl.arguments) {
-        u32 len = darrayLength(func->decl.arguments);
-        for (u32 i = 0; i < len; i++) {
-            validateType(func->decl.arguments[i].type.structName);
-        }
+    if (func->mustInferReturnType) {
+        // TODO: infer return type
+    } else {
+        validateType(func->decl.returnType.structName);
     }
 
-    validateType(func->decl.returnType.structName);
+    if (func->decl.arguments) {
+        u32 len = darrayLength(func->decl.arguments);
+        for (u32 i = 0; i < len; i++) validateType(func->decl.arguments[i].type.structName);
+    }
 
     currentScope = null;
     validateScope(&func->scope);
@@ -501,6 +510,11 @@ u32 validate() {
     u32 struLen = darrayLength(structs);
     for (u32 i = 0; i < struLen; i++) {
         validateStruct(&structs[i]);
+    }
+
+    u32 globLen = darrayLength(globalVariables);
+    for (u32 i = 0; i < globLen; i++) {
+        // TODO: validate globals
     }
 
     variables = darrayCreate(Variable);

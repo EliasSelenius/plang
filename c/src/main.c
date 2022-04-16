@@ -19,8 +19,6 @@
         *- boolean comparisons 
         - function pointers
         - function overloads
-        - return type inference
-        - localy defined functions
         - localy defined structs
         *- clasic for loop: for (int i = 0; i < 10; i++)
         - for in range loop: for i in 0..10
@@ -34,6 +32,8 @@
     InProgress:
         - line numbers in validation errors
         *- global variables
+        - localy defined functions
+        - return type inference
 
 
     DONE list:

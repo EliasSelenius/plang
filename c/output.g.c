@@ -1,5 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
+#define true 1
+#define false 0
 // Structs
 typedef struct Entity {
     char* name;
@@ -25,16 +27,8 @@ int main() {
     void* t = test ? 0 : malloc(sizeof(Test));
     int f = true ? (12 + 2) : t ? 0 : true;
     Entity* e = make_entity("John");
-    {
-        Entity* g;
-        int i = 1;
-        {
-            if (true) {
-            }
-            i = 0;
-        }
-        g = e;
-    }
+    char* m = g_Name;
+    int g = g_Test->x;
     return 0;
 }
 Entity* make_entity(char* name) {

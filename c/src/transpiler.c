@@ -258,6 +258,8 @@ static void transpileFunctionSignature(FuncDeclaration* func) {
 }
 
 static void transpileFunction(PlangFunction* func) {
+    if (func->mustInferReturnType) return; // TODO: remove this
+
     transpileFunctionSignature(&func->decl);
     sbAppend(sb, " ");
     transpileBlock(&func->scope);
@@ -295,6 +297,7 @@ void transpile() {
 
     sbAppend(sb, "#include <stdlib.h>\n"); // malloc
     sbAppend(sb, "#include <stdio.h>\n"); // printf
+    sbAppend(sb, "#define true 1\n#define false 0\n");
 
     sbAppend(sb, "// Structs\n");
     u32 structsLen = darrayLength(structs);
@@ -305,7 +308,11 @@ void transpile() {
     sbAppend(sb, "\n// Forward declarations\n");
     u32 functionsLen = darrayLength(functions);
     for (u32 i = 0; i < functionsLen; i++) {
-        transpileFunctionSignature(&functions[i].decl);
+        PlangFunction* func = &functions[i];
+
+        if (func->mustInferReturnType) continue; // TODO: remove this
+
+        transpileFunctionSignature(&func->decl);
         sbAppend(sb, ";\n");
     }
     
