@@ -21,6 +21,7 @@
         - function overloads
         - return type inference
         - subfunctions
+        - localy defined structs
         *- clasic for loop: for (int i = 0; i < 10; i++)
         - for in range loop: for i in 0..10
         - loop block: loop { } == while (true) { }

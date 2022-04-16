@@ -417,24 +417,34 @@ static Statement* expectStatement() {
 
                 ValuePath* valuePath = parseValue();
 
-                if (tok(Tok_OpenParen)) {
-                    // funcCall
+                switch (tokens[token_index].type) {
+                    case Tok_OpenParen: {
+                        token_index++;
+                        // funcCall
+                        FuncCallStatement* funcCall = malloc(sizeof(FuncCallStatement));
+                        funcCall->base.statementType = Statement_FuncCall;
+                        expectFuncCallArgs(&funcCall->call, valuePath);
+                        res = (Statement*)funcCall;
+                    } break;
 
-                    FuncCallStatement* funcCall = malloc(sizeof(FuncCallStatement));
-                    funcCall->base.statementType = Statement_FuncCall;
-                    expectFuncCallArgs(&funcCall->call, valuePath);
-                    res = (Statement*)funcCall;
+                    case Tok_PlusEquals:
+                    case Tok_MinusEquals:
+                    case Tok_MulEquals:
+                    case Tok_DivEquals:
+                    case Tok_Assign: {
+                        // assignment
 
-                } else {
-                    // assignment
+                        Assignement* ass = malloc(sizeof(Assignement));
+                        ass->base.statementType = Statement_Assignment;
+                        ass->assignee = valuePath;
+                        ass->assignmentOper = tokens[token_index++].type;
+                        ass->expr = expectExpression();
+                        res = (Statement*)ass;
+                    } break;
 
-                    Assignement* ass = malloc(sizeof(Assignement));
-                    ass->base.statementType = Statement_Assignment;
-                    ass->assignee = valuePath;
-                    // TODO: verify tokentype here
-                    ass->assignmentOper = tokens[token_index++].type;
-                    ass->expr = expectExpression();
-                    res = (Statement*)ass;
+                    default: 
+                        unexpectedToken(); 
+                        return null;
                 }
             }
 
@@ -603,8 +613,7 @@ static void expectBlock(Codeblock* scope) {
         if (statement) {
             darrayAdd(scope->statements, statement);
         } else {
-            // there must have been an error. increment index to avoid infinite loop.
-            token_index++;
+            // there must have been an error.
         }
     }
 }

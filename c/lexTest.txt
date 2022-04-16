@@ -7,6 +7,9 @@ int main() {
 
 
     Entity* e = make_entity("John");
+    let f = alloc Entity;
+
+    e += f;
 
     {
         Entity* g;

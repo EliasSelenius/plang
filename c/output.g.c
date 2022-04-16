@@ -22,6 +22,8 @@ int get(int my_number);
 int main() {
     printf("Hello, Plang!");
     Entity* e = make_entity("John");
+    Entity* f = malloc(sizeof(Entity));
+    e += f;
     {
         Entity* g;
         int i = 1;
