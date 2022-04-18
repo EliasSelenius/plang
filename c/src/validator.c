@@ -358,7 +358,6 @@ static void validateScope(Codeblock* scope) {
         currentStatement = sta;
         switch (sta->statementType) {
             case Statement_Declaration: {
-
                 VarDecl* decl = (VarDecl*)sta;
 
                 // Check wheter there already is a variable with this name
@@ -395,7 +394,6 @@ static void validateScope(Codeblock* scope) {
                 } else {
                     validateType(decl->type.structName);
                 }
-
 
                 Variable var;
                 var.name = decl->name;
@@ -505,6 +503,12 @@ static void validateStruct(PlangStruct* stru) {
     }    
 }
 
+static void validateGlobalVar(VarDecl* decl) {
+    // TODO: validate globals
+
+
+}
+
 u32 validate() {
 
     u32 struLen = darrayLength(structs);
@@ -514,7 +518,15 @@ u32 validate() {
 
     u32 globLen = darrayLength(globalVariables);
     for (u32 i = 0; i < globLen; i++) {
-        // TODO: validate globals
+        VarDecl* decl = &globalVariables[i];
+        //validateGlobalVar(&globalVariables[i]);
+
+        for (u32 j = i+1; j < globLen; j++) {
+            if (spanEqualsSpan(globalVariables[j].name, decl->name)) {
+                error("Global variable \"%.*s\" name conflict.",
+                    decl->name.length, decl->name.start);
+            }
+        }
     }
 
     variables = darrayCreate(Variable);

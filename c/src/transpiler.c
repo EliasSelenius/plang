@@ -147,21 +147,24 @@ static void transpileIfStatement(IfStatement* ifst) {
     }
 }
 
+static void transpileVarDecl(VarDecl* decl) {
+    transpileType(decl->type);
+    sbAppend(sb, " ");
+    sbAppendSpan(sb, decl->name);
+
+    if (decl->assignmentOrNull) {
+        sbAppend(sb, " = ");
+        transpileExpression(decl->assignmentOrNull);
+    }
+
+    sbAppend(sb, ";");
+}
+
 static void transpileStatement(Statement* statement) {
     switch (statement->statementType) {
         case Statement_Declaration: {
             VarDecl* decl = (VarDecl*)statement;
-
-            transpileType(decl->type);
-            sbAppend(sb, " ");
-            sbAppendSpan(sb, decl->name);
-
-            if (decl->assignmentOrNull) {
-                sbAppend(sb, " = ");
-                transpileExpression(decl->assignmentOrNull);
-            }
-
-            sbAppend(sb, ";");
+            transpileVarDecl(decl);
         } break;
         case Statement_Assignment: {
             Assignement* ass = (Assignement*)statement;
@@ -316,6 +319,13 @@ void transpile() {
         sbAppend(sb, ";\n");
     }
     
+    sbAppend(sb, "\n// Globals\n");
+    u32 globLen = darrayLength(globalVariables);
+    for (u32 i = 0; i < globLen; i++) {
+        transpileVarDecl(&globalVariables[i]);
+        sbAppend(sb, "\n");
+    }
+
     sbAppend(sb, "\n// Implementations\n");
 
     for (u32 i = 0; i < functionsLen; i++) {     

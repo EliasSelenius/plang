@@ -29,6 +29,7 @@ int main() {
 char* g_Name = "Elias";
 Entity* g_Entity;
 let g_Test = alloc Test;
+let g_Entity2 = -0;
 
 struct Entity {
     char* name;

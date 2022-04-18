@@ -20,6 +20,12 @@ void yes(int i, char* str);
 void sayFoo(int i, char* str);
 int get(int my_number);
 
+// Globals
+char* g_Name = "Elias";
+Entity* g_Entity;
+Entity* g_Test = malloc(sizeof(Test));
+Entity* g_Entity2 = -0;
+
 // Implementations
 int main() {
     printf("Hello, Plang!");
