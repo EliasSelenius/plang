@@ -28,6 +28,7 @@
         - allow underscores in number literals
         *- switch statements
         - omit curl brackets in if/while etc. for single statement block
+        *- multiple files 
 
     InProgress:
         - line numbers in validation errors

@@ -556,7 +556,6 @@ static void funcOrGlobal(bool typeinfer) {
         darrayAdd(globalVariables, decl);
 
         semicolon();
-        // printf("global variables are not implemented yet.\n");
     }
 }
 

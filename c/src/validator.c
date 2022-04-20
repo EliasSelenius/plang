@@ -154,28 +154,32 @@ static PlangType getExpressedType(Expression* expr) {
 
 
 static PlangType* getDeclaredVariable(StrSpan name) {
-    
+
     // look for local var
-    u32 len = darrayLength(variables);
-    for (u32 i = 0; i < len; i++) {
-        if (spanEqualsSpan(name, variables[i].name)) {
-            return variables[i].type;
+    if (variables) {
+        u32 len = darrayLength(variables);
+        for (u32 i = 0; i < len; i++) {
+            if (spanEqualsSpan(name, variables[i].name)) {
+                return variables[i].type;
+            }
         }
     }
 
     // look for func argument
-    if (function->decl.arguments) {
-        len = darrayLength(function->decl.arguments);
-        for (u32 i = 0; i < len; i++) {
-            FuncArg* arg = &function->decl.arguments[i];
-            if (spanEqualsSpan(name, arg->name)) {
-                return &arg->type;
+    if (function) {
+        if (function->decl.arguments) {
+            u32 len = darrayLength(function->decl.arguments);
+            for (u32 i = 0; i < len; i++) {
+                FuncArg* arg = &function->decl.arguments[i];
+                if (spanEqualsSpan(name, arg->name)) {
+                    return &arg->type;
+                }
             }
         }
     }
 
     // look for global var
-    len = darrayLength(globalVariables);
+    u32 len = darrayLength(globalVariables);
     for (u32 i = 0; i < len; i++) {
         if (spanEqualsSpan(name, globalVariables[i].name)) return &globalVariables[i].type;
     }
@@ -504,9 +508,24 @@ static void validateStruct(PlangStruct* stru) {
 }
 
 static void validateGlobalVar(VarDecl* decl) {
-    // TODO: validate globals
+    if (decl->assignmentOrNull) {
+        PlangType assType;
+        if (validateExpression(decl->assignmentOrNull)) assType = getExpressedType(decl->assignmentOrNull);
+        else return; // if type could not be determined then we should not continue.
 
+        if (decl->mustInferType) {
+            decl->type = assType;
+        } else {
+            validateType(decl->type.structName);
 
+            if (!typeEquals(decl->type, assType)) {
+                error("Type missmatch in global.");
+            }
+        }
+
+    } else {
+        validateType(decl->type.structName);
+    }
 }
 
 u32 validate() {
@@ -519,7 +538,7 @@ u32 validate() {
     u32 globLen = darrayLength(globalVariables);
     for (u32 i = 0; i < globLen; i++) {
         VarDecl* decl = &globalVariables[i];
-        //validateGlobalVar(&globalVariables[i]);
+        validateGlobalVar(&globalVariables[i]);
 
         for (u32 j = i+1; j < globLen; j++) {
             if (spanEqualsSpan(globalVariables[j].name, decl->name)) {

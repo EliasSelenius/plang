@@ -9,27 +9,19 @@ int main() {
     printf("Hello, Plang!");
     // printf("Hello, This is printf() from %s\n", "plang");
 
-    Test* test = alloc Test[64];
-
-    // int num = 12 + true / null;
-
-    let t = test ? null : alloc Test;
-
-    let f = (true ? (12 + 2) : t ? null : true);
-
-    Entity* e = make_entity("John");
-
-    char* m = g_Name;
-
-    let g = g_Test.x;
 
     return 0;
 }
 
 char* g_Name = "Elias";
-Entity* g_Entity;
-let g_Test = alloc Test;
-let g_Entity2 = -0;
+let g_Entity = make_entity(g_Name);
+
+let tre = tre;
+
+let a = b;
+let b = a;
+
+let nomo = g_Entity;
 
 struct Entity {
     char* name;
@@ -57,9 +49,8 @@ int get(int my_number) {
     return my_number;
 }
 
-
-
 struct Test {
     float x;
     float y;
+    Test test;
 }

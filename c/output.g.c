@@ -11,6 +11,7 @@ typedef struct Entity {
 typedef struct Test {
     float x;
     float y;
+    Test test;
 } Test;
 
 // Forward declarations
@@ -22,19 +23,15 @@ int get(int my_number);
 
 // Globals
 char* g_Name = "Elias";
-Entity* g_Entity;
-Entity* g_Test = malloc(sizeof(Test));
-Entity* g_Entity2 = -0;
+Entity* g_Entity = make_entity(g_Name);
+char* tre = tre;
+char* a = b;
+char* b = a;
+Entity* nomo = g_Entity;
 
 // Implementations
 int main() {
     printf("Hello, Plang!");
-    Test* test = malloc(sizeof(Test) * 64);
-    void* t = test ? 0 : malloc(sizeof(Test));
-    int f = true ? (12 + 2) : t ? 0 : true;
-    Entity* e = make_entity("John");
-    char* m = g_Name;
-    int g = g_Test->x;
     return 0;
 }
 Entity* make_entity(char* name) {
