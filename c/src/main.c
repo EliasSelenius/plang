@@ -29,6 +29,7 @@
         *- switch statements
         - omit curl brackets in if/while etc. for single statement block
         *- multiple files 
+        *- struct self-reference
 
     InProgress:
         - line numbers in validation errors

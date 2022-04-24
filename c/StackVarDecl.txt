@@ -1,0 +1,80 @@
+
+int g_Num;
+
+void start() {
+    int ^start = g_Num;
+}
+
+void other() {
+    Foo* ^start;
+}
+
+void end() {
+    g_Num = ^start;
+}
+
+
+void some() {
+
+    void localFunc() {
+        printf("%s", name);
+    }
+
+
+    // int start = g_Num;
+    start();
+    // other();
+
+    int i = start;
+
+    char* name = getRandomName();
+    localFunc();
+
+    // { // ...
+    //     g_Num++;
+    //     if (true) {
+    //         some();
+    //     } else if (idontknow) {
+    //         start();
+    //         // ...
+    //         end();
+    //     }
+    // }
+
+    //g_Num = start;
+    end();
+
+    
+}
+
+
+char* getRandomName() {
+    // char* name = malloc(200);
+    char ^name[200];
+    return name;
+}
+
+
+void rec1() {
+    int ^i = 1;
+
+    //  ^i good
+    //   i bad
+
+    rec1();
+
+    //  ^i good
+    //   i good
+}
+
+
+int someFuncThatgetsCalledByRec2() {
+    printf("Assignement happend\n");
+    return 23;
+}
+void rec2() {
+    if (false) {
+        int ^i = someFuncThatgetsCalledByRec2();
+    }
+    rec2();
+}
