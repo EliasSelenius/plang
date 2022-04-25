@@ -305,6 +305,13 @@ void transpile() {
     sbAppend(sb, "// Structs\n");
     u32 structsLen = darrayLength(structs);
     for (u32 i = 0; i < structsLen; i++) {
+        sbAppend(sb, "typedef struct ");
+        sbAppendSpan(sb, structs[i].name);
+        sbAppend(sb, " ");
+        sbAppendSpan(sb, structs[i].name);
+        sbAppend(sb, ";\n");
+    }
+    for (u32 i = 0; i < structsLen; i++) {
         transpileStruct(&structs[i]);
     }
 

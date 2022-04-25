@@ -21,12 +21,24 @@ static u32 numberOfErrors = 0;
 
 bool validateExpression(Expression* expr);
 
-
 inline void error(char* format, ...) {
     // TODO: better line of not only statements
     u32 lineNum = 0;
     if (currentStatement) lineNum = currentStatement->nodebase.lineNumber;  
     printf("Error Ln%d: ", lineNum);
+
+    va_list args;
+    va_start(args, format);
+    vprintf(format, args);
+    va_end(args);
+    
+    printf("\n");
+
+    numberOfErrors++;
+}
+
+inline void errorLine(u32 line, char* format, ...) {
+    printf("Error Ln%d: ", line);
 
     va_list args;
     va_start(args, format);
@@ -424,12 +436,15 @@ static void validateScope(Codeblock* scope) {
                 validateScope(&((Scope*)sta)->codeblock);
             } break;
             case Statement_If: {
-                // TODO: check if condition is a boolean expression
                 IfStatement* ifsta = (IfStatement*)sta;
+
+                // TODO: check if condition is a boolean expression
+                validateExpression(ifsta->condition);
                 validateScope(&ifsta->scope);
 
                 while (ifsta->next) {
                     ifsta = ifsta->next;
+                    if (ifsta->condition) validateExpression(ifsta->condition);
                     validateScope(&ifsta->scope);
                 }
 
@@ -437,6 +452,7 @@ static void validateScope(Codeblock* scope) {
             case Statement_While: {
                 WhileStatement* whileSta = (WhileStatement*)sta;
                 // TODO: check if condition is a boolean expression
+                validateExpression(whileSta->condition);
                 validateScope(&whileSta->scope);
             } break;
 
@@ -503,8 +519,14 @@ static void validateFunction(PlangFunction* func) {
 static void validateStruct(PlangStruct* stru) {
     u32 fieldLen = darrayLength(stru->fields);
     for (u32 i = 0; i < fieldLen; i++) {
-        validateType(stru->fields[i].type.structName);
-    }    
+        Field* field = &stru->fields[i]; 
+        validateType(field->type.structName);
+
+        if (field->type.numPointers == 0 && spanEqualsSpan(field->type.structName, stru->name)) {
+            errorLine(field->nodebase.lineNumber, "Struct \"%.*s\" self reference by value.",
+                stru->name.length, stru->name.start);
+        }
+    }
 }
 
 static void validateGlobalVar(VarDecl* decl) {

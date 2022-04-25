@@ -3,6 +3,8 @@
 #define true 1
 #define false 0
 // Structs
+typedef struct Entity Entity;
+typedef struct Test Test;
 typedef struct Entity {
     char* name;
     int x;
@@ -11,7 +13,8 @@ typedef struct Entity {
 typedef struct Test {
     float x;
     float y;
-    Test test;
+    Test* test;
+    void* ptr;
 } Test;
 
 // Forward declarations
@@ -23,15 +26,17 @@ int get(int my_number);
 
 // Globals
 char* g_Name = "Elias";
-Entity* g_Entity = make_entity(g_Name);
-char* tre = tre;
-char* a = b;
-char* b = a;
-Entity* nomo = g_Entity;
 
 // Implementations
 int main() {
-    printf("Hello, Plang!");
+    printf("Hello, Plang!\n");
+    Test test;
+    test.ptr = 0;
+    if (test.ptr) {
+        printf("There is a test\n");
+    } else {
+        printf("No There is no test\n");
+    }
     return 0;
 }
 Entity* make_entity(char* name) {

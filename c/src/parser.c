@@ -315,6 +315,7 @@ static IfStatement* expectIfStatement() {
             IfStatement* elseStatement = malloc(sizeof(IfStatement));
             elseStatement->base.statementType = Statement_If;
             elseStatement->condition = null;
+            elseStatement->next = null;
             expectBlock(&elseStatement->scope);
 
             res->next = elseStatement;
@@ -487,6 +488,7 @@ static PlangStruct expectStruct() {
 
     do {
         Field field;
+        field.nodebase.lineNumber = tokens[token_index].line;
         field.type = expectType();
         field.name = identifier();
         semicolon();

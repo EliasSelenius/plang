@@ -29,7 +29,6 @@
         *- switch statements
         - omit curl brackets in if/while etc. for single statement block
         *- multiple files 
-        *- struct self-reference
 
     InProgress:
         - line numbers in validation errors
@@ -39,6 +38,7 @@
 
 
     DONE list:
+        *- struct self-reference
         *- restructure expression types
         - scopes
         - type missmatch in assignments and declarations

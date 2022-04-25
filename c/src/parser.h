@@ -188,6 +188,7 @@ typedef struct FuncCallStatement {
 // ----Struct----------------------------------------------
 
 typedef struct Field {
+    Node nodebase;
     PlangType type;
     StrSpan name;
 } Field;
@@ -198,6 +199,13 @@ typedef struct PlangStruct {
     Field* fields; // darray
 } PlangStruct;
 
+
+typedef struct TranslationUnit {
+    PlangFunction* functions; // darray
+    FuncDeclaration* functionDeclarations; // darray
+    PlangStruct* structs; // darray
+    VarDecl* globalVariables; // darray
+} TranslationUnit;
 
 extern PlangFunction* functions;
 extern FuncDeclaration* functionDeclarations;

@@ -6,22 +6,31 @@ let yo() {
 }
 
 int main() {
-    printf("Hello, Plang!");
+    printf("Hello, Plang!\n");
     // printf("Hello, This is printf() from %s\n", "plang");
 
+    Test test;
+    test.ptr = null;
+    // test.test = alloc Test;
+
+    if (test.ptr) {
+        printf("There is a test\n");
+    } else {
+        printf("No There is no test\n");
+    }
 
     return 0;
 }
 
 char* g_Name = "Elias";
-let g_Entity = make_entity(g_Name);
+// let g_Entity = make_entity(g_Name);
 
-let tre = tre;
+// TODO: fix:
+// let tre = tre.name;
+// let a = b;
+// let b = a;
 
-let a = b;
-let b = a;
-
-let nomo = g_Entity;
+// let nomo = g_Entity;
 
 struct Entity {
     char* name;
@@ -52,5 +61,6 @@ int get(int my_number) {
 struct Test {
     float x;
     float y;
-    Test test;
+    Test* test;
+    void* ptr;
 }
