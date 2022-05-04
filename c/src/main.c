@@ -28,7 +28,7 @@
         - allow underscores in number literals
         *- switch statements
         - omit curl brackets in if/while etc. for single statement block
-        *- multiple files 
+        - hash identifiers (Tok_Word tokens) for faster string equals and to free the file buffer
 
     InProgress:
         - line numbers in validation errors
@@ -38,6 +38,7 @@
 
 
     DONE list:
+        *- multiple files 
         *- struct self-reference
         *- restructure expression types
         - scopes
@@ -65,7 +66,7 @@ char* fileread(const char* filename, u32* strLength) {
     FILE* file;
     if ( fopen_s(&file, filename, "r") ) {
         printf("Could not read file: %s\n", filename);
-        return NULL;
+        return null;
     }
 
     fseek(file, 0, SEEK_END);
@@ -102,38 +103,46 @@ void filewrite(const char* filename, char* content) {
 
 // } PlangFile;
 
-
-void startPerf();
-i64 endPerf();
-
-int main(int argc, char* argv[]) {
-
-    for (u32 i = 0; i < argc; i++) {
-        printf("    %d. %s\n", i, argv[i]);
-    }
-
-    startPerf();
-
-    u32 filesize;
-    char* text = fileread("lexTest.txt", &filesize);
+void addFile(char* filename) {
+    u32 filesize = 0;
+    char* fileContent = fileread(filename, &filesize);
+    if (!fileContent) return;
 
     printf("Tokenize...\n");
-    u32 numErrors = lex(text);
+    u32 numErrors = lex(fileContent);
     if (numErrors) {
         printf("There were %d errors during tokenizing.\nFix errors and try again.\n", numErrors);
-        return 0;
+        exit(0); // TODO: handle this properly
     }
 
     printf("Parse...\n");
     numErrors = parse();
     if (numErrors) {
         printf("There were %d errors during parsing.\nFix errors and try again.\n", numErrors);
-        return 0;
+        exit(0);
+    }
+
+    // TODO: Tokens are refering to the fileContent, so we can't free yet, but we probably should
+    // free(fileContent);
+
+}
+
+void startPerf();
+i64 endPerf();
+
+int main(int argc, char* argv[]) {
+
+
+    startPerf();
+
+    printf("Files:\n");
+    for (u32 i = 1; i < argc; i++) {
+        printf("    %d. %s\n", i, argv[i]);
+        addFile(argv[i]);
     }
 
     printf("Validate...\n");
-    numErrors = validate();
-
+    u32 numErrors = validate();
     if (numErrors) {
         printf("There were %d errors during validation.\nFix errors and try again.\n", numErrors);
         return 0;

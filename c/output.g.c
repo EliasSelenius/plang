@@ -5,6 +5,7 @@
 // Structs
 typedef struct Entity Entity;
 typedef struct Test Test;
+typedef struct Person Person;
 typedef struct Entity {
     char* name;
     int x;
@@ -16,6 +17,10 @@ typedef struct Test {
     Test* test;
     void* ptr;
 } Test;
+typedef struct Person {
+    char* name;
+    int age;
+} Person;
 
 // Forward declarations
 int main();
@@ -23,13 +28,14 @@ Entity* make_entity(char* name);
 void yes(int i, char* str);
 void sayFoo(int i, char* str);
 int get(int my_number);
+void sayHello(Person* p);
 
 // Globals
 char* g_Name = "Elias";
 
 // Implementations
 int main() {
-    printf("Hello, Plang!\n");
+    printf("    Hello, Plang!\n");
     Test test;
     test.ptr = 0;
     if (test.ptr) {
@@ -37,6 +43,12 @@ int main() {
     } else {
         printf("No There is no test\n");
     }
+    Person* p = malloc(sizeof(Person));
+    p->name = g_Name;
+    sayHello(p);
+    printf("Persons name is: ");
+    printf(p->name);
+    printf("\n");
     return 0;
 }
 Entity* make_entity(char* name) {
@@ -54,4 +66,7 @@ void sayFoo(int i, char* str) {
 }
 int get(int my_number) {
     return my_number;
+}
+void sayHello(Person* p) {
+    printf("Hello, From Person.\n");
 }

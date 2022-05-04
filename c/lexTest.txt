@@ -6,7 +6,7 @@ let yo() {
 }
 
 int main() {
-    printf("Hello, Plang!\n");
+    printf("    Hello, Plang!\n");
     // printf("Hello, This is printf() from %s\n", "plang");
 
     Test test;
@@ -18,6 +18,14 @@ int main() {
     } else {
         printf("No There is no test\n");
     }
+
+    let p = alloc Person;
+    p.name = g_Name;
+    sayHello(p);
+
+    printf("Persons name is: ");
+    printf(p.name);
+    printf("\n");
 
     return 0;
 }

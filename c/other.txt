@@ -1,0 +1,9 @@
+
+struct Person {
+    char* name;
+    int age;
+}
+
+void sayHello(Person* p) {
+    printf("Hello, From Person.\n");
+}

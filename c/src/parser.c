@@ -10,7 +10,7 @@ void expectBlock(Codeblock* scope);
 Expression* parseExpression();
 Expression* expectExpression();
 
-static u32 token_index;
+static u32 token_index = 0;
 
 PlangFunction* functions = null;
 FuncDeclaration* functionDeclarations = null;
@@ -564,12 +564,15 @@ static void funcOrGlobal(bool typeinfer) {
 u32 parse() {
 
     // TODO: PlangFile
-    functions = darrayCreate(PlangFunction);
-    functionDeclarations = darrayCreate(FuncDeclaration);
-    structs = darrayCreate(PlangStruct);
-    globalVariables = darrayCreate(VarDecl);
+    if (!functions) {
+        functions = darrayCreate(PlangFunction);
+        functionDeclarations = darrayCreate(FuncDeclaration);
+        structs = darrayCreate(PlangStruct);
+        globalVariables = darrayCreate(VarDecl);
+    }
 
-    token_index = 0;
+    // token_index = 0;
+
     while (token_index < tokens_length) {
 
         switch (tokens[token_index].type) {
