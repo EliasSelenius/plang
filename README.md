@@ -16,11 +16,9 @@ Some C features that have been removed/changed/added are:
 
 - Function overloads. Do you rotate using quaternions or euler-angles? It doesnt matter anyway since with overloads a hypothetical rotate() function could use both. They're not needed but they're noice.
 
-- Type inference. Working with languages that support type inference, I connot remember the last time I bothered to specify the type of a variable. Type inference is syntax sugar I cannot live without. Return types can also be inferred, I don't necessarily think this is good feature because when you create a function, you are actually doing two things: implementing the function, and designing the API, I think it's better to be specific about a functions return type when you design an API, but as you'll see, return type inference works well with sub-functions and internal/private functions.
+- Type inference. Working with languages that support type inference, I connot remember the last time I bothered to specify the type of a variable. Type inference is syntax sugar I cannot live without. Return types can also be inferred, I don't necessarily think this is good feature because when you create a function, you are actually doing two things: implementing the function, and designing the API, I think it's better to be specific about a functions return type when you design an API, but as you'll see, return type inference works well with localy defined functions and internal/private functions.
 
-- Type arguments.
-
-- Run time type information. If required the transpiler should generate type information on structs, enums and functions.
+- Introspection capabilities. c# and java have the reflection apis, c have no form of introspection/reflection, I'd really like to get a string (or char*) representation of enum values for example. Or just know the fields of a struct at runtime. So, if required, the compiler should generate type information on structs, enums and functions. But, there is a much more powerfull language capability here, by serializing the syntax tree to disk, one can read it during runtime of the application, (or during compile-time), this gives you the most instrosepction you'll ever need.
 
 
 
@@ -32,11 +30,56 @@ Some C features that have been removed/changed/added are:
 
 ## Type Inference
 
-### Locals
-### Return Types
-### Literals
+``` c
+// Type-infer a variable with the "let" keyword.
+let x = 1.0;
+// x is float
 
-## Sub-Functions
+// You can also type-infer return types
+let add(float x, float y) {
+    return x + y;
+}
+// add(x, y) is float
+```
+### Null literal type inference
+Most languages dont allow for the null-literal to be type-infered,
+however plang does allow for this.
+``` rust
+let p = null;
+// what type could p be?
+```
+Reasoning: zero (0) and null represents the same value, but the difference is that zero implies an integral type, while null implies a pointer type. Null does not however say anything about what type it is pointing to, luckily there exist exactly such a type.
+
+<details>
+    <summary>Answer</summary>
+
+    p is void*
+</details>
+
+### Number literal type suffixes
+// TODO: fill out section
+
+
+
+## Localy defined functions
+
+Functions can be declared inside other functions.
+``` c
+void main() {
+    bool isLowerCaseLetter(char c) {
+        return c >= 'a' and c <= 'z';
+    }
+
+    printf("Type your name:\n");
+    char* input = getInput();
+    if (isLowerCaseLetter(input[0])) {
+        printf("I dont mean to be nitpicky, but your name should start with a capital letter.\n");
+    }
+}
+```
+// TODO: capturing variables
+
+## Localy defined structs
 
 ## Function Pointers
 
