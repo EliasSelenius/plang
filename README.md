@@ -48,13 +48,7 @@ however plang does allow for this.
 let p = null;
 // what type could p be?
 ```
-Reasoning: zero (0) and null represents the same value, but the difference is that zero implies an integral type, while null implies a pointer type. Null does not however say anything about what type it is pointing to, luckily there exist exactly such a type.
-
-<details>
-    <summary>Answer</summary>
-
-    p is void*
-</details>
+Reasoning: the zero-literal ("0") and the null-literal ("null") represents the same value, but the difference is that zero implies an integral type, while null implies a pointer type. Null does not however say anything about what type it is pointing to, only that it is a pointer. There already exists such a type in c. So naturally the type of the null literal is void*.
 
 ### Number literal type suffixes
 // TODO: fill out section
