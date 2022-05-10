@@ -48,6 +48,7 @@ typedef struct StringBuilder {
 StringBuilder sbCreateWithCapacity(u32 initialCapacity);
 StringBuilder sbCreate();
 void sbDestroy(StringBuilder* sb);
+void sbAppendChar(StringBuilder* sb, char c);
 void sbAppend(StringBuilder* sb, char* str);
 void sbAppendSpan(StringBuilder* sb, StrSpan str);
 void sbCopyIntoBuffer(StringBuilder* sb, char* buffer, u32 bufferLength);

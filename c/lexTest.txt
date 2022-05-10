@@ -9,6 +9,17 @@ int main() {
     printf("    Hello, Plang!\n");
     // printf("Hello, This is printf() from %s\n", "plang");
 
+    { // test boolean op
+        let isSome = true;
+
+        if (isSome and false) {
+            printf("YEES\n")
+        } else {
+            printf("NOOO\n");
+        }
+
+    }
+
     Test test;
     test.ptr = null;
     // test.test = alloc Test;

@@ -1,8 +1,7 @@
 #include "essh-string.h"
 #include "types.h"
 
-
-#include <stdlib.h> // included for NULL
+#include <stdlib.h> // included for malloc
 #include <string.h> // included for strlen()
 
 
@@ -99,7 +98,7 @@ StringBuilder sbCreate() {
 
 void sbDestroy(StringBuilder* sb) {
     free(sb->content);
-    sb->content = NULL;
+    sb->content = null;
     sb->capacity = sb->length = 0;
 }
 
@@ -116,6 +115,13 @@ static void growBufferSize(StringBuilder* sb, u32 additionalSpace) {
         
         sb->content = realloc(sb->content, sb->capacity);
     }
+}
+
+void sbAppendChar(StringBuilder* sb, char c) {
+    growBufferSize(sb, 1);
+    sb->content[sb->length++] = c;
+    // make sure the content is zero-terminated, so that it can be used as a c string
+    sb->content[sb->length] = '\0';
 }
 
 void sbAppend(StringBuilder* sb, char* str) {

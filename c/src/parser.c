@@ -254,6 +254,8 @@ static Expression* testForTernary(Expression* expr) {
     return (Expression*)ter;
 }
 
+
+/*
 // returns null if it fails to parse an expression
 static Expression* parseExpression() {
     Expression* leaf = parseLeafExpression();
@@ -283,6 +285,7 @@ static Expression* parseExpression() {
     
     return testForTernary((Expression*)arith);
 }
+*/
 
 static Expression* expectExpression() {
     Expression* res = parseExpression();
@@ -295,6 +298,56 @@ static Expression* expectExpression() {
     return res;
 }
 
+/*
+    a + b * c
+
+      +
+     / \
+    a   *
+       / \
+      b   c
+
+
+
+    a * b + c
+
+          +
+         / \
+        *   c
+       / \
+      a   b
+
+*/
+
+
+static Expression* testForBinaryOperator(Expression* from) {
+    
+    TokenType tokentype = tokens[token_index].type;
+    if (!isOperator(tokentype)) return from;
+    token_index++;
+
+    BinaryOperator* op = malloc(sizeof(BinaryOperator));
+    op->base.expressionType = (ExprType)tokentype; 
+    op->left = from;
+
+    Expression* next = parseLeafExpression();
+    if (!next) {
+        error("..."); // TODO: fill out error message
+    }
+
+    next = testForBinaryOperator(next);
+
+    op->right = next;
+
+    return (Expression*)op;
+}
+
+static Expression* parseExpression() {
+    Expression* leaf = parseLeafExpression();
+    if (!leaf) return null;
+
+    return testForBinaryOperator(leaf);
+}
 
 static IfStatement* expectIfStatement() {
     IfStatement* res = malloc(sizeof(IfStatement));

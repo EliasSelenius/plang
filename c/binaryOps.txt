@@ -1,0 +1,11 @@
+
+declare void printf(char* str);
+
+int main() {
+
+    printf("Testing binary operations.\n");
+
+    let x = 12 / 2 + 6 * (2 + 6);
+
+    return 0;
+}

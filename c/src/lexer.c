@@ -70,6 +70,8 @@ u32 lex(char* input) {
             else if (spanEquals(word, "while")) tokType = Tok_Keyword_While;
             else if (spanEquals(word, "true")) tokType = Tok_Keyword_True;
             else if (spanEquals(word, "false")) tokType = Tok_Keyword_False;
+            else if (spanEquals(word, "and")) tokType = Tok_Keyword_And;
+            else if (spanEquals(word, "or")) tokType = Tok_Keyword_Or;
             else if (spanEquals(word, "null")) tokType = Tok_Keyword_Null;
             else if (spanEquals(word, "continue")) tokType = Tok_Keyword_Continue;
             else if (spanEquals(word, "break")) tokType = Tok_Keyword_Break;

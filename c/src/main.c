@@ -29,6 +29,7 @@
         *- switch statements
         - omit curl brackets in if/while etc. for single statement block
         - hash identifiers (Tok_Word tokens) for faster string equals and to free the file buffer
+        - nested multi-line comments
 
     InProgress:
         - line numbers in validation errors
@@ -131,6 +132,11 @@ void startPerf();
 i64 endPerf();
 
 int main(int argc, char* argv[]) {
+
+    if (argc == 1) {
+        printf("Insufficent arguments.\n");
+        return 0;
+    }
 
 
     startPerf();

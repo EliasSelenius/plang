@@ -49,7 +49,7 @@ static void transpileFuncCall(FuncCall* func) {
 static void transpileExpression(Expression* expr) {
 
     switch (expr->expressionType) {
-        case ExprType_Arithmetic: {
+        /* case ExprType_Arithmetic: {
             sbAppend(sb, "(");
 
             ArithmeticExpression* arith = (ArithmeticExpression*)expr;
@@ -63,7 +63,25 @@ static void transpileExpression(Expression* expr) {
             }
 
             sbAppend(sb, ")");
+        } break; */
+
+        {
+            char operator = '\0';
+
+            case ExprType_Plus: operator = '+';  goto end;
+            case ExprType_Minus: operator = '-'; goto end;
+            case ExprType_Mul: operator = '*';   goto end;
+            case ExprType_Div: operator = '/';   goto end;
+
+            end:
+            BinaryOperator* bop = (BinaryOperator*)expr;
+            sbAppend(sb, "(");
+            transpileExpression(bop->left);
+            sbAppendChar(sb, operator);
+            transpileExpression(bop->right);
+            sbAppend(sb, ")"); 
         } break;
+
 
         case ExprType_Literal_Null: {
             sbAppend(sb, "0");

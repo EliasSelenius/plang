@@ -128,7 +128,11 @@ static PlangType getExpressedType(Expression* expr) {
             ValuePath* value = ((ExpressionProxy*)expr)->node;
             return getExpressedTypeValuePath(value);
         } break;
-        case ExprType_Arithmetic: {
+        
+        case ExprType_Plus:
+        case ExprType_Minus:
+        case ExprType_Mul:
+        case ExprType_Div: {
             return (PlangType) { 
                 .structName = spFrom("int"),
                 .numPointers = 0
@@ -322,9 +326,9 @@ static bool validateExpression(Expression* expr) {
             return validateValue(var);
         } break;
 
-        case ExprType_Arithmetic: {
-            // is a valid operator operands pair?
-        } break;
+        // case ExprType_Arithmetic: {
+        //     // is a valid operator operands pair?
+        // } break;
         
         case ExprType_Alloc: {
             AllocExpression* alloc = (AllocExpression*)expr;
