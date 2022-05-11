@@ -16,14 +16,14 @@ void printInt(int i) {
 }
 int main() {
     printf("Testing binary operations.\n", 0);
-    int x = ((1 + (2 * 3)) + 4);
+    int a = 1;
+    int e = 3;
+    int x = ((a + (2 * 3)) + 4);
     int y = (((1 * 2) + 3) + 4);
-    int _y = ((1 * (2 + 3)) + 4);
-    int z = ((1 - (9 / 3)) + (4 * 5));
+    int _y = ((1 * (2 + e)) + 4);
+    int g = (9 / (3 + 4));
+    printInt(g);
+    int z = ((1 - (9 / (3 + 7))) * 5);
     printInt(z);
-
-    int _z = 1 - 9 / 3 + 4 * 5;
-    printInt(_z);
-
     return 0;
 }

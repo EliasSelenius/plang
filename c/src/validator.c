@@ -318,6 +318,7 @@ static void validateFuncCall(FuncCall* call) {
     }
 }
 
+// returns wheter the expressed type could be determined
 static bool validateExpression(Expression* expr) {
     switch (expr->expressionType) {        
         case ExprType_Variable: {
@@ -326,9 +327,15 @@ static bool validateExpression(Expression* expr) {
             return validateValue(var);
         } break;
 
-        // case ExprType_Arithmetic: {
-        //     // is a valid operator operands pair?
-        // } break;
+        case ExprType_Plus:
+        case ExprType_Minus:
+        case ExprType_Mul:
+        case ExprType_Div: {
+            BinaryExpression* bop = (BinaryExpression*)expr;
+            if (validateExpression(bop->left) && validateExpression(bop->right)) {
+                // TODO: is a valid operator operands pair?
+            } else return false;
+        } break;
         
         case ExprType_Alloc: {
             AllocExpression* alloc = (AllocExpression*)expr;

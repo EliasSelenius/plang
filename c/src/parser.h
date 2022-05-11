@@ -64,19 +64,11 @@ typedef struct BinaryExpression {
     Expression* right;
 } BinaryExpression;
 
-typedef struct ArithmeticExpression {
-    Expression base;
-    u32 count;
-    StrSpan* operators; // TODO: maybe use different type than StrSpan
-    Expression** subExpressions;
-} ArithmeticExpression;
-
 typedef struct AllocExpression {
     Expression base;
     Expression* sizeExpr;
     PlangType type;
 } AllocExpression;
-
 
 typedef struct ValuePath {
     

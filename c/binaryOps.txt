@@ -9,13 +9,18 @@ int main() {
 
     printf("Testing binary operations.\n", 0);
 
-    let x = 1 + 2 * 3 + 4;
+    let a = 1;
+    let e = 3;
+
+    let x = a + 2 * 3 + 4;
     //   ((1 + (2 * 3)) + 4)
     
     let y = 1 * 2 + 3 + 4;
-    let _y = 1 * (2 + 3) + 4;
+    let _y = 1 * (2 + e) + 4;
 
-    let z = 1 - 9 / 3 + 4 * 5;
+    let g = 9 / (3 + 4);
+    printInt(g);
+    let z = 1 - 9 / (3 + 7) * 5;
     printInt(z);
 
 

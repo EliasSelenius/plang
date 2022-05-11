@@ -254,39 +254,6 @@ static Expression* testForTernary(Expression* expr) {
     return (Expression*)ter;
 }
 
-
-/*
-// returns null if it fails to parse an expression
-static Expression* parseExpression() {
-    Expression* leaf = parseLeafExpression();
-    if (!leaf) return null;
-
-    u32 num = 0;
-    Expression* temp[16]; // TODO: these arrays needs to go.
-    temp[num++] = leaf;
-    StrSpan ops[15];
-
-    while (isOperator(tokens[token_index].type)) {
-        ops[num-1] = tokens[token_index++].value;
-        temp[num++] = parseLeafExpression(); // TODO: test for null
-    }
-
-    if (num == 1) return testForTernary(leaf);
-
-    ArithmeticExpression* arith = malloc(sizeof(ArithmeticExpression));
-    arith->base.expressionType = ExprType_Arithmetic;
-    arith->base.nodebase.lineNumber = leaf->nodebase.lineNumber;
-    arith->count = num;
-    arith->operators = malloc(sizeof(StrSpan) * (num-1));
-    arith->subExpressions = malloc(sizeof(Expression*) * num);
-
-    for (u32 i = 0; i < num-1; i++) arith->operators[i] = ops[i];
-    for (u32 i = 0; i < num; i++) arith->subExpressions[i] = temp[i];
-    
-    return testForTernary((Expression*)arith);
-}
-*/
-
 static Expression* expectExpression() {
     Expression* res = parseExpression();
     if (res == null) {
