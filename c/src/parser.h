@@ -32,6 +32,7 @@ typedef enum ExprType {
     ExprType_Ternary,
     ExprType_FuncCall,
 
+
     ExprType_Plus = Tok_Plus,
     ExprType_Minus = Tok_Minus,
     ExprType_Mul = Tok_Mul,
@@ -57,11 +58,11 @@ typedef struct LiteralExpression {
     StrSpan value; // TODO: maybe use different type than StrSpan
 } LiteralExpression;
 
-typedef struct BinaryOperator {
+typedef struct BinaryExpression {
     Expression base;
     Expression* left;
     Expression* right;
-} BinaryOperator;
+} BinaryExpression;
 
 typedef struct ArithmeticExpression {
     Expression base;

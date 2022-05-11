@@ -66,18 +66,18 @@ static void transpileExpression(Expression* expr) {
         } break; */
 
         {
-            char operator = '\0';
+            char* operator = null;
 
-            case ExprType_Plus: operator = '+';  goto end;
-            case ExprType_Minus: operator = '-'; goto end;
-            case ExprType_Mul: operator = '*';   goto end;
-            case ExprType_Div: operator = '/';   goto end;
+            case ExprType_Plus: operator = " + ";  goto end;
+            case ExprType_Minus: operator = " - "; goto end;
+            case ExprType_Mul: operator = " * ";   goto end;
+            case ExprType_Div: operator = " / ";   goto end;
 
             end:
-            BinaryOperator* bop = (BinaryOperator*)expr;
+            BinaryExpression* bop = (BinaryExpression*)expr;
             sbAppend(sb, "(");
             transpileExpression(bop->left);
-            sbAppendChar(sb, operator);
+            sbAppend(sb, operator);
             transpileExpression(bop->right);
             sbAppend(sb, ")"); 
         } break;

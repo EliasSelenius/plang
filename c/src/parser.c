@@ -298,16 +298,24 @@ static Expression* expectExpression() {
     return res;
 }
 
+static bool isBinaryExpression(Expression* expr) {
+    switch (expr->expressionType) {
+        case ExprType_Plus:
+        case ExprType_Minus:
+        case ExprType_Mul:
+        case ExprType_Div: return true;
+        default: return false;
+    }
+}
+
 /*
     a + b * c
-
+    
       +
      / \
     a   *
        / \
       b   c
-
-
 
     a * b + c
 
@@ -317,36 +325,112 @@ static Expression* expectExpression() {
        / \
       a   b
 
+
+
+    a - b / c + d * e
+
+            -
+           / \
+          a   +
+             / \
+         (/)     *
+         / \    / \
+        b   c  d   e
+
+    at: ab
+        -
+       / \
+      a   b
+
+    at: abc
+        -
+       / \
+      a  (\)
+         / \
+        b   c
+
+    at: abcd
+        -
+       / \
+      a   +
+         / \
+      (\)   d
+      / \
+     b   c
+
+    at: abcde
+            -
+           / \
+          a   +
+             / \
+         (/)     *
+         / \    / \
+        b   c  d   e
+
+
 */
 
+static u32 operatorPriority(ExprType type) {
+    switch (type) {
+        case ExprType_Plus:
+        case ExprType_Minus:
+            return 1;
+        case ExprType_Mul:
+        case ExprType_Div:
+            return 2;
 
-static Expression* testForBinaryOperator(Expression* from) {
-    
-    TokenType tokentype = tokens[token_index].type;
-    if (!isOperator(tokentype)) return from;
-    token_index++;
-
-    BinaryOperator* op = malloc(sizeof(BinaryOperator));
-    op->base.expressionType = (ExprType)tokentype; 
-    op->left = from;
-
-    Expression* next = parseLeafExpression();
-    if (!next) {
-        error("..."); // TODO: fill out error message
+        default: return 0; // not an operator
     }
+}
+inline u32 binaryOperatorPriority(BinaryExpression* expr) {
+    return operatorPriority(expr->base.expressionType);
+}
 
-    next = testForBinaryOperator(next);
-
-    op->right = next;
-
-    return (Expression*)op;
+static Expression* expectLeafExpression() {
+    Expression* res = parseLeafExpression();
+    if (!res)
+        error("..."); // TODO: fill out error message
+    return res;
 }
 
 static Expression* parseExpression() {
-    Expression* leaf = parseLeafExpression();
-    if (!leaf) return null;
+    Expression* a = parseLeafExpression();
+    if (!a) return null;
 
-    return testForBinaryOperator(leaf);
+    TokenType tokentype = tokens[token_index].type;
+    if (!isOperator(tokentype)) return a;
+    token_index++;
+
+    BinaryExpression* root = malloc(sizeof(BinaryExpression));
+    root->base.expressionType = (ExprType)tokentype; // safe to make cast since isOperator ensures only correct values for tokentype
+    root->left = a;
+    root->right = expectLeafExpression();
+
+    BinaryExpression* last = root;
+    tokentype = tokens[token_index].type;
+    while (isOperator(tokentype)) {
+        token_index++;
+
+        BinaryExpression* op = malloc(sizeof(BinaryExpression));
+        op->base.expressionType = (ExprType)tokentype; // safe to make cast since isOperator ensures only correct values for tokentype
+        op->right = expectLeafExpression();
+
+        if (binaryOperatorPriority(last) >= binaryOperatorPriority(op)) {
+            // assume parenthood
+            op->left = (Expression*)root;
+            root = op;
+            last = root;
+        } else {
+            // theft
+            op->left = last->right;
+            last->right = (Expression*)op;
+            last = (BinaryExpression*)last->right;
+        }
+
+        tokentype = tokens[token_index].type;
+    }
+
+    return (Expression*)root;
 }
 
 static IfStatement* expectIfStatement() {
