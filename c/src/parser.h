@@ -37,9 +37,17 @@ typedef enum ExprType {
     ExprType_Minus = Tok_Minus,
     ExprType_Mul = Tok_Mul,
     ExprType_Div = Tok_Div,
-    
-    ExprType_BooleanAnd,
-    //ExprType_BooleanOr,
+
+    ExprType_Less = Tok_LessThan,
+    ExprType_Greater = Tok_GreaterThan,
+    ExprType_LessEquals = Tok_LessThanOrEqual,
+    ExprType_GreaterEquals = Tok_GreaterThanOrEqual,
+    ExprType_Equals = Tok_Equals,
+    // NOTE: we might get into trouble if we add more ExprTypes 
+    ExprType_BooleanAnd = Tok_Keyword_And,
+    ExprType_BooleanOr = Tok_Keyword_Or,
+
+
 } ExprType;
 
 typedef struct Expression {
@@ -56,6 +64,13 @@ typedef struct ExpressionProxy {
 typedef struct LiteralExpression {
     Expression base;
     StrSpan value; // TODO: maybe use different type than StrSpan
+
+    // union {
+    //     char* string;
+    //     u64 integer;
+    //     f64 decimal;
+    // };
+
 } LiteralExpression;
 
 typedef struct BinaryExpression {

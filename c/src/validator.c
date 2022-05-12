@@ -129,6 +129,13 @@ static PlangType getExpressedType(Expression* expr) {
             return getExpressedTypeValuePath(value);
         } break;
         
+        case ExprType_Less:
+        case ExprType_Greater:
+        case ExprType_LessEquals:
+        case ExprType_GreaterEquals:
+        case ExprType_Equals:
+        case ExprType_BooleanAnd:
+        case ExprType_BooleanOr:
         case ExprType_Plus:
         case ExprType_Minus:
         case ExprType_Mul:
@@ -327,6 +334,13 @@ static bool validateExpression(Expression* expr) {
             return validateValue(var);
         } break;
 
+        case ExprType_Less:
+        case ExprType_Greater:
+        case ExprType_LessEquals:
+        case ExprType_GreaterEquals:
+        case ExprType_Equals:
+        case ExprType_BooleanAnd:
+        case ExprType_BooleanOr:
         case ExprType_Plus:
         case ExprType_Minus:
         case ExprType_Mul:

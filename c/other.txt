@@ -5,5 +5,5 @@ struct Person {
 }
 
 void sayHello(Person* p) {
-    printf("Hello, From Person.\n");
+    println("Hello, From Person.");
 }

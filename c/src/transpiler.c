@@ -59,6 +59,14 @@ static void transpileExpression(Expression* expr) {
             case ExprType_Mul: operator = " * ";   goto end;
             case ExprType_Div: operator = " / ";   goto end;
 
+            case ExprType_Less: operator = " < ";           goto end;
+            case ExprType_Greater: operator = " > ";        goto end;
+            case ExprType_LessEquals: operator = " <= ";    goto end;
+            case ExprType_GreaterEquals: operator = " >= "; goto end;
+            case ExprType_Equals: operator = " == ";        goto end;
+            case ExprType_BooleanAnd: operator = " && ";    goto end;
+            case ExprType_BooleanOr: operator = " || ";     goto end;
+
             end:
             BinaryExpression* bop = (BinaryExpression*)expr;
             sbAppend(sb, "(");

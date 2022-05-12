@@ -15,8 +15,6 @@
 
 
     TODO list:
-        *- boolean operators
-        *- boolean comparisons 
         - function pointers
         - function overloads
         - localy defined structs
@@ -24,12 +22,15 @@
         - for in range loop: for i in 0..10
         - loop block: loop { } == while (true) { }
         - modules or namespaces ?
-        *- better number literal type inference: 10 => int, 10.0 => f64, 10f => f32 ?
+        *- better number literal type inference: 10 => int, 10.0 => f32, 10d => f64 ?
         - allow underscores in number literals
         *- switch statements
         - omit curl brackets in if/while etc. for single statement block
         - hash identifiers (Tok_Word tokens) for faster string equals and to free the file buffer
         - nested multi-line comments
+        *- unary not operator
+        *- not equals operator
+
 
     InProgress:
         - line numbers in validation errors
@@ -39,6 +40,8 @@
 
 
     DONE list:
+        *- boolean operators
+        *- boolean comparisons 
         *- multiple files 
         *- struct self-reference
         *- restructure expression types

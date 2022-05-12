@@ -168,10 +168,6 @@ static void expectFuncCallArgs(FuncCall* func, ValuePath* valuePath) {
     expect(Tok_CloseParen);
 }
 
-inline bool isOperator(TokenType type) {
-    return type >= Tok_Plus && type <= Tok_Div;
-}
-
 static Expression* createLiteral(ExprType type) {
     LiteralExpression* lit = malloc(sizeof(LiteralExpression));
     lit->base.expressionType = type;
@@ -265,16 +261,6 @@ static Expression* expectExpression() {
     return res;
 }
 
-static bool isBinaryExpression(Expression* expr) {
-    switch (expr->expressionType) {
-        case ExprType_Plus:
-        case ExprType_Minus:
-        case ExprType_Mul:
-        case ExprType_Div: return true;
-        default: return false;
-    }
-}
-
 /*
     a + b * c
     
@@ -339,12 +325,24 @@ static bool isBinaryExpression(Expression* expr) {
 
 static u32 operatorPriority(ExprType type) {
     switch (type) {
+
+        case ExprType_BooleanAnd:
+        case ExprType_BooleanOr:
+            return 1;
+
+        case ExprType_Less:
+        case ExprType_Greater:
+        case ExprType_LessEquals:
+        case ExprType_GreaterEquals:
+        case ExprType_Equals:
+            return 2;
+
         case ExprType_Plus:
         case ExprType_Minus:
-            return 1;
+            return 3;
         case ExprType_Mul:
         case ExprType_Div:
-            return 2;
+            return 4;
 
         default: return 0; // not an operator
     }
@@ -358,6 +356,13 @@ static Expression* expectLeafExpression() {
     if (!res)
         error("..."); // TODO: fill out error message
     return res;
+}
+
+inline bool isOperator(TokenType type) {
+    return (type >= Tok_Plus && type <= Tok_Div)
+        || (type >= Tok_LessThan && type <= Tok_Equals)
+        || (type == Tok_Keyword_And)
+        || (type == Tok_Keyword_Or);
 }
 
 static Expression* parseExpression() {

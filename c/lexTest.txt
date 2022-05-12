@@ -1,42 +1,56 @@
 
-declare void printf(char* str);
+declare void printf(char* str, char* arg);
+
+void println(char* str) {
+    printf("%s\n", str);
+}
 
 let yo() {
     // return "Yo!";
 }
 
 int main() {
-    printf("    Hello, Plang!\n");
-    // printf("Hello, This is printf() from %s\n", "plang");
+    println("    Hello, Plang!");
+    printf("Hello, This is printf() from %s\n", "plang");
 
+    int i = 0;
+    while (i < 10) {
+        if (i == 3) {
+            break;
+        }
+        println("Loop.");
+        i += 1;
+    }
+
+
+/*
     { // test boolean op
         let isSome = true;
 
-        if (isSome and false) {
-            printf("YEES\n")
+        if (isSome or false) {
+            println("YEES");
         } else {
-            printf("NOOO\n");
+            println("NOOO");
         }
 
     }
+*/
 
     Test test;
     test.ptr = null;
     // test.test = alloc Test;
 
     if (test.ptr) {
-        printf("There is a test\n");
+        println("There is a test");
     } else {
-        printf("No There is no test\n");
+        println("No There is no test");
     }
 
     let p = alloc Person;
     p.name = g_Name;
     sayHello(p);
 
-    printf("Persons name is: ");
-    printf(p.name);
-    printf("\n");
+    printf("Persons name is: %s\n", p.name);
 
     return 0;
 }
