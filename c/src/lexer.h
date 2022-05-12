@@ -38,6 +38,7 @@ typedef enum TokenType {
     Tok_Semicolon,
     Tok_Colon,
     Tok_QuestionMark,
+    Tok_ExclamationMark,
 
     Tok_OpenCurl,
     Tok_CloseCurl,
@@ -51,6 +52,7 @@ typedef enum TokenType {
     Tok_LessThanOrEqual,
     Tok_GreaterThanOrEqual,
     Tok_Equals,
+    Tok_NotEquals,
     Tok_Assign,
 
     Tok_Plus,

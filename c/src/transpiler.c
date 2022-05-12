@@ -64,6 +64,7 @@ static void transpileExpression(Expression* expr) {
             case ExprType_LessEquals: operator = " <= ";    goto end;
             case ExprType_GreaterEquals: operator = " >= "; goto end;
             case ExprType_Equals: operator = " == ";        goto end;
+            case ExprType_NotEquals: operator = " != ";     goto end;
             case ExprType_BooleanAnd: operator = " && ";    goto end;
             case ExprType_BooleanOr: operator = " || ";     goto end;
 

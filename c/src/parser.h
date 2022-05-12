@@ -43,6 +43,7 @@ typedef enum ExprType {
     ExprType_LessEquals = Tok_LessThanOrEqual,
     ExprType_GreaterEquals = Tok_GreaterThanOrEqual,
     ExprType_Equals = Tok_Equals,
+    ExprType_NotEquals = Tok_NotEquals,
     // NOTE: we might get into trouble if we add more ExprTypes 
     ExprType_BooleanAnd = Tok_Keyword_And,
     ExprType_BooleanOr = Tok_Keyword_Or,

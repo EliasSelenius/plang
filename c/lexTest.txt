@@ -14,10 +14,7 @@ int main() {
     printf("Hello, This is printf() from %s\n", "plang");
 
     int i = 0;
-    while (i < 10) {
-        if (i == 3) {
-            break;
-        }
+    while (i < 10 and i != 4) {
         println("Loop.");
         i += 1;
     }

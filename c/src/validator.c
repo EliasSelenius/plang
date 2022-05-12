@@ -134,6 +134,7 @@ static PlangType getExpressedType(Expression* expr) {
         case ExprType_LessEquals:
         case ExprType_GreaterEquals:
         case ExprType_Equals:
+        case ExprType_NotEquals:
         case ExprType_BooleanAnd:
         case ExprType_BooleanOr:
         case ExprType_Plus:
@@ -339,6 +340,7 @@ static bool validateExpression(Expression* expr) {
         case ExprType_LessEquals:
         case ExprType_GreaterEquals:
         case ExprType_Equals:
+        case ExprType_NotEquals:
         case ExprType_BooleanAnd:
         case ExprType_BooleanOr:
         case ExprType_Plus:

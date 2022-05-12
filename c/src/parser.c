@@ -335,6 +335,7 @@ static u32 operatorPriority(ExprType type) {
         case ExprType_LessEquals:
         case ExprType_GreaterEquals:
         case ExprType_Equals:
+        case ExprType_NotEquals:
             return 2;
 
         case ExprType_Plus:
@@ -362,7 +363,8 @@ inline bool isOperator(TokenType type) {
     return (type >= Tok_Plus && type <= Tok_Div)
         || (type >= Tok_LessThan && type <= Tok_Equals)
         || (type == Tok_Keyword_And)
-        || (type == Tok_Keyword_Or);
+        || (type == Tok_Keyword_Or)
+        || (type == ExprType_NotEquals);
 }
 
 static Expression* parseExpression() {
