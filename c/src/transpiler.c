@@ -77,6 +77,12 @@ static void transpileExpression(Expression* expr) {
             sbAppend(sb, ")"); 
         } break;
 
+        case ExprType_Deref: {
+            DerefOperator* deref = (DerefOperator*)expr;
+            transpileExpression(deref->expr);
+            sbAppend(sb, ".");
+            sbAppendSpan(sb, deref->name);
+        } break;
 
         case ExprType_Literal_Null: {
             sbAppend(sb, "0");
@@ -90,7 +96,11 @@ static void transpileExpression(Expression* expr) {
         } break;
 
         case ExprType_Variable: {
-            transpileValuePath(((ExpressionProxy*)expr)->node);
+            // transpileValuePath(((ExpressionProxy*)expr)->node);
+
+            VariableExpression* var = (VariableExpression*)expr;
+            sbAppendSpan(sb, var->name);
+
         } break;
 
         case ExprType_Alloc: {

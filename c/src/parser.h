@@ -31,6 +31,7 @@ typedef enum ExprType {
     ExprType_Alloc,
     ExprType_Ternary,
     ExprType_FuncCall,
+    ExprType_Deref,
 
 
     ExprType_Plus = Tok_Plus,
@@ -64,13 +65,13 @@ typedef struct ExpressionProxy {
 
 typedef struct LiteralExpression {
     Expression base;
-    StrSpan value; // TODO: maybe use different type than StrSpan
 
-    // union {
-    //     char* string;
-    //     u64 integer;
-    //     f64 decimal;
-    // };
+    union {
+        StrSpan value; // TODO: remove this
+        char* string;
+        u64 integer;
+        f64 decimal;
+    };
 
 } LiteralExpression;
 
@@ -85,6 +86,17 @@ typedef struct AllocExpression {
     Expression* sizeExpr;
     PlangType type;
 } AllocExpression;
+
+typedef struct DerefOperator {
+    Expression base;
+    Expression* expr;
+    StrSpan name;
+} DerefOperator;
+
+typedef struct VariableExpression {
+    Expression base;
+    StrSpan name;
+} VariableExpression;
 
 typedef struct ValuePath {
     

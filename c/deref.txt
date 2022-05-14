@@ -1,0 +1,26 @@
+
+declare void printf(char* str);
+
+struct vec3 {
+    float x;
+    float y; 
+    float z;
+}
+
+struct Transform {
+    vec3 pos;
+}
+
+struct Entity {
+    Transform trans;
+}
+
+int main() {
+    printf("Testing deref.\n");
+
+    Entity e;
+    let ep = e;
+    let x = e.trans.pos.x;
+
+    return 0;
+}

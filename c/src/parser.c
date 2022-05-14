@@ -178,27 +178,37 @@ static Expression* createLiteral(ExprType type) {
 }
 
 static Expression* parseLeafExpression() {
+    Expression* res = null;
+
     switch (tokens[token_index].type) {
         case Tok_Word: {
             // valuepath or funcCall
             // TODO: line numbers 
-            ValuePath* value = parseValue();
-            if (tok(Tok_OpenParen)) {
-                // func
-                FuncCallExpression* funcex = malloc(sizeof(FuncCallExpression));
-                funcex->base.expressionType = ExprType_FuncCall;
+            // ValuePath* value = parseValue();
+            // if (tok(Tok_OpenParen)) {
+            //     // func
+            //     FuncCallExpression* funcex = malloc(sizeof(FuncCallExpression));
+            //     funcex->base.expressionType = ExprType_FuncCall;
 
-                expectFuncCallArgs(&funcex->call, value);
-                return (Expression*)funcex;
-            } else {
-                // value
-                ExpressionProxy* exp = malloc(sizeof(ExpressionProxy));
-                exp->base.expressionType = ExprType_Variable;
+            //     expectFuncCallArgs(&funcex->call, value);
+            //     res = (Expression*)funcex;
+            // } else {
+            //     // value
+            //     ExpressionProxy* exp = malloc(sizeof(ExpressionProxy));
+            //     exp->base.expressionType = ExprType_Variable;
 
-                exp->node = value;
-                return (Expression*)exp;
-            }
-        }
+            //     exp->node = value;
+            //     res = (Expression*)exp;
+            // }
+
+            VariableExpression* ve = malloc(sizeof(VariableExpression));
+            ve->base.expressionType = ExprType_Variable;
+            ve->base.nodebase.lineNumber = tokens[token_index].line;
+            ve->name = identifier();
+
+            res = (Expression*)ve;
+
+        } break;
 
         case Tok_Keyword_Alloc: {
             AllocExpression* alloc = malloc(sizeof(AllocExpression));
@@ -213,26 +223,36 @@ static Expression* parseLeafExpression() {
                 expect(Tok_CloseSquare);
             }
 
-            return (Expression*)alloc;
-        }
+            res = (Expression*)alloc;
+        } break;
 
         case Tok_OpenParen: {
             token_index++;
             Expression* expr = expectExpression();
             expect(Tok_CloseParen);
-            return expr;
-        }
+            res = expr;
+        } break;
 
 
-        case Tok_Number:        return createLiteral(ExprType_Literal_Number);
-        case Tok_String:        return createLiteral(ExprType_Literal_String);
-        case Tok_Keyword_True:  return createLiteral(ExprType_Literal_Bool);
-        case Tok_Keyword_False: return createLiteral(ExprType_Literal_Bool);
-        case Tok_Keyword_Null:  return createLiteral(ExprType_Literal_Null);
+        case Tok_Number:        res = createLiteral(ExprType_Literal_Number); break;
+        case Tok_String:        res = createLiteral(ExprType_Literal_String); break;
+        case Tok_Keyword_True:  res = createLiteral(ExprType_Literal_Bool); break;
+        case Tok_Keyword_False: res = createLiteral(ExprType_Literal_Bool); break;
+        case Tok_Keyword_Null:  res = createLiteral(ExprType_Literal_Null); break;
 
         default: return null;
     }
-    return null;
+
+    while (tok(Tok_Period)) {
+        DerefOperator* deref = malloc(sizeof(DerefOperator));
+        deref->base.expressionType = ExprType_Deref;
+        deref->base.nodebase.lineNumber = tokens[token_index - 1].line;
+        deref->expr = res;
+        deref->name = identifier();
+        res = (Expression*)deref;
+    }
+
+    return res;
 }
 
 static Expression* testForTernary(Expression* expr) {

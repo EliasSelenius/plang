@@ -19,7 +19,8 @@ static Codeblock* currentScope;
 static Statement* currentStatement;
 static u32 numberOfErrors = 0;
 
-bool validateExpression(Expression* expr);
+PlangType* validateExpression(Expression* expr);
+PlangType* getDeclaredVariable(StrSpan name);
 
 inline void error(char* format, ...) {
     // TODO: better line of not only statements
@@ -120,13 +121,15 @@ static PlangType getExpressedType(Expression* expr) {
         } break;
         case ExprType_Literal_Bool: {
             return (PlangType) {
-                .structName = spFrom("bool"),
+                .structName = spFrom("int"),
                 .numPointers = 0
             };
         } break;
         case ExprType_Variable: {
-            ValuePath* value = ((ExpressionProxy*)expr)->node;
-            return getExpressedTypeValuePath(value);
+            VariableExpression* var = (VariableExpression*)expr;
+            return *getDeclaredVariable(var->name);
+            // ValuePath* value = ((ExpressionProxy*)expr)->node;
+            // return getExpressedTypeValuePath(value);
         } break;
         
         case ExprType_Less:
@@ -211,6 +214,19 @@ static PlangType* getDeclaredVariable(StrSpan name) {
 
     return null;
 }
+
+static PlangType* validateVariable(VariableExpression* var) {
+    PlangType* type = getDeclaredVariable(var->name);
+    if (!type) {
+        error("Variable \"%.*s\" is not declared.",
+            var->name.length,
+            var->name.start);
+
+        return null;
+    }
+    return type;
+}
+
 
 static bool validateValue(ValuePath* var) {
     // is this a valid value? like a local, a function arguemnt or a global 
@@ -326,13 +342,39 @@ static void validateFuncCall(FuncCall* call) {
     }
 }
 
-// returns wheter the expressed type could be determined
-static bool validateExpression(Expression* expr) {
+
+static PlangType* validateExpression(Expression* expr) {
     switch (expr->expressionType) {        
         case ExprType_Variable: {
-            ExpressionProxy* exp = (ExpressionProxy*)expr;
-            ValuePath* var = exp->node;
-            return validateValue(var);
+            //ExpressionProxy* exp = (ExpressionProxy*)expr;
+            //ValuePath* var = exp->node;
+            //return validateValue(var);
+
+            VariableExpression* var = (VariableExpression*)expr;
+            return validateVariable(var);
+
+        } break;
+
+        case ExprType_Deref: {
+            DerefOperator* deref = (DerefOperator*)expr;
+            PlangType* type = validateExpression(deref->expr);
+            if (!type) return null;
+            
+            if (type->numPointers > 1) {
+                error("Attempted to dereference a %dth-degree pointer.", type->numPointers);
+                return null;
+            }
+
+            PlangStruct* stru = getStructByName(type->structName);
+            Field* field = getField(stru, deref->name);
+            if (!field) {
+                error("Field \"%.*s\" does not exist on type \"%.*s\".",
+                        field->name.length, field->name.start,
+                        stru->name.length, stru->name.start);
+                return null;
+            }
+
+            return &field->type;
         } break;
 
         case ExprType_Less:
@@ -348,9 +390,14 @@ static bool validateExpression(Expression* expr) {
         case ExprType_Mul:
         case ExprType_Div: {
             BinaryExpression* bop = (BinaryExpression*)expr;
-            if (validateExpression(bop->left) && validateExpression(bop->right)) {
+            PlangType* leftType = validateExpression(bop->left);
+            PlangType* rightType = validateExpression(bop->right);
+            
+            if (leftType && rightType) {
                 // TODO: is a valid operator operands pair?
-            } else return false;
+            } else return null;
+
+            return leftType;
         } break;
         
         case ExprType_Alloc: {
@@ -358,34 +405,46 @@ static bool validateExpression(Expression* expr) {
             validateType(alloc->type.structName);
 
             // recurse on possibe size-subexpression
-            if (alloc->sizeExpr) validateExpression(alloc->sizeExpr);
+            PlangType* size = null;
+            if (alloc->sizeExpr) size = validateExpression(alloc->sizeExpr);
+
+            if (size) {
+                // TODO: is this a valid integer expression?
+            }
+
+            // TODO: Ugly hack here, find better memory storage for types. 
+            // Or return PlangType by value perhaps?
+            alloc->type.numPointers++;
+            return &alloc->type;
 
         } break;
         
         case ExprType_Ternary: {
             TernaryExpression* ter = (TernaryExpression*)expr;
-            validateExpression(ter->condition);
-            validateExpression(ter->thenExpr);
-            validateExpression(ter->elseExpr);
+            PlangType* conditionType = validateExpression(ter->condition);
+            PlangType* thenType = validateExpression(ter->thenExpr);
+            PlangType* elseType = validateExpression(ter->elseExpr);
 
             // TODO: is condition a valid boolean expression
             // TODO: does thenExpr and elseExpr have a common type? 
 
+            return thenType;
         } break;
 
         case ExprType_FuncCall: {
+            // TODO: determine type here
             FuncCallExpression* fc = (FuncCallExpression*)expr;
             validateFuncCall(&fc->call);
         } break;
 
-        // ExprType_Literal_Number,
-        // ExprType_Literal_String,
-        // ExprType_Literal_Bool,
-        // ExprType_Literal_Null,
-        default: break;
+        case ExprType_Literal_Number: return &(PlangType) { .structName = "int", .numPointers = 0 };
+        case ExprType_Literal_String: return &(PlangType) { .structName = "char", .numPointers = 1 };
+        case ExprType_Literal_Bool:   return &(PlangType) { .structName = "int", .numPointers = 0 };
+        case ExprType_Literal_Null:   return &(PlangType) { .structName = "void", .numPointers = 1 };
     }
 
-    return true;
+    error("Unknown expression type. This is a bug!");
+    return null;
 }
 
 
@@ -420,16 +479,15 @@ static void validateScope(Codeblock* scope) {
                 */
 
                 if (decl->assignmentOrNull) {
-                    PlangType assType;
-                    if (validateExpression(decl->assignmentOrNull)) assType = getExpressedType(decl->assignmentOrNull);
-                    else break; // if type could not be determined then we should not continue, act as if this statement does not exist 
+                    PlangType* assType = validateExpression(decl->assignmentOrNull);
+                    if (!assType) break; // if type could not be determined then we should not continue, act as if this statement does not exist 
 
                     if (decl->mustInferType) {
-                        decl->type = assType;
+                        decl->type = *assType;
                     } else {
                         validateType(decl->type.structName);
 
-                        if (!typeEquals(decl->type, assType)) {
+                        if (!typeEquals(decl->type, *assType)) {
                             error("Type missmatch in declaration.");
                         }
                     }
@@ -448,7 +506,7 @@ static void validateScope(Codeblock* scope) {
             case Statement_Assignment: {
                 Assignement* ass = (Assignement*)sta;
                 bool assigneeValid = validateValue(ass->assignee);
-                bool exprValid = validateExpression(ass->expr);
+                PlangType* exprValid = validateExpression(ass->expr);
                 if (assigneeValid && exprValid) {
                     PlangType asseeType = getExpressedTypeValuePath(ass->assignee);
                     PlangType exprType = getExpressedType(ass->expr);

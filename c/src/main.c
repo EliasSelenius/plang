@@ -29,8 +29,8 @@
         - hash identifiers (Tok_Word tokens) for faster string equals and to free the file buffer
         - nested multi-line comments
         *- unary not operator
-        *- not equals operator
-
+        *- address-of operator &
+        *- value-of operator *
 
     InProgress:
         - line numbers in validation errors
@@ -40,6 +40,7 @@
 
 
     DONE list:
+        *- not equals operator
         *- boolean operators
         *- boolean comparisons 
         *- multiple files 
