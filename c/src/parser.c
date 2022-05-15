@@ -372,6 +372,10 @@ inline u32 binaryOperatorPriority(BinaryExpression* expr) {
     return operatorPriority(expr->base.expressionType);
 }
 
+inline bool isBinaryExpression(Expression* expr) {
+    return operatorPriority(expr->expressionType) != 0;
+}
+
 static Expression* expectLeafExpression() {
     Expression* res = parseLeafExpression();
     if (!res)
@@ -387,6 +391,27 @@ inline bool isOperator(TokenType type) {
         || (type == ExprType_NotEquals);
 }
 
+static BinaryExpression* appendBinaryExpression(BinaryExpression* target, BinaryExpression* addition) {
+    u32 targetPriority = binaryOperatorPriority(target);
+    u32 additionPriority = binaryOperatorPriority(addition);
+
+    if (additionPriority > targetPriority) {
+        if (isBinaryExpression(target->right)) {
+            target->right = (Expression*)appendBinaryExpression((BinaryExpression*)target->right, addition);
+            return target;
+        } else {
+            addition->left = target->right;
+            target->right = (Expression*)addition;
+            return target;
+        }
+    } else {
+        addition->left = (Expression*)target;
+        return addition;
+    }
+
+    return null; // should never happen
+}
+
 static Expression* parseExpression() {
     Expression* a = parseLeafExpression();
     if (!a) return null;
@@ -400,7 +425,6 @@ static Expression* parseExpression() {
     root->left = a;
     root->right = expectLeafExpression();
 
-    BinaryExpression* last = root;
     tokentype = tokens[token_index].type;
     while (isOperator(tokentype)) {
         token_index++;
@@ -409,17 +433,7 @@ static Expression* parseExpression() {
         op->base.expressionType = (ExprType)tokentype; // safe to make cast since isOperator ensures only correct values for tokentype
         op->right = expectLeafExpression();
 
-        if (binaryOperatorPriority(last) >= binaryOperatorPriority(op)) {
-            // assume parenthood
-            op->left = (Expression*)root;
-            root = op;
-            last = root;
-        } else {
-            // theft
-            op->left = last->right;
-            last->right = (Expression*)op;
-            last = (BinaryExpression*)last->right;
-        }
+        root = appendBinaryExpression(root, op);
 
         tokentype = tokens[token_index].type;
     }

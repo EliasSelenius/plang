@@ -329,13 +329,13 @@ static void validateFuncCall(FuncCall* call) {
     }
     
     for (u32 i = 0; i < argLen; i++) {
-        if (validateExpression(call->args[i])) {
-            PlangType passedArg = getExpressedType(call->args[i]);
+        PlangType* passedArgType = validateExpression(call->args[i]);
+        if (passedArgType) {
             PlangType expectedArg = call->function->arguments[i].type;
 
-            if (!typeEquals(passedArg, expectedArg)) {
+            if (!typeEquals(*passedArgType, expectedArg)) {
                 error("Argument type missmatch, expression of type %.*s cannot be passed to argument of type %.*s",
-                    passedArg.structName.length, passedArg.structName.start,
+                    passedArgType->structName.length, passedArgType->structName.start,
                     expectedArg.structName.length, expectedArg.structName.start);
             }
         }
@@ -437,10 +437,17 @@ static PlangType* validateExpression(Expression* expr) {
             validateFuncCall(&fc->call);
         } break;
 
-        case ExprType_Literal_Number: return &(PlangType) { .structName = "int", .numPointers = 0 };
-        case ExprType_Literal_String: return &(PlangType) { .structName = "char", .numPointers = 1 };
-        case ExprType_Literal_Bool:   return &(PlangType) { .structName = "int", .numPointers = 0 };
-        case ExprType_Literal_Null:   return &(PlangType) { .structName = "void", .numPointers = 1 };
+        { // literals
+            static PlangType int32type = (PlangType) { .structName = ((StrSpan) { .start = "int", .length = 3 }), .numPointers = 0 };
+            static PlangType charP     = (PlangType) { .structName = ((StrSpan) { .start = "char", .length = 4 }), .numPointers = 1 };
+            static PlangType voidP     = (PlangType) { .structName = ((StrSpan) { .start = "void", .length = 4 }), .numPointers = 1 };
+
+            case ExprType_Literal_Number: return &int32type;
+            case ExprType_Literal_String: return &charP;
+            case ExprType_Literal_Bool:   return &int32type;
+            case ExprType_Literal_Null:   return &voidP;
+        }
+
     }
 
     error("Unknown expression type. This is a bug!");
