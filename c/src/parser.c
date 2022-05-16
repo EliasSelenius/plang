@@ -125,6 +125,67 @@ inline bool tok(TokenType type) {
     return false;
 }
 
+static Token* anyof(u32 count, ...) {
+    va_list args;
+    va_start(args, count);    
+    for (u32 i = 0; i < count; i++) {
+        TokenType type = va_arg(args, TokenType);
+        Token* tok = &tokens[token_index];
+        if (tok->type == type) {
+            token_index++;
+            return tok;
+        }
+    }
+    va_end(args);
+    return null;
+}
+
+
+// tok_scan("t t t", Tok_Let, Tok_Word, Tok_Assign)
+static bool tok_scan(char* format, ...) {
+    u32 start = token_index;
+
+    va_list args;
+    va_start(args, format);
+
+    TokenType type;
+    char mode = ' ';
+
+    u32 formatIndex = 0;
+    while (true) {
+        char cmd = format[formatIndex++];
+        if (cmd == '\0') return true;
+        if (cmd == ' ') continue;
+
+        if (cmd == 't') {
+            type = va_arg(args, TokenType);
+
+            if (mode == ' ') {
+                if (tokens[token_index].type == type) {
+                    token_index++;
+                    continue;
+                } 
+                
+                goto fail;
+            } else if (mode == '*') {
+                while (tokens[token_index].type == type) token_index++;
+                mode = ' ';
+                continue;
+            }
+
+        }
+
+        if (cmd == '*') {
+            mode = '*'; continue;
+        }
+
+        printf("Wrong format in tok_scan()\n");
+    }
+
+    fail:
+    token_index = start;
+    return false;
+}
 
 static ValuePath* parseValue() {
     if (tokens[token_index].type != Tok_Word) return null;
@@ -148,8 +209,8 @@ static ValuePath* parseValue() {
     return res;
 }
 
-static void expectFuncCallArgs(FuncCall* func, ValuePath* valuePath) {
-    func->valuePath = valuePath;
+static void expectFuncCallArgs(FuncCall* func, Expression* funcExpr) {
+    func->funcExpr = funcExpr;
     func->function = null;
 
     Expression* expr = parseExpression();
@@ -167,6 +228,7 @@ static void expectFuncCallArgs(FuncCall* func, ValuePath* valuePath) {
 
     expect(Tok_CloseParen);
 }
+
 
 static Expression* createLiteral(ExprType type) {
     LiteralExpression* lit = malloc(sizeof(LiteralExpression));
@@ -243,6 +305,7 @@ static Expression* parseLeafExpression() {
         default: return null;
     }
 
+    // deref
     while (tok(Tok_Period)) {
         DerefOperator* deref = malloc(sizeof(DerefOperator));
         deref->base.expressionType = ExprType_Deref;
@@ -251,6 +314,16 @@ static Expression* parseLeafExpression() {
         deref->name = identifier();
         res = (Expression*)deref;
     }
+
+    // func call
+    if (tok(Tok_OpenParen)) {
+        FuncCall* call = malloc(sizeof(FuncCall));
+        call->base.expressionType = ExprType_FuncCall;
+        expectFuncCallArgs(call, res);
+        res = (Expression*)call;
+    }
+
+    // TODO: dereferencing a function call?
 
     return res;
 }
@@ -279,6 +352,15 @@ static Expression* expectExpression() {
         token_index++;
     }
     return res;
+}
+
+static bool isExpressionWriteable(Expression* expr) {
+    
+    switch (expr->expressionType) {
+        case ExprType_Variable:
+        case ExprType_Deref: return true;
+        default: return false;
+    }
 }
 
 /*
@@ -499,54 +581,6 @@ static Statement* expectStatement() {
     u32 startingLineNum = tokens[token_index].line;
 
     switch (tokens[token_index].type) {
-        case Tok_Keyword_Let: {
-            res = (Statement*)expectVarDecl();
-            semicolon();
-        } break;
-        case Tok_Word: {
-            TokenType nextToken = tokens[token_index + 1].type;
-            if (nextToken == Tok_Mul || nextToken == Tok_Word) {
-                // var decl
-                res = (Statement*)expectVarDecl();
-            } else {
-                // assignment or funcCall
-
-                ValuePath* valuePath = parseValue();
-
-                switch (tokens[token_index].type) {
-                    case Tok_OpenParen: {
-                        token_index++;
-                        // funcCall
-                        FuncCallStatement* funcCall = malloc(sizeof(FuncCallStatement));
-                        funcCall->base.statementType = Statement_FuncCall;
-                        expectFuncCallArgs(&funcCall->call, valuePath);
-                        res = (Statement*)funcCall;
-                    } break;
-
-                    case Tok_PlusEquals:
-                    case Tok_MinusEquals:
-                    case Tok_MulEquals:
-                    case Tok_DivEquals:
-                    case Tok_Assign: {
-                        // assignment
-
-                        Assignement* ass = malloc(sizeof(Assignement));
-                        ass->base.statementType = Statement_Assignment;
-                        ass->assignee = valuePath;
-                        ass->assignmentOper = tokens[token_index++].type;
-                        ass->expr = expectExpression();
-                        res = (Statement*)ass;
-                    } break;
-
-                    default: 
-                        unexpectedToken(); 
-                        return null;
-                }
-            }
-
-            semicolon();
-        } break;
-        
 
         case Tok_OpenCurl: {
             Scope* scope = malloc(sizeof(Scope));
@@ -595,7 +629,122 @@ static Statement* expectStatement() {
             semicolon();
         } break;
 
+
+
+        // case Tok_Keyword_Let: {
+        //     res = (Statement*)expectVarDecl();
+        //     semicolon();
+        // } break;
+        // case Tok_Word: {
+        //     TokenType nextToken = tokens[token_index + 1].type;
+        //     if (nextToken == Tok_Mul || nextToken == Tok_Word) {
+        //         // var decl
+        //         res = (Statement*)expectVarDecl();
+        //     } else {
+        //         // assignment or funcCall
+
+        //         // ValuePath* valuePath = parseValue();
+
+
+        //         switch (tokens[token_index].type) {
+        //             case Tok_OpenParen: {
+        //                 token_index++;
+        //                 // funcCall
+        //                 FuncCallStatement* funcCall = malloc(sizeof(FuncCallStatement));
+        //                 funcCall->base.statementType = Statement_FuncCall;
+        //                 expectFuncCallArgs(&funcCall->call, valuePath);
+        //                 res = (Statement*)funcCall;
+        //             } break;
+
+        //             case Tok_PlusAssign:
+        //             case Tok_MinusAssign:
+        //             case Tok_MulAssign:
+        //             case Tok_DivAssign:
+        //             case Tok_Assign: {
+        //                 // assignment
+
+        //                 Assignement* ass = malloc(sizeof(Assignement));
+        //                 ass->base.statementType = Statement_Assignment;
+        //                 ass->assignee = valuePath;
+        //                 ass->assignmentOper = tokens[token_index++].type;
+        //                 ass->expr = expectExpression();
+        //                 res = (Statement*)ass;
+        //             } break;
+
+        //             default: 
+        //                 unexpectedToken(); 
+        //                 return null;
+        //         }
+        //     }
+
+        //     semicolon();
+        // } break;
+        
+        case Tok_Keyword_Let: {
+            res = (Statement*)expectVarDecl();
+            semicolon();
+        } break;
+
         default: {
+
+            // id id | id any(*) id
+
+            { // declaration
+                u32 i = token_index;
+                if (tokens[i++].type == Tok_Word) {
+                    while (tokens[i].type == Tok_Mul) i++;
+                    if (tokens[i++].type == Tok_Word) {
+                        // confirmed declaration
+
+                        VarDecl* decl = malloc(sizeof(VarDecl));
+                        decl->base.statementType = Statement_Declaration;
+                        decl->mustInferType = false;
+                        decl->type = expectType();
+                        decl->name = identifier();
+                        decl->assignmentOrNull = tok(Tok_Assign) ? expectExpression() : null;
+
+                        semicolon();
+                        res = (Statement*)decl;
+                        break;
+                    }
+                }
+            }
+
+
+            Expression* expr = parseExpression();
+            if (expr) {
+                switch (expr->expressionType) {
+                    case ExprType_FuncCall: {                        
+                        StatementExpression* staExpr = malloc(sizeof(StatementExpression));
+                        staExpr->base.statementType = Statement_Expression;
+                        staExpr->base.nodebase.lineNumber = expr->nodebase.lineNumber;
+                        staExpr->expr = expr;
+                        res = (Statement*)staExpr;
+                    } break;
+                    case ExprType_Variable:
+                    case ExprType_Deref: {
+
+                        Token* token = anyof(5, Tok_Assign, Tok_PlusAssign, Tok_MinusAssign, Tok_MulAssign, Tok_DivAssign);
+                        if (token) {
+                            Assignement* ass = malloc(sizeof(Assignement));
+                            ass->base.statementType = Statement_Assignment;
+                            ass->assigneeExpr = expr;
+                            ass->assignmentOper = token->type;
+                            ass->expr = expectExpression();
+                            res = (Statement*)ass;
+                        } else {
+                            error("Expected an assignment.");
+                        }
+
+                    } break;
+                    default:
+                        error("This expression is all by its lonesome.");
+                        return null;
+                }
+                semicolon();
+                break;
+            }
+
             unexpectedToken();
             return null;
         }

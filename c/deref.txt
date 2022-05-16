@@ -1,5 +1,5 @@
 
-declare void printf(char* str);
+declare void printf(char* str, int i);
 
 struct vec3 {
     float x;
@@ -15,12 +15,28 @@ struct Entity {
     Transform trans;
 }
 
+int get_Number(int i) {
+    return i * 2;
+}
+
 int main() {
-    printf("Testing deref.\n");
+    printf("Testing deref.%d\n", 0);
+
+    let n = get_Number(2);
+    printf("number = %d\n", n);
 
     Entity e;
     let ep = e;
     let x = e.trans.pos.x;
+
+    let t = alloc Transform;
+    // let f = t.pos;
+
+    vec3* vpp = alloc vec3;
+    // let h = (vpp + 2).x;
+
+    // TODO: fix tokenizing of numbers to allow for this:
+    // let dwa = 12.name;
 
     return 0;
 }

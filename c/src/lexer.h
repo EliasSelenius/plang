@@ -60,10 +60,10 @@ typedef enum TokenType {
     Tok_Mul,
     Tok_Div,
 
-    Tok_PlusEquals,
-    Tok_MinusEquals,
-    Tok_MulEquals,
-    Tok_DivEquals
+    Tok_PlusAssign,
+    Tok_MinusAssign,
+    Tok_MulAssign,
+    Tok_DivAssign
 
 } TokenType;
 

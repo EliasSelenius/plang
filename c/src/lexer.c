@@ -213,10 +213,10 @@ u32 lex(char* input) {
         test_op_eq('=', Tok_Assign, Tok_Equals);        
         test_op_eq('!', Tok_ExclamationMark, Tok_NotEquals);
 
-        test_op_eq('+', Tok_Plus, Tok_PlusEquals);
-        test_op_eq('-', Tok_Minus, Tok_MinusEquals);
-        test_op_eq('*', Tok_Mul, Tok_MulEquals);
-        test_op_eq('/', Tok_Div, Tok_DivEquals);
+        test_op_eq('+', Tok_Plus, Tok_PlusAssign);
+        test_op_eq('-', Tok_Minus, Tok_MinusAssign);
+        test_op_eq('*', Tok_Mul, Tok_MulAssign);
+        test_op_eq('/', Tok_Div, Tok_DivAssign);
 
 
         

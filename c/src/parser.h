@@ -124,7 +124,7 @@ typedef struct TernaryExpression {
 typedef enum StatementType {
     Statement_Declaration,
     Statement_Assignment,
-    Statement_FuncCall,
+    Statement_Expression,
 
     Statement_Scope,
     Statement_If,
@@ -140,6 +140,11 @@ typedef struct Statement {
     StatementType statementType;
 } Statement;
 
+typedef struct StatementExpression {
+    Statement base;
+    Expression* expr;
+} StatementExpression;
+
 typedef struct VarDecl {
     Statement base;
     PlangType type;
@@ -150,9 +155,8 @@ typedef struct VarDecl {
 
 typedef struct Assignement {
     Statement base;
-    ValuePath* assignee;
-    // = += -= *= /=
-    TokenType assignmentOper;
+    Expression* assigneeExpr;
+    TokenType assignmentOper; // = += -= *= /=
     Expression* expr;
 } Assignement;
 
@@ -204,20 +208,22 @@ typedef struct PlangFunction {
 } PlangFunction;
 
 typedef struct FuncCall {
+    Expression base;
     FuncDeclaration* function;
-    ValuePath* valuePath;
+    // ValuePath* valuePath;
+    Expression* funcExpr;
     Expression** args; // darray of Expression pointers
 } FuncCall;
 
-typedef struct FuncCallExpression {
-    Expression base;
-    FuncCall call;
-} FuncCallExpression;
+// typedef struct FuncCallExpression {
+//     Expression base;
+//     FuncCall call;
+// } FuncCallExpression;
 
-typedef struct FuncCallStatement {
-    Statement base;
-    FuncCall call;
-} FuncCallStatement;
+// typedef struct FuncCallStatement {
+//     Statement base;
+//     FuncCall call;
+// } FuncCallStatement;
 
 // ----Struct----------------------------------------------
 

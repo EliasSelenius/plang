@@ -125,8 +125,8 @@ static void transpileExpression(Expression* expr) {
         } break;
 
         case ExprType_FuncCall: {
-            FuncCallExpression* fc = (FuncCallExpression*)expr;
-            transpileFuncCall(&fc->call);
+            FuncCall* fc = (FuncCall*)expr;
+            transpileFuncCall(fc);
         } break;
     }
 
@@ -191,19 +191,19 @@ static void transpileStatement(Statement* statement) {
         } break;
         case Statement_Assignment: {
             Assignement* ass = (Assignement*)statement;
-            transpileValuePath(ass->assignee);
+            transpileExpression(ass->assigneeExpr);
 
             switch (ass->assignmentOper) {
                 case Tok_Assign: sbAppend(sb, " = "); break;
-                case Tok_PlusEquals: sbAppend(sb, " += "); break;
-                case Tok_MinusEquals: sbAppend(sb, " -= "); break;
-                case Tok_MulEquals: sbAppend(sb, " *= "); break;
-                case Tok_DivEquals: sbAppend(sb, " /= "); break;
+                case Tok_PlusAssign: sbAppend(sb, " += "); break;
+                case Tok_MinusAssign: sbAppend(sb, " -= "); break;
+                case Tok_MulAssign: sbAppend(sb, " *= "); break;
+                case Tok_DivAssign: sbAppend(sb, " /= "); break;
                 default: break;
             }
 
             transpileExpression(ass->expr);
-            sbAppend(sb, ";");            
+            sbAppend(sb, ";");        
         } break;
 
         case Statement_Scope: {
@@ -235,9 +235,9 @@ static void transpileStatement(Statement* statement) {
             
         } break;
 
-        case Statement_FuncCall: {
-            FuncCallStatement* funcCallSta = (FuncCallStatement*)statement;
-            transpileFuncCall(&funcCallSta->call);
+        case Statement_Expression: {
+            StatementExpression* staExpr = (StatementExpression*)statement;
+            transpileExpression(staExpr->expr);
             sbAppend(sb, ";");
         } break;
     }

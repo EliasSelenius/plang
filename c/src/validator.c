@@ -6,7 +6,7 @@
 
 #include <stdio.h>
 #include <stdarg.h>
-
+#include <stdlib.h> // included for malloc
 
 typedef struct Variable {
     StrSpan name;
@@ -103,6 +103,7 @@ static PlangType getExpressedTypeValuePath(ValuePath* value) {
     return type;
 }
 
+/*
 static PlangType getExpressedType(Expression* expr) {
     switch (expr->expressionType) {
         case ExprType_Literal_Number: {
@@ -177,7 +178,7 @@ static PlangType getExpressedType(Expression* expr) {
         .structName = spFrom("err_no_type"),
         .numPointers = 0
     };
-}
+}*/
 
 
 static PlangType* getDeclaredVariable(StrSpan name) {
@@ -298,18 +299,19 @@ inline void validateType(StrSpan typename) {
 
 }
 
-static void validateFuncCall(FuncCall* call) {
+static PlangType* validateFuncCall(FuncCall* call) {
     
-    if (call->valuePath->next || call->valuePath->index) {
+    if (call->funcExpr->expressionType != ExprType_Variable) {
         printf("Feature not implemented yet.\n");
-        return;
+        return null;
     }
 
-    StrSpan name = call->valuePath->name;
+    VariableExpression* var = (VariableExpression*)call->funcExpr;
+    StrSpan name = var->name;
     call->function = getFuncDecl(name);
     if (!call->function) {
         error("Function \"%.*s\" does not exist.", name.length, name.start);
-        return;
+        return null;
     }
 
     u32 argLen = call->args ? darrayLength(call->args) : 0;
@@ -325,7 +327,7 @@ static void validateFuncCall(FuncCall* call) {
             validateExpression(call->args[i]);
         }
 
-        return;
+        return &call->function->returnType;
     }
     
     for (u32 i = 0; i < argLen; i++) {
@@ -340,19 +342,16 @@ static void validateFuncCall(FuncCall* call) {
             }
         }
     }
+
+    return &call->function->returnType;
 }
 
 
 static PlangType* validateExpression(Expression* expr) {
     switch (expr->expressionType) {        
         case ExprType_Variable: {
-            //ExpressionProxy* exp = (ExpressionProxy*)expr;
-            //ValuePath* var = exp->node;
-            //return validateValue(var);
-
             VariableExpression* var = (VariableExpression*)expr;
             return validateVariable(var);
-
         } break;
 
         case ExprType_Deref: {
@@ -366,15 +365,20 @@ static PlangType* validateExpression(Expression* expr) {
             }
 
             PlangStruct* stru = getStructByName(type->structName);
-            Field* field = getField(stru, deref->name);
-            if (!field) {
-                error("Field \"%.*s\" does not exist on type \"%.*s\".",
-                        field->name.length, field->name.start,
-                        stru->name.length, stru->name.start);
+            if (stru) {
+                Field* field = getField(stru, deref->name);                
+                if (!field) {
+                    error("Field \"%.*s\" does not exist on type \"%.*s\".",
+                            field->name.length, field->name.start,
+                            stru->name.length, stru->name.start);
+                    return null;
+                }
+                return &field->type;
+            } else {
+                error("%.*s cannot be dereferenced.", type->structName.length, type->structName.start);
                 return null;
             }
 
-            return &field->type;
         } break;
 
         case ExprType_Less:
@@ -405,17 +409,22 @@ static PlangType* validateExpression(Expression* expr) {
             validateType(alloc->type.structName);
 
             // recurse on possibe size-subexpression
-            PlangType* size = null;
-            if (alloc->sizeExpr) size = validateExpression(alloc->sizeExpr);
+            if (alloc->sizeExpr) {
+                PlangType* size = validateExpression(alloc->sizeExpr);
 
-            if (size) {
-                // TODO: is this a valid integer expression?
+                if (size) {
+                    // TODO: is this a valid integer expression?
+                }
             }
 
+
             // TODO: Ugly hack here, find better memory storage for types. 
-            // Or return PlangType by value perhaps?
-            alloc->type.numPointers++;
-            return &alloc->type;
+            // Or return PlangType by value perhaps? no, I have decided not to. Because we want to return null sometimes.
+            // This is a memory leak!
+            PlangType* type = malloc(sizeof(PlangType));
+            *type = alloc->type;
+            type->numPointers++;
+            return type;
 
         } break;
         
@@ -432,15 +441,14 @@ static PlangType* validateExpression(Expression* expr) {
         } break;
 
         case ExprType_FuncCall: {
-            // TODO: determine type here
-            FuncCallExpression* fc = (FuncCallExpression*)expr;
-            validateFuncCall(&fc->call);
+            FuncCall* fc = (FuncCall*)expr;
+            return validateFuncCall(fc);
         } break;
 
         { // literals
-            static PlangType int32type = (PlangType) { .structName = ((StrSpan) { .start = "int", .length = 3 }), .numPointers = 0 };
-            static PlangType charP     = (PlangType) { .structName = ((StrSpan) { .start = "char", .length = 4 }), .numPointers = 1 };
-            static PlangType voidP     = (PlangType) { .structName = ((StrSpan) { .start = "void", .length = 4 }), .numPointers = 1 };
+            static PlangType int32type = { .structName = { .start = "int", .length = 3 }, .numPointers = 0 };
+            static PlangType charP     = { .structName = { .start = "char", .length = 4 }, .numPointers = 1 };
+            static PlangType voidP     = { .structName = { .start = "void", .length = 4 }, .numPointers = 1 };
 
             case ExprType_Literal_Number: return &int32type;
             case ExprType_Literal_String: return &charP;
@@ -512,12 +520,12 @@ static void validateScope(Codeblock* scope) {
             } break;
             case Statement_Assignment: {
                 Assignement* ass = (Assignement*)sta;
-                bool assigneeValid = validateValue(ass->assignee);
-                PlangType* exprValid = validateExpression(ass->expr);
-                if (assigneeValid && exprValid) {
-                    PlangType asseeType = getExpressedTypeValuePath(ass->assignee);
-                    PlangType exprType = getExpressedType(ass->expr);
-                    if (!typeEquals(asseeType, exprType)) {
+
+                PlangType* toType = validateExpression(ass->assigneeExpr);
+                PlangType* fromType = validateExpression(ass->expr);
+
+                if (toType && fromType) {
+                    if (!typeEquals(*toType, *fromType)) {
                         error("Type missmatch in assignment.");
                     }
                 }
@@ -558,9 +566,9 @@ static void validateScope(Codeblock* scope) {
                 ReturnStatement* retSta = (ReturnStatement*)sta;
 
                 if (retSta->returnExpr) {
-                    if (validateExpression(retSta->returnExpr)) {
-                        PlangType returnType = getExpressedType(retSta->returnExpr);
-                        if (!typeEquals(returnType, function->decl.returnType)) {
+                    PlangType* returnType = validateExpression(retSta->returnExpr);
+                    if (returnType) {
+                        if (!typeEquals(*returnType, function->decl.returnType)) {
                             error("Return type missmatch in function \"%.*s\".", function->decl.name.length, function->decl.name.start);
                         }
                     }
@@ -576,9 +584,9 @@ static void validateScope(Codeblock* scope) {
 
             } break;
 
-            case Statement_FuncCall: {
-                FuncCallStatement* call = (FuncCallStatement*)sta;
-                validateFuncCall(&call->call);
+            case Statement_Expression: {
+                StatementExpression* staExpr = (StatementExpression*)sta;
+                validateExpression(staExpr->expr);
             } break;
         }
     }
@@ -623,16 +631,15 @@ static void validateStruct(PlangStruct* stru) {
 
 static void validateGlobalVar(VarDecl* decl) {
     if (decl->assignmentOrNull) {
-        PlangType assType;
-        if (validateExpression(decl->assignmentOrNull)) assType = getExpressedType(decl->assignmentOrNull);
-        else return; // if type could not be determined then we should not continue.
+        PlangType* assType = validateExpression(decl->assignmentOrNull);
+        if (!assType) return; // if type could not be determined then we should not continue.
 
         if (decl->mustInferType) {
-            decl->type = assType;
+            decl->type = *assType;
         } else {
             validateType(decl->type.structName);
 
-            if (!typeEquals(decl->type, assType)) {
+            if (!typeEquals(decl->type, *assType)) {
                 error("Type missmatch in global.");
             }
         }
