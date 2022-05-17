@@ -187,28 +187,6 @@ static bool tok_scan(char* format, ...) {
     return false;
 }
 
-static ValuePath* parseValue() {
-    if (tokens[token_index].type != Tok_Word) return null;
-
-    ValuePath* res = malloc(sizeof(ValuePath));
-    res->name = tokens[token_index].value;
-    res->type = null;
-    res->next = null;
-    res->index = null;
-    token_index++;
-
-    if (tok(Tok_OpenSquare)) {
-        res->index = expectExpression();
-        expect(Tok_CloseSquare);
-    }
-
-    if (tok(Tok_Period)) {
-        res->next = parseValue();
-    }
-
-    return res;
-}
-
 static void expectFuncCallArgs(FuncCall* func, Expression* funcExpr) {
     func->funcExpr = funcExpr;
     func->function = null;
@@ -244,32 +222,11 @@ static Expression* parseLeafExpression() {
 
     switch (tokens[token_index].type) {
         case Tok_Word: {
-            // valuepath or funcCall
-            // TODO: line numbers 
-            // ValuePath* value = parseValue();
-            // if (tok(Tok_OpenParen)) {
-            //     // func
-            //     FuncCallExpression* funcex = malloc(sizeof(FuncCallExpression));
-            //     funcex->base.expressionType = ExprType_FuncCall;
-
-            //     expectFuncCallArgs(&funcex->call, value);
-            //     res = (Expression*)funcex;
-            // } else {
-            //     // value
-            //     ExpressionProxy* exp = malloc(sizeof(ExpressionProxy));
-            //     exp->base.expressionType = ExprType_Variable;
-
-            //     exp->node = value;
-            //     res = (Expression*)exp;
-            // }
-
             VariableExpression* ve = malloc(sizeof(VariableExpression));
             ve->base.expressionType = ExprType_Variable;
             ve->base.nodebase.lineNumber = tokens[token_index].line;
             ve->name = identifier();
-
             res = (Expression*)ve;
-
         } break;
 
         case Tok_Keyword_Alloc: {
@@ -353,77 +310,6 @@ static Expression* expectExpression() {
     }
     return res;
 }
-
-static bool isExpressionWriteable(Expression* expr) {
-    
-    switch (expr->expressionType) {
-        case ExprType_Variable:
-        case ExprType_Deref: return true;
-        default: return false;
-    }
-}
-
-/*
-    a + b * c
-    
-      +
-     / \
-    a   *
-       / \
-      b   c
-
-    a * b + c
-
-          +
-         / \
-        *   c
-       / \
-      a   b
-
-
-
-    a - b / c + d * e
-
-            -
-           / \
-          a   +
-             / \
-         (/)     *
-         / \    / \
-        b   c  d   e
-
-    at: ab
-        -
-       / \
-      a   b
-
-    at: abc
-        -
-       / \
-      a  (\)
-         / \
-        b   c
-
-    at: abcd
-        -
-       / \
-      a   +
-         / \
-      (\)   d
-      / \
-     b   c
-
-    at: abcde
-            -
-           / \
-          a   +
-             / \
-         (/)     *
-         / \    / \
-        b   c  d   e
-
-
-*/
 
 static u32 operatorPriority(ExprType type) {
     switch (type) {
@@ -628,57 +514,6 @@ static Statement* expectStatement() {
             ((ReturnStatement*)res)->returnExpr = parseExpression();
             semicolon();
         } break;
-
-
-
-        // case Tok_Keyword_Let: {
-        //     res = (Statement*)expectVarDecl();
-        //     semicolon();
-        // } break;
-        // case Tok_Word: {
-        //     TokenType nextToken = tokens[token_index + 1].type;
-        //     if (nextToken == Tok_Mul || nextToken == Tok_Word) {
-        //         // var decl
-        //         res = (Statement*)expectVarDecl();
-        //     } else {
-        //         // assignment or funcCall
-
-        //         // ValuePath* valuePath = parseValue();
-
-
-        //         switch (tokens[token_index].type) {
-        //             case Tok_OpenParen: {
-        //                 token_index++;
-        //                 // funcCall
-        //                 FuncCallStatement* funcCall = malloc(sizeof(FuncCallStatement));
-        //                 funcCall->base.statementType = Statement_FuncCall;
-        //                 expectFuncCallArgs(&funcCall->call, valuePath);
-        //                 res = (Statement*)funcCall;
-        //             } break;
-
-        //             case Tok_PlusAssign:
-        //             case Tok_MinusAssign:
-        //             case Tok_MulAssign:
-        //             case Tok_DivAssign:
-        //             case Tok_Assign: {
-        //                 // assignment
-
-        //                 Assignement* ass = malloc(sizeof(Assignement));
-        //                 ass->base.statementType = Statement_Assignment;
-        //                 ass->assignee = valuePath;
-        //                 ass->assignmentOper = tokens[token_index++].type;
-        //                 ass->expr = expectExpression();
-        //                 res = (Statement*)ass;
-        //             } break;
-
-        //             default: 
-        //                 unexpectedToken(); 
-        //                 return null;
-        //         }
-        //     }
-
-        //     semicolon();
-        // } break;
         
         case Tok_Keyword_Let: {
             res = (Statement*)expectVarDecl();
@@ -686,8 +521,6 @@ static Statement* expectStatement() {
         } break;
 
         default: {
-
-            // id id | id any(*) id
 
             { // declaration
                 u32 i = token_index;
@@ -709,7 +542,6 @@ static Statement* expectStatement() {
                     }
                 }
             }
-
 
             Expression* expr = parseExpression();
             if (expr) {
@@ -751,14 +583,12 @@ static Statement* expectStatement() {
     }
 
     // res should never be null up to this point
-
     res->nodebase.lineNumber = startingLineNum;
 
     return res;
 }
 
 static void expectBlock(Codeblock* scope) {
-
     expect(Tok_OpenCurl);
 
     scope->statements = darrayCreate(Statement*);
@@ -840,7 +670,7 @@ static void funcOrGlobal(bool typeinfer) {
         VarDecl decl;
         decl.assignmentOrNull = null;
         decl.name = name;
-        decl.mustInferType = typeinfer;        
+        decl.mustInferType = typeinfer;    
         decl.type = type;
         
         if (tok(Tok_Assign)) {

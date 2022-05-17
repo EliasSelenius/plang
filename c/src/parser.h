@@ -57,12 +57,6 @@ typedef struct Expression {
     ExprType expressionType;
 } Expression;
 
-// used by value path temporarily 
-typedef struct ExpressionProxy {
-    Expression base;
-    void* node;
-} ExpressionProxy;
-
 typedef struct LiteralExpression {
     Expression base;
 
@@ -97,18 +91,6 @@ typedef struct VariableExpression {
     Expression base;
     StrSpan name;
 } VariableExpression;
-
-typedef struct ValuePath {
-    
-    /*
-        the type of the variable that name refers to.
-    */
-    PlangType* type;
-
-    StrSpan name;
-    Expression* index;
-    struct ValuePath* next;
-} ValuePath;
 
 typedef struct TernaryExpression {
     Expression base;
@@ -214,16 +196,6 @@ typedef struct FuncCall {
     Expression* funcExpr;
     Expression** args; // darray of Expression pointers
 } FuncCall;
-
-// typedef struct FuncCallExpression {
-//     Expression base;
-//     FuncCall call;
-// } FuncCallExpression;
-
-// typedef struct FuncCallStatement {
-//     Statement base;
-//     FuncCall call;
-// } FuncCallStatement;
 
 // ----Struct----------------------------------------------
 

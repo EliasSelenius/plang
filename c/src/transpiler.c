@@ -7,7 +7,6 @@
 
 void transpileBlock(Codeblock* scope);
 void filewrite(const char* filename, char* content);
-void transpileValuePath(ValuePath* value);
 void transpileExpression(Expression* expr);
 
 static StringBuilder* sb;
@@ -96,11 +95,8 @@ static void transpileExpression(Expression* expr) {
         } break;
 
         case ExprType_Variable: {
-            // transpileValuePath(((ExpressionProxy*)expr)->node);
-
             VariableExpression* var = (VariableExpression*)expr;
             sbAppendSpan(sb, var->name);
-
         } break;
 
         case ExprType_Alloc: {
@@ -130,29 +126,6 @@ static void transpileExpression(Expression* expr) {
         } break;
     }
 
-}
-
-static void transpileValuePath(ValuePath* value) {
-    sbAppendSpan(sb, value->name);
-    
-    u32 numPointers = value->type->numPointers;
-
-    if (value->index) {
-        numPointers--;
-
-        sbAppend(sb, "[");
-        transpileExpression(value->index);
-        sbAppend(sb, "]");
-    }
-
-
-    if (value->next) {
-        if (numPointers == 0) sbAppend(sb, ".");
-        else if (numPointers == 1) sbAppend(sb, "->");
-        else printf("transpileValuePath could not transpile valuepath, this is a bug! the validator should have made sure this never happened\n");
-
-        transpileValuePath(value->next);
-    }
 }
 
 static void transpileIfStatement(IfStatement* ifst) {
@@ -247,7 +220,8 @@ static void transpileBlock(Codeblock* scope) {
     sbAppend(sb, "{");
     tabing++;
 
-    for (u32 i = 0; i < darrayLength(scope->statements); i++) {
+    u32 len = darrayLength(scope->statements);
+    for (u32 i = 0; i < len; i++) {
         newline();
         transpileStatement(scope->statements[i]);
     }
@@ -299,7 +273,8 @@ static void transpileStruct(PlangStruct* stru) {
     
     tabing++;
 
-    for (u32 i = 0; i < darrayLength(stru->fields); i++) {
+    u32 len = darrayLength(stru->fields);
+    for (u32 i = 0; i < len; i++) {
         newline();
         transpileType(stru->fields[i].type);
         sbAppend(sb, " ");

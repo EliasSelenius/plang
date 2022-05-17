@@ -94,93 +94,6 @@ inline bool typeEquals(PlangType a, PlangType b) {
     return spanEqualsSpan(a.structName, b.structName) && a.numPointers == b.numPointers;
 }
 
-static PlangType getExpressedTypeValuePath(ValuePath* value) {
-    while (value->next) value = value->next;
-    
-    PlangType type = *value->type;
-
-    if (value->index) type.numPointers--;
-    return type;
-}
-
-/*
-static PlangType getExpressedType(Expression* expr) {
-    switch (expr->expressionType) {
-        case ExprType_Literal_Number: {
-            // TODO: different number types by literal suffix
-
-            return (PlangType) { 
-                .structName = spFrom("int"),
-                .numPointers = 0
-            };
-        } break;
-        case ExprType_Literal_String: {
-            return (PlangType) {
-                .structName = spFrom("char"),
-                .numPointers = 1
-            };
-        } break;
-        case ExprType_Literal_Bool: {
-            return (PlangType) {
-                .structName = spFrom("int"),
-                .numPointers = 0
-            };
-        } break;
-        case ExprType_Variable: {
-            VariableExpression* var = (VariableExpression*)expr;
-            return *getDeclaredVariable(var->name);
-            // ValuePath* value = ((ExpressionProxy*)expr)->node;
-            // return getExpressedTypeValuePath(value);
-        } break;
-        
-        case ExprType_Less:
-        case ExprType_Greater:
-        case ExprType_LessEquals:
-        case ExprType_GreaterEquals:
-        case ExprType_Equals:
-        case ExprType_NotEquals:
-        case ExprType_BooleanAnd:
-        case ExprType_BooleanOr:
-        case ExprType_Plus:
-        case ExprType_Minus:
-        case ExprType_Mul:
-        case ExprType_Div: {
-            return (PlangType) { 
-                .structName = spFrom("int"),
-                .numPointers = 0
-            };
-        } break;
-        case ExprType_Alloc: {
-            PlangType res = ((AllocExpression*)expr)->type;
-            res.numPointers++;
-            return res;
-        } break;
-        case ExprType_Literal_Null: {
-            return (PlangType) {
-                .structName = spFrom("void"),
-                .numPointers = 1
-            };
-        } break;
-        case ExprType_Ternary: {
-            TernaryExpression* ter = (TernaryExpression*)expr;
-            return getExpressedType(ter->thenExpr);
-        } break;
-        case ExprType_FuncCall: {
-            FuncCallExpression* fc = (FuncCallExpression*)expr;
-            return fc->call.function->returnType;
-        } break;
-    }
-
-    // This is not supposed to ever hapen
-    printf("getExpressedType could not determine type of expression, this is a bug!\n");
-    numberOfErrors++;
-    return (PlangType) {
-        .structName = spFrom("err_no_type"),
-        .numPointers = 0
-    };
-}*/
-
-
 static PlangType* getDeclaredVariable(StrSpan name) {
 
     // look for local var
@@ -226,62 +139,6 @@ static PlangType* validateVariable(VariableExpression* var) {
         return null;
     }
     return type;
-}
-
-
-static bool validateValue(ValuePath* var) {
-    // is this a valid value? like a local, a function arguemnt or a global 
-
-    PlangType* rootType = getDeclaredVariable(var->name);
-    var->type = rootType;
-    if (!rootType) {
-        error("Variable \"%.*s\" is not declared.",
-            var->name.length,
-            var->name.start);
-
-        return false;
-    }
-
-    PlangStruct* stru = getStructByName(rootType->structName);
-    if (stru) {
-
-        ValuePath* value = var;
-        do {
-            
-            // does it use indexing? if so is it valid? and recurse on index expression
-            if (value->index) {
-                validateExpression(value->index);
-                // TODO: is integer expression
-
-                // TODO: is allowed to index on this type?
-            }
-
-
-            // is it being dereferenced? if so does the field exist?
-            if (value->next) {
-                Field* field = getField(stru, value->next->name);
-                if (!field) {
-                    error("Field \"%.*s\" does not exist on type \"%.*s\".",
-                        value->next->name.length, value->next->name.start,
-                        stru->name.length, stru->name.start);
-
-                    break;
-                }
-
-                stru = getStructByName(field->type.structName);
-
-                value->next->type = &field->type;
-            }
-
-            value = value->next;
-        } while (value);
-
-    } else {
-        
-    }
-
-
-    return true;
 }
 
 inline void validateType(StrSpan typename) {
@@ -680,4 +537,3 @@ u32 validate() {
 
     return numberOfErrors;
 }
-
