@@ -79,7 +79,7 @@ static void transpileExpression(Expression* expr) {
         case ExprType_Deref: {
             DerefOperator* deref = (DerefOperator*)expr;
             transpileExpression(deref->expr);
-            sbAppend(sb, ".");
+            sbAppend(sb, deref->derefOp);
             sbAppendSpan(sb, deref->name);
         } break;
 
@@ -102,6 +102,8 @@ static void transpileExpression(Expression* expr) {
         case ExprType_Alloc: {
             AllocExpression* allocExpr = (AllocExpression*)expr;
             sbAppend(sb, "malloc(sizeof(");
+            // TODO: Ugly hack here, find better memory storage for types.
+            allocExpr->type.numPointers--;
             transpileType(allocExpr->type);
             sbAppend(sb, ")");
             if (allocExpr->sizeExpr) {
@@ -339,6 +341,14 @@ void transpile() {
     }
 
 
-    filewrite("output.g.c", sb->content);
+    FILE* file;
+    if ( !fopen_s(&file, "output.g.c", "w") ) {
+        fprintf(file, "%s", sb->content);
+        fclose(file);
+    } else {
+        printf("Could not write to output.g.c\n");
+    }
+
+
     sbDestroy(sb);
 }

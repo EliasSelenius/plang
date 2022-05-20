@@ -19,12 +19,18 @@ typedef struct Entity {
 } Entity;
 
 // Forward declarations
+Entity* createEntity(int x, int z);
 int get_Number(int i);
 int main();
 
 // Globals
+Entity entity;
 
 // Implementations
+Entity* createEntity(int x, int z) {
+    Entity* e = malloc(sizeof(Entity));
+    return e;
+}
 int get_Number(int i) {
     return (i * 2);
 }
@@ -34,8 +40,11 @@ int main() {
     printf("number = %d\n", n);
     Entity e;
     Entity ep = e;
-    float x = e.trans.pos.x;
-    Transform* t = malloc(sizeof(Transform));
+    entity = e;
+    float x = entity.trans.pos.x;
+    Transform t = createEntity(0, 12)->trans;
+    vec3 f = t.pos;
     vec3* vpp = malloc(sizeof(vec3));
+    float h = (vpp + 2)->x;
     return 0;
 }

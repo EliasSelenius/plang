@@ -84,6 +84,8 @@ typedef struct AllocExpression {
 typedef struct DerefOperator {
     Expression base;
     Expression* expr;
+    // I feel this is a little bit of a hack. We may have to remove this
+    char* derefOp;
     StrSpan name;
 } DerefOperator;
 
@@ -192,7 +194,6 @@ typedef struct PlangFunction {
 typedef struct FuncCall {
     Expression base;
     FuncDeclaration* function;
-    // ValuePath* valuePath;
     Expression* funcExpr;
     Expression** args; // darray of Expression pointers
 } FuncCall;

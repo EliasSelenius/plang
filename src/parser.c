@@ -261,26 +261,25 @@ static Expression* parseLeafExpression() {
 
         default: return null;
     }
-
-    // deref
-    while (tok(Tok_Period)) {
-        DerefOperator* deref = malloc(sizeof(DerefOperator));
-        deref->base.expressionType = ExprType_Deref;
-        deref->base.nodebase.lineNumber = tokens[token_index - 1].line;
-        deref->expr = res;
-        deref->name = identifier();
-        res = (Expression*)deref;
+    
+    while (true) {
+        if (tok(Tok_Period)) {
+            DerefOperator* deref = malloc(sizeof(DerefOperator));
+            deref->base.expressionType = ExprType_Deref;
+            deref->base.nodebase.lineNumber = tokens[token_index - 1].line;
+            deref->expr = res;
+            deref->derefOp = null;
+            deref->name = identifier();
+            res = (Expression*)deref;
+        } else if (tok(Tok_OpenParen)) {
+            FuncCall* call = malloc(sizeof(FuncCall));
+            call->base.expressionType = ExprType_FuncCall;
+            expectFuncCallArgs(call, res);
+            res = (Expression*)call;
+        } else {
+            break;
+        }
     }
-
-    // func call
-    if (tok(Tok_OpenParen)) {
-        FuncCall* call = malloc(sizeof(FuncCall));
-        call->base.expressionType = ExprType_FuncCall;
-        expectFuncCallArgs(call, res);
-        res = (Expression*)call;
-    }
-
-    // TODO: dereferencing a function call?
 
     return res;
 }

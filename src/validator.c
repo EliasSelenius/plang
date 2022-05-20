@@ -221,6 +221,8 @@ static PlangType* validateExpression(Expression* expr) {
                 return null;
             }
 
+            deref->derefOp = type->numPointers ? "->" : ".";
+
             PlangStruct* stru = getStructByName(type->structName);
             if (stru) {
                 Field* field = getField(stru, deref->name);                
@@ -275,13 +277,17 @@ static PlangType* validateExpression(Expression* expr) {
             }
 
 
+
             // TODO: Ugly hack here, find better memory storage for types. 
+            alloc->type.numPointers++;
+            return &alloc->type;
+
             // Or return PlangType by value perhaps? no, I have decided not to. Because we want to return null sometimes.
             // This is a memory leak!
-            PlangType* type = malloc(sizeof(PlangType));
-            *type = alloc->type;
-            type->numPointers++;
-            return type;
+            // PlangType* type = malloc(sizeof(PlangType));
+            // *type = alloc->type;
+            // type->numPointers++;
+            // return type;
 
         } break;
         

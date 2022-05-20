@@ -15,9 +15,18 @@ struct Entity {
     Transform trans;
 }
 
+Entity* createEntity(int x, int z) {
+    let e = alloc Entity;
+    // e.trans.pos.x = x;
+    // e.trans.pos.z = z;
+    return e;
+}
+
 int get_Number(int i) {
     return i * 2;
 }
+
+Entity entity;
 
 int main() {
     printf("Testing deref.%d\n", 0);
@@ -27,13 +36,14 @@ int main() {
 
     Entity e;
     let ep = e;
-    let x = e.trans.pos.x;
+    entity = e;
+    let x = entity.trans.pos.x;
 
-    let t = alloc Transform;
-    // let f = t.pos;
+    let t = createEntity(0, 12).trans;
+    let f = t.pos;
 
     vec3* vpp = alloc vec3;
-    // let h = (vpp + 2).x;
+    let h = (vpp + 2).x;
 
     // TODO: fix tokenizing of numbers to allow for this:
     // let dwa = 12.name;
