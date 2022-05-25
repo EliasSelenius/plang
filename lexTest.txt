@@ -13,6 +13,10 @@ int main() {
     println("    Hello, Plang!");
     printf("Hello, This is printf() from %s\n", "plang");
 
+    let booleanValue = true;
+    char* str = false and true ? "Yes" : booleanValue ? "Okay Then" : "No";
+    println(str);
+
     int i = 0;
     while (i < 10 and i != 4 + 2) {
         println("Loop.");

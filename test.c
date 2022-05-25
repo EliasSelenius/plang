@@ -6,16 +6,13 @@ typedef struct String {
     char c_str[];
 } String;
 
+#define true 1
+#define false 0
+
 int main() {
 
-    char* s1 = "daw";
-    char s2[] = "daw";
-
-    // let str1 = "Hello";
-    String str1 = { 5, "Hello" };
-
-    String* str2 = malloc(sizeof(unsigned int) + 6);
-    *str2 = str1;
+    int b = false * true ? false : true;
+    printf("%d\n", b);
 
     return 0;
 }

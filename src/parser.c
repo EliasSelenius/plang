@@ -384,7 +384,7 @@ static Expression* parseExpression() {
     if (!a) return null;
 
     TokenType tokentype = tokens[token_index].type;
-    if (!isOperator(tokentype)) return a;
+    if (!isOperator(tokentype)) return testForTernary(a);
     token_index++;
 
     BinaryExpression* root = malloc(sizeof(BinaryExpression));
@@ -405,7 +405,8 @@ static Expression* parseExpression() {
         tokentype = tokens[token_index].type;
     }
 
-    return (Expression*)root;
+    // return (Expression*)root;
+    return testForTernary((Expression*)root);
 }
 
 static IfStatement* expectIfStatement() {
