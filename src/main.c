@@ -35,11 +35,11 @@
         - localy defined functions
         - return type inference
 
+
+    DONE list:
         *- unary not operator
         *- address-of operator *
         *- value-of operator @
-
-    DONE list:
         *- not equals operator
         *- boolean operators
         *- boolean comparisons 
@@ -142,6 +142,8 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
+    // TODO: use higher default capacity here, to minimize the amount of reallocs 
+    tokens = darrayCreate(Token);
 
     startPerf();
 

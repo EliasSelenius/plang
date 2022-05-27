@@ -1,26 +1,23 @@
 #include "lexer.h"
+#include "darray.h"
 
 #include <stdio.h>
 
-// TODO: use dynamic array 
-Token tokens[100000];
-u32 tokens_length = 0;
+Token* tokens; // darray
 
 static u32 current_line;
 static char* cursor;
 
-static void appendTokenLength(TokenType type, u32 len) {
-    tokens[tokens_length++] = (Token) {
-        .type = type,
-        .line = current_line,
-        .value = (StrSpan) {
-            .start = cursor,
-            .length = len
-        }
-    };
+inline void appendTokenLength(TokenType type, u32 len) {
+    Token token;
+    token.type = type;
+    token.line = current_line;
+    token.value.start = cursor;
+    token.value.length = len;    
+    darrayAdd(tokens, token);
 }
 
-static void appendToken(TokenType type) {
+inline void appendToken(TokenType type) {
     appendTokenLength(type, 1);
 }
 
@@ -56,7 +53,7 @@ u32 lex(char* input) {
             while (isLetter(*++cursor) || isDigit(*cursor) || (*cursor == '_'));
             cursor--;
 
-            StrSpan word = (StrSpan) {
+            StrSpan word = {
                 .start = wordStart,
                 .length = cursor - (wordStart - 1)
             };
@@ -80,11 +77,11 @@ u32 lex(char* input) {
             else if (spanEquals(word, "return")) tokType = Tok_Keyword_Return;
             else if (spanEquals(word, "declare")) tokType = Tok_Keyword_Declare;
 
-            tokens[tokens_length++] = (Token) {
-                .type = tokType,
-                .line = current_line,
-                .value = word
-            };
+            Token token;
+            token.type = tokType;
+            token.line = current_line;
+            token.value = word;
+            darrayAdd(tokens, token);
 
             continue;
         }
@@ -102,14 +99,15 @@ u32 lex(char* input) {
             }
             cursor--;
 
-            tokens[tokens_length++] = (Token) {
+            Token token = {
                 .type = Tok_Number,
                 .line = current_line,
-                .value = (StrSpan) {
+                .value = {
                     .start = digitStart,
                     .length = cursor - (digitStart - 1)
                 }
             };
+            darrayAdd(tokens, token);
 
             continue;
         }
@@ -126,15 +124,15 @@ u32 lex(char* input) {
                 }
             }
 
-            tokens[tokens_length++] = (Token) {
+            Token token = {
                 .type = Tok_String,
                 .line = current_line,
-                .value = (StrSpan) {
+                .value = {
                     .start = strStart,
                     .length = cursor - (strStart - 1)
                 }
             };
-
+            darrayAdd(tokens, token);
             continue;
         }
 

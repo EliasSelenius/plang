@@ -45,7 +45,6 @@ int main() {
     vec3* vpp = alloc vec3;
     let h = @(vpp + 2);
 
-    let i = *(1 + *2);
 
     // TODO: fix tokenizing of numbers to allow for this:
     // let dwa = 12.name;

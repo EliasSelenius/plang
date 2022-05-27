@@ -46,6 +46,5 @@ int main() {
     vec3 f = t.pos;
     vec3* vpp = malloc(sizeof(vec3));
     vec3 h = *(vpp + 2);
-    int* i = &(1 + &2);
     return 0;
 }

@@ -717,6 +717,8 @@ u32 parse() {
 
     // token_index = 0;
 
+    u32 tokens_length = darrayLength(tokens);
+
     while (token_index < tokens_length) {
 
         switch (tokens[token_index].type) {

@@ -80,7 +80,6 @@ typedef struct Token {
     u32 line;
 } Token;
 
-extern Token tokens[100000];
-extern u32 tokens_length;
+extern Token* tokens;
 
 u32 lex(char* input);
