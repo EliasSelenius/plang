@@ -240,6 +240,35 @@ static PlangType* validateExpression(Expression* expr) {
 
         } break;
 
+        case ExprType_Unary_Not: {
+            UnaryExpression* unary = (UnaryExpression*)expr;
+            PlangType* type = validateExpression(unary->expr);
+            // TODO: is type a boolean type?
+            return type; // TODO: return boolean
+        } break;
+        case ExprType_Unary_AddressOf: {
+            UnaryExpression* unary = (UnaryExpression*)expr;
+            PlangType* type = validateExpression(unary->expr);
+            // TODO: is unary->expr an expression we can take the address of?
+
+            // TODO: this is a memory leak! find better storage for types
+            PlangType* unaryType = malloc(sizeof(PlangType));
+            *unaryType = *type;
+            unaryType->numPointers++;
+            return unaryType;
+        } break;
+        case ExprType_Unary_ValueOf: {
+            UnaryExpression* unary = (UnaryExpression*)expr;
+            PlangType* type = validateExpression(unary->expr);
+            // TODO: is unary->expr an expression we can take the value of?
+
+            // TODO: this is a memory leak! find better storage for types
+            PlangType* unaryType = malloc(sizeof(PlangType));
+            *unaryType = *type;
+            unaryType->numPointers--;
+            return unaryType;
+        } break;
+
         case ExprType_Less:
         case ExprType_Greater:
         case ExprType_LessEquals:

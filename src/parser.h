@@ -49,6 +49,9 @@ typedef enum ExprType {
     ExprType_BooleanAnd = Tok_Keyword_And,
     ExprType_BooleanOr = Tok_Keyword_Or,
 
+    ExprType_Unary_Not,
+    ExprType_Unary_AddressOf,
+    ExprType_Unary_ValueOf,
 
 } ExprType;
 
@@ -68,6 +71,11 @@ typedef struct LiteralExpression {
     };
 
 } LiteralExpression;
+
+typedef struct UnaryExpression {
+    Expression base;
+    Expression* expr;
+} UnaryExpression;
 
 typedef struct BinaryExpression {
     Expression base;

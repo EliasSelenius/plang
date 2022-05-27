@@ -28,9 +28,6 @@
         - omit curl brackets in if/while etc. for single statement block
         - hash identifiers (Tok_Word tokens) for faster string equals and to free the file buffer
         - nested multi-line comments
-        *- unary not operator
-        *- address-of operator &
-        *- value-of operator *
 
     InProgress:
         - line numbers in validation errors
@@ -38,6 +35,9 @@
         - localy defined functions
         - return type inference
 
+        *- unary not operator
+        *- address-of operator *
+        *- value-of operator @
 
     DONE list:
         *- not equals operator

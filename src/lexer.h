@@ -39,6 +39,7 @@ typedef enum TokenType {
     Tok_Colon,
     Tok_QuestionMark,
     Tok_ExclamationMark,
+    Tok_At,
 
     Tok_OpenCurl,
     Tok_CloseCurl,

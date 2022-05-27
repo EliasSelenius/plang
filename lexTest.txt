@@ -1,4 +1,9 @@
 
+// namespace io {
+//     declare struct FILE;
+//     FILE* open(char* name, char* mode);
+// }
+
 declare void printf(char* str, char* arg);
 
 void println(char* str) {
@@ -12,6 +17,22 @@ let yo() {
 int main() {
     println("    Hello, Plang!");
     printf("Hello, This is printf() from %s\n", "plang");
+
+    { // unary test
+        int i;
+        let ip = *i;
+
+        int a = @ip;
+
+        let b = !true;
+        if (!b and !false) {
+            println("unary not test");
+        }
+
+        if ( !(b and true) ) {
+            println("Other unary test");
+        }
+    }
 
     let booleanValue = true;
     char* str = false and true ? "Yes" : booleanValue ? "Okay Then" : "No";

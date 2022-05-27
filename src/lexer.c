@@ -35,6 +35,9 @@ u32 lex(char* input) {
     while (true) {
         cursor++;
 
+        // TODO: this should be a switch statement as it would be faster
+        //       ĉi tio devus esti ŝaltilo deklaro ĉar ĝi estus pli rapida
+
         if (*cursor == '\0') break;
         
         
@@ -60,7 +63,6 @@ u32 lex(char* input) {
 
             TokenType tokType = Tok_Word;
 
-            // TODO: this can be faster some day
             // Keywords
             if (spanEquals(word, "struct")) tokType = Tok_Keyword_Struct;
             else if (spanEquals(word, "alloc")) tokType = Tok_Keyword_Alloc;
@@ -188,6 +190,7 @@ u32 lex(char* input) {
         test_char(';', Tok_Semicolon);
         test_char(':', Tok_Colon);
         test_char('?', Tok_QuestionMark);
+        test_char('@', Tok_At);
 
         test_char('{', Tok_OpenCurl);
         test_char('}', Tok_CloseCurl);

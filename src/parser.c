@@ -217,8 +217,23 @@ static Expression* createLiteral(ExprType type) {
     return (Expression*)lit;
 }
 
+static UnaryExpression* createUnaryExpr(ExprType type) {
+    UnaryExpression* unary = malloc(sizeof(UnaryExpression));
+    unary->base.expressionType = type;
+    unary->base.nodebase.lineNumber = tokens[token_index++].line;
+    return unary;
+}
+
 static Expression* parseLeafExpression() {
     Expression* res = null;
+
+    UnaryExpression* unary = null;
+    switch (tokens[token_index].type) {
+        case Tok_Mul: unary = createUnaryExpr(ExprType_Unary_AddressOf); break;
+        case Tok_At: unary = createUnaryExpr(ExprType_Unary_ValueOf); break;
+        case Tok_ExclamationMark: unary = createUnaryExpr(ExprType_Unary_Not); break;
+        default: break;
+    }
 
     switch (tokens[token_index].type) {
         case Tok_Word: {
@@ -279,6 +294,11 @@ static Expression* parseLeafExpression() {
         } else {
             break;
         }
+    }
+
+    if (unary) {
+        unary->expr = res;
+        res = (Expression*)unary;
     }
 
     return res;

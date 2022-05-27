@@ -49,32 +49,43 @@ static void transpileExpression(Expression* expr) {
 
     switch (expr->expressionType) {
         
-        { // BinaryExpression
+        { // Binary & Unary Expressions
         
             char* operator = null;
 
-            case ExprType_Plus: operator = " + ";  goto end;
-            case ExprType_Minus: operator = " - "; goto end;
-            case ExprType_Mul: operator = " * ";   goto end;
-            case ExprType_Div: operator = " / ";   goto end;
+            case ExprType_Unary_Not:       operator = "!"; goto unary;
+            case ExprType_Unary_AddressOf: operator = "&"; goto unary;
+            case ExprType_Unary_ValueOf:   operator = "*"; goto unary;
 
-            case ExprType_Less: operator = " < ";           goto end;
-            case ExprType_Greater: operator = " > ";        goto end;
-            case ExprType_LessEquals: operator = " <= ";    goto end;
-            case ExprType_GreaterEquals: operator = " >= "; goto end;
-            case ExprType_Equals: operator = " == ";        goto end;
-            case ExprType_NotEquals: operator = " != ";     goto end;
-            case ExprType_BooleanAnd: operator = " && ";    goto end;
-            case ExprType_BooleanOr: operator = " || ";     goto end;
+            case ExprType_Plus:  operator = " + "; goto binary;
+            case ExprType_Minus: operator = " - "; goto binary;
+            case ExprType_Mul:   operator = " * "; goto binary;
+            case ExprType_Div:   operator = " / "; goto binary;
 
-            end:
-            BinaryExpression* bop = (BinaryExpression*)expr;
-            sbAppend(sb, "(");
-            transpileExpression(bop->left);
-            sbAppend(sb, operator);
-            transpileExpression(bop->right);
-            sbAppend(sb, ")"); 
-        } break;
+            case ExprType_Less:          operator = " < ";  goto binary;
+            case ExprType_Greater:       operator = " > ";  goto binary;
+            case ExprType_LessEquals:    operator = " <= "; goto binary;
+            case ExprType_GreaterEquals: operator = " >= "; goto binary;
+            case ExprType_Equals:        operator = " == "; goto binary;
+            case ExprType_NotEquals:     operator = " != "; goto binary;
+            case ExprType_BooleanAnd:    operator = " && "; goto binary;
+            case ExprType_BooleanOr:     operator = " || "; goto binary;
+
+            unary: {
+                UnaryExpression* unary = (UnaryExpression*)expr;
+                sbAppend(sb, operator);
+                transpileExpression(unary->expr);
+            } break;
+
+            binary: {
+                BinaryExpression* bop = (BinaryExpression*)expr;
+                sbAppend(sb, "(");
+                transpileExpression(bop->left);
+                sbAppend(sb, operator);
+                transpileExpression(bop->right);
+                sbAppend(sb, ")");
+            } break;
+        }
 
         case ExprType_Deref: {
             DerefOperator* deref = (DerefOperator*)expr;

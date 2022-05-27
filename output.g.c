@@ -45,6 +45,7 @@ int main() {
     Transform t = createEntity(0, 12)->trans;
     vec3 f = t.pos;
     vec3* vpp = malloc(sizeof(vec3));
-    float h = (vpp + 2)->x;
+    vec3 h = *(vpp + 2);
+    int* i = &(1 + &2);
     return 0;
 }
