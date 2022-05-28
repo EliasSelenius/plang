@@ -271,8 +271,6 @@ static void transpileFunctionSignature(FuncDeclaration* func) {
 }
 
 static void transpileFunction(PlangFunction* func) {
-    if (func->mustInferReturnType) return; // TODO: remove this
-
     transpileFunctionSignature(&func->decl);
     sbAppend(sb, " ");
     transpileBlock(&func->scope);

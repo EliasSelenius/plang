@@ -11,7 +11,7 @@ void println(char* str) {
 }
 
 let yo() {
-    // return "Yo!";
+    return "Yo!";
 }
 
 int main() {
@@ -76,10 +76,13 @@ int main() {
 }
 
 char* g_Name = "Elias";
+// let nomo = g_Name;
 // let g_Entity = make_entity(g_Name);
 
 // TODO: fix:
-// let tre = tre.name;
+
+//let tre = tre.name;
+
 // let a = b;
 // let b = a;
 

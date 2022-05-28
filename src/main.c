@@ -31,12 +31,12 @@
 
     InProgress:
         - line numbers in validation errors
-        *- global variables
         - localy defined functions
-        - return type inference
 
 
     DONE list:
+        - return type inference
+        *- global variables
         *- unary not operator
         *- address-of operator *
         *- value-of operator @

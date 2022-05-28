@@ -457,22 +457,39 @@ static void validateScope(Codeblock* scope) {
             case Statement_Return: {
                 ReturnStatement* retSta = (ReturnStatement*)sta;
 
-                if (retSta->returnExpr) {
-                    PlangType* returnType = validateExpression(retSta->returnExpr);
-                    if (returnType) {
-                        if (!typeEquals(*returnType, function->decl.returnType)) {
-                            error("Return type missmatch in function \"%.*s\".", function->decl.name.length, function->decl.name.start);
-                        }
-                    }
+                static PlangType voidType = { .structName = { .start = "void", .length = 4 }, .numPointers = 0 };
+
+                PlangType* type = &voidType;
+                if (retSta->returnExpr) type = validateExpression(retSta->returnExpr);
+
+                if (!type) break; 
+
+                if (function->mustInferReturnType) {
+                    function->decl.returnType = *type;
+                    function->mustInferReturnType = false;
                 } else {
-                    if (function->decl.returnType.numPointers == 0 && spanEquals(function->decl.returnType.structName, "void"));
-                    else {
-                        // TODO: proper type string in print
-                        error("Function \"%.*s\" returns %.*s, but return statement does not return any value.",
-                            function->decl.name.length, function->decl.name.start,
-                            function->decl.returnType.structName.length, function->decl.returnType.structName.start);
+                    if (!typeEquals(*type, function->decl.returnType)) {
+                        error("Return type missmatch in function \"%.*s\".", function->decl.name.length, function->decl.name.start);
                     }
                 }
+
+
+                // if (retSta->returnExpr) {
+                //     PlangType* returnType = validateExpression(retSta->returnExpr);
+                //     if (returnType) {
+                //         if (!typeEquals(*returnType, function->decl.returnType)) {
+                //             error("Return type missmatch in function \"%.*s\".", function->decl.name.length, function->decl.name.start);
+                //         }
+                //     }
+                // } else {
+                //     if (function->decl.returnType.numPointers == 0 && spanEquals(function->decl.returnType.structName, "void"));
+                //     else {
+                //         // TODO: proper type string in print
+                //         error("Function \"%.*s\" returns %.*s, but return statement does not return any value.",
+                //             function->decl.name.length, function->decl.name.start,
+                //             function->decl.returnType.structName.length, function->decl.returnType.structName.start);
+                //     }
+                // }
 
             } break;
 
@@ -493,9 +510,7 @@ static void validateScope(Codeblock* scope) {
 static void validateFunction(PlangFunction* func) {
     function = func;
 
-    if (func->mustInferReturnType) {
-        // TODO: infer return type
-    } else {
+    if (!func->mustInferReturnType) {
         validateType(func->decl.returnType.structName);
     }
 
