@@ -334,6 +334,13 @@ void transpile() {
         transpileFunctionSignature(&func->decl);
         sbAppend(sb, ";\n");
     }
+
+    u32 declsLength = darrayLength(functionDeclarations);
+    for (u32 i = 0; i < declsLength; i++) {
+        transpileFunctionSignature(&functionDeclarations[i]);
+        sbAppend(sb, ";\n");
+    }
+
     
     sbAppend(sb, "\n// Globals\n");
     u32 globLen = darrayLength(globalVariables);

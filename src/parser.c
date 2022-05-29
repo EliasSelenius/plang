@@ -646,22 +646,26 @@ static PlangStruct expectStruct() {
     return stru;
 }
 
-static void expectFuncArgList(FuncArg** arguments) {
+static FuncArg* expectFuncArgList() {
+    FuncArg* res = null;
+
     FuncArg arg;
     if (parseType(&arg.type)) {
         arg.name = identifier();
         
-        *arguments = darrayCreate(FuncArg);
-        darrayAdd(*arguments, arg);
+        res = darrayCreate(FuncArg);
+        darrayAdd(res, arg);
         
         while (tok(Tok_Comma)) {
             arg.type = expectType();
             arg.name = identifier();
-            darrayAdd(*arguments, arg);
+            darrayAdd(res, arg);
         }
     }
 
     expect(Tok_CloseParen);
+
+    return res;
 }
 
 static void funcOrGlobal(bool typeinfer) {
@@ -678,9 +682,7 @@ static void funcOrGlobal(bool typeinfer) {
         func.mustInferReturnType = typeinfer;
         func.decl.returnType = type;
         func.decl.name = name;
-        func.decl.arguments = null;
-
-        expectFuncArgList(&func.decl.arguments);
+        func.decl.arguments = expectFuncArgList();
         
         expectBlock(&func.scope);
         darrayAdd(functions, func);
@@ -750,7 +752,7 @@ u32 parse() {
                 funcDecl.returnType = expectType();
                 funcDecl.name = identifier();
                 expect(Tok_OpenParen);
-                expectFuncArgList(&funcDecl.arguments);
+                funcDecl.arguments = expectFuncArgList();
                 semicolon();
 
                 darrayAdd(functionDeclarations, funcDecl);

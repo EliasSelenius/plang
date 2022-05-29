@@ -9,6 +9,15 @@
             "args": ["deref.txt"],
             "cwd": "${workspaceFolder}",
             // "preLaunchTask": "c_project_build"
+        },
+        {
+            "name": "plang file (output.c)",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/output.exe",
+            //"args": ["deref.txt"],
+            "cwd": "${workspaceFolder}",
+            // "preLaunchTask": "c_project_build"
         }
     ]
 }

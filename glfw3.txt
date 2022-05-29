@@ -1,0 +1,31 @@
+
+declare int glfwInit();
+declare void glfwTerminate();
+declare void* glfwCreateWindow(int width, int height, char* title, void* monitor, void* share);
+declare void glfwPollEvents();
+declare void glfwDestroyWindow(void* window);
+declare void glfwSwapBuffers(void* window);
+declare int glfwWindowShouldClose(void* window);
+
+
+int main() {
+    if (!glfwInit()) {
+        return -1;
+    }
+
+    let width = 1600;
+    let height = 900;
+    let window = glfwCreateWindow(width, height, "GLFW Window in Plang", null, null);
+    if (!window) {
+        glfwTerminate();
+        return -1;
+    }
+
+    while (!glfwWindowShouldClose(window)) {
+        glfwSwapBuffers(window);
+        glfwPollEvents();
+    }
+
+    glfwDestroyWindow(window);
+    glfwTerminate();
+}

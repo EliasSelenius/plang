@@ -168,7 +168,7 @@ int main(int argc, char* argv[]) {
 
 
     printf("Compile...\n");
-    int code = system("clang output.g.c -o output.exe");
+    int code = system("clang output.g.c -o output.exe -lglfw3dll.lib");
     if (code == 0) {
         system("output.exe");
     } else {
