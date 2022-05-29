@@ -19,6 +19,8 @@ static Codeblock* currentScope;
 static Statement* currentStatement;
 static u32 numberOfErrors = 0;
 
+static PlangType type_voidPointer = { .structName = { .start = "void", .length = 4 }, .numPointers = 1 };
+
 PlangType* validateExpression(Expression* expr);
 PlangType* getDeclaredVariable(StrSpan name);
 
@@ -125,6 +127,12 @@ static PlangType* getDeclaredVariable(StrSpan name) {
         if (spanEqualsSpan(name, globalVariables[i].name)) return &globalVariables[i].type;
     }
 
+    // TODO: temporary soulution until we get function pointers
+    // look for function
+    FuncDeclaration* decl = getFuncDecl(name);
+    if (decl) {
+        return &type_voidPointer;
+    }
 
     return null;
 }
@@ -340,12 +348,11 @@ static PlangType* validateExpression(Expression* expr) {
         { // literals
             static PlangType int32type = { .structName = { .start = "int", .length = 3 }, .numPointers = 0 };
             static PlangType charP     = { .structName = { .start = "char", .length = 4 }, .numPointers = 1 };
-            static PlangType voidP     = { .structName = { .start = "void", .length = 4 }, .numPointers = 1 };
-
+            
             case ExprType_Literal_Number: return &int32type;
             case ExprType_Literal_String: return &charP;
             case ExprType_Literal_Bool:   return &int32type;
-            case ExprType_Literal_Null:   return &voidP;
+            case ExprType_Literal_Null:   return &type_voidPointer;
         }
 
     }

@@ -98,15 +98,6 @@ void filewrite(const char* filename, char* content) {
     fclose(file);
 }
 
-// typedef struct PlangFile {
-//     char* path;
-    
-//     Token* tokens; // darray
-
-//     PlangFunction* functions; // darray
-//     PlangStruct* structs; // darray
-
-// } PlangFile;
 
 void addFile(char* filename) {
     u32 filesize = 0;
@@ -135,22 +126,34 @@ void addFile(char* filename) {
 void startPerf();
 i64 endPerf();
 
+
+// plang glfw.txt cflags -g -lglfw3dll.lib
 int main(int argc, char* argv[]) {
+
+    // TODO: use higher default capacity here, to minimize the amount of reallocs 
+    tokens = darrayCreate(Token);
 
     if (argc == 1) {
         printf("Insufficent arguments.\n");
         return 0;
     }
 
-    // TODO: use higher default capacity here, to minimize the amount of reallocs 
-    tokens = darrayCreate(Token);
-
     startPerf();
 
-    printf("Files:\n");
-    for (u32 i = 1; i < argc; i++) {
-        printf("    %d. %s\n", i, argv[i]);
-        addFile(argv[i]);
+    u32 i = 1;
+    while (i < argc) {
+        char* arg = argv[i++];
+        if (spanEquals(spFrom("cflags"), arg)) break;
+        printf("    %d. %s\n", i, arg);
+        addFile(arg);
+    }
+
+    StringBuilder sb = sbCreate();
+    sbAppend(&sb, "clang output.g.c -o output.exe ");
+
+    while (i < argc) {
+        sbAppend(&sb, argv[i++]);
+        sbAppendChar(&sb, ' ');
     }
 
     printf("Validate...\n");
@@ -168,7 +171,8 @@ int main(int argc, char* argv[]) {
 
 
     printf("Compile...\n");
-    int code = system("clang output.g.c -o output.exe -lglfw3dll.lib");
+    printf("%s\n", sb.content);
+    int code = system(sb.content);
     if (code == 0) {
         system("output.exe");
     } else {

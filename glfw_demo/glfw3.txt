@@ -6,6 +6,9 @@ declare void glfwPollEvents();
 declare void glfwDestroyWindow(void* window);
 declare void glfwSwapBuffers(void* window);
 declare int glfwWindowShouldClose(void* window);
+declare void glfwMakeContextCurrent(void* window);
+declare void* glfwGetProcAddress(char* name);
+declare int gladLoadGL(void* load);
 
 
 int main() {
@@ -15,11 +18,14 @@ int main() {
 
     let width = 1600;
     let height = 900;
-    let window = glfwCreateWindow(width, height, "GLFW Window in Plang", null, null);
+    let window = glfwCreateWindow(width, height, "Window", null, null);
     if (!window) {
         glfwTerminate();
         return -1;
     }
+
+    glfwMakeContextCurrent(window);
+    gladLoadGL(glfwGetProcAddress);
 
     while (!glfwWindowShouldClose(window)) {
         glfwSwapBuffers(window);
