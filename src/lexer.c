@@ -93,14 +93,18 @@ u32 lex(char* input) {
             // integer part
             char* digitStart = cursor;
             while (isDigit(*++cursor));
+            
+            TokenType tt = Tok_Integer;
+            
             // decimal part
             if (*cursor == '.') {
+                tt = Tok_Decimal;
                 while (isDigit(*++cursor));
             }
             cursor--;
 
             Token token = {
-                .type = Tok_Number,
+                .type = tt,
                 .line = current_line,
                 .value = {
                     .start = digitStart,

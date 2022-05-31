@@ -31,7 +31,7 @@ static void transpileType(PlangType type) {
 }
 
 static void transpileFuncCall(FuncCall* func) {
-    sbAppendSpan(sb, func->function->name);
+    sbAppendSpan(sb, func->functionName);
     sbAppend(sb, "(");
     if (func->args) {
         transpileExpression(func->args[0]);
@@ -100,7 +100,8 @@ static void transpileExpression(Expression* expr) {
 
         case ExprType_Literal_Bool:
         case ExprType_Literal_String:
-        case ExprType_Literal_Number: {
+        case ExprType_Literal_Integer:
+        case ExprType_Literal_Decimal: {
             LiteralExpression* lit = (LiteralExpression*)expr;
             sbAppendSpan(sb, lit->value);
         } break;
@@ -133,6 +134,7 @@ static void transpileExpression(Expression* expr) {
             transpileExpression(ter->elseExpr);
         } break;
 
+        case ExprType_FuncPointerCall:
         case ExprType_FuncCall: {
             FuncCall* fc = (FuncCall*)expr;
             transpileFuncCall(fc);

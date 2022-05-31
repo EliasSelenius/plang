@@ -10,24 +10,45 @@ declare void glfwMakeContextCurrent(void* window);
 declare void* glfwGetProcAddress(char* name);
 declare int gladLoadGL(void* load);
 
+// declare void glClearColor(float r, float g, float b, float a);
+// declare void glClear(int bitfield);
+
+// use global variable for now, as we dont have constants nor defines nor enums
+let GL_COLOR_BUFFER_BIT = 16384; // 0x00004000
+
+let getString(char** out_string) {
+    @out_string = "pli da ŝanĝo";
+}
 
 int main() {
     if (!glfwInit()) {
         return -1;
     }
 
+    let constructTitleFunc = getString;
+    char* title = "dwa";
+    constructTitleFunc(*title);
+
     let width = 1600;
     let height = 900;
-    let window = glfwCreateWindow(width, height, "Window", null, null);
+    let window = glfwCreateWindow(width, height, title, null, null);
     if (!window) {
         glfwTerminate();
         return -1;
     }
 
     glfwMakeContextCurrent(window);
-    gladLoadGL(glfwGetProcAddress);
+    // gladLoadGL(glfwGetProcAddress);
+
+    void* glClearColor = glfwGetProcAddress("glClearColor");
+    void* glClear      = glfwGetProcAddress("glClear");
+
+    glClearColor(1.0, 1.0, 0.0, 1.0);
 
     while (!glfwWindowShouldClose(window)) {
+
+        glClear(GL_COLOR_BUFFER_BIT);
+
         glfwSwapBuffers(window);
         glfwPollEvents();
     }

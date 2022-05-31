@@ -1,0 +1,25 @@
+
+
+bitsize    signed          unsigned
+
+integer types:
+8          sbyte           byte
+16         short           ushort
+32         int             uint
+64         long            ulong
+
+floatingpoint types: 
+16         half
+32         float
+64         double
+
+
+0   -> int32
+0.0 -> float32
+
+0l -> int64
+0u -> uint32
+0ul -> uint64
+0f -> float32
+0d -> float64
+

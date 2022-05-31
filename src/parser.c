@@ -189,7 +189,6 @@ static bool tok_scan(char* format, ...) {
 
 static void expectFuncCallArgs(FuncCall* func, Expression* funcExpr) {
     func->funcExpr = funcExpr;
-    func->function = null;
 
     Expression* expr = parseExpression();
     if (expr) {
@@ -268,7 +267,8 @@ static Expression* parseLeafExpression() {
         } break;
 
 
-        case Tok_Number:        res = createLiteral(ExprType_Literal_Number); break;
+        case Tok_Integer:       res = createLiteral(ExprType_Literal_Integer); break;
+        case Tok_Decimal:       res = createLiteral(ExprType_Literal_Decimal); break;
         case Tok_String:        res = createLiteral(ExprType_Literal_String); break;
         case Tok_Keyword_True:  res = createLiteral(ExprType_Literal_Bool); break;
         case Tok_Keyword_False: res = createLiteral(ExprType_Literal_Bool); break;
@@ -573,6 +573,7 @@ static Statement* expectStatement() {
                         staExpr->expr = expr;
                         res = (Statement*)staExpr;
                     } break;
+                    case ExprType_Unary_ValueOf:
                     case ExprType_Variable:
                     case ExprType_Deref: {
 

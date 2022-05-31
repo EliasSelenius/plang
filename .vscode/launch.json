@@ -6,7 +6,7 @@
             "type": "lldb",
             "request": "launch",
             "program": "${workspaceFolder}/bin/plang.exe",
-            "args": ["deref.txt"],
+            "args": ["glfw_demo/glfw3.txt"],
             "cwd": "${workspaceFolder}",
             // "preLaunchTask": "c_project_build"
         },
@@ -17,6 +17,15 @@
             "program": "${workspaceFolder}/output.exe",
             //"args": ["deref.txt"],
             "cwd": "${workspaceFolder}",
+            // "preLaunchTask": "c_project_build"
+        },
+        {
+            "name": "glfw_demo",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/glfw_demo/output.exe",
+            //"args": ["deref.txt"],
+            "cwd": "${workspaceFolder}/glfw_demo",
             // "preLaunchTask": "c_project_build"
         }
     ]

@@ -20,6 +20,7 @@ static Statement* currentStatement;
 static u32 numberOfErrors = 0;
 
 static PlangType type_voidPointer = { .structName = { .start = "void", .length = 4 }, .numPointers = 1 };
+static PlangType type_void = { .structName = { .start = "void", .length = 4 }, .numPointers = 0 };
 
 PlangType* validateExpression(Expression* expr);
 PlangType* getDeclaredVariable(StrSpan name);
@@ -127,19 +128,19 @@ static PlangType* getDeclaredVariable(StrSpan name) {
         if (spanEqualsSpan(name, globalVariables[i].name)) return &globalVariables[i].type;
     }
 
-    // TODO: temporary soulution until we get function pointers
-    // look for function
-    FuncDeclaration* decl = getFuncDecl(name);
-    if (decl) {
-        return &type_voidPointer;
-    }
-
     return null;
 }
 
 static PlangType* validateVariable(VariableExpression* var) {
     PlangType* type = getDeclaredVariable(var->name);
+
     if (!type) {
+
+        // TODO: temporary soulution until we get function pointers
+        FuncDeclaration* decl = getFuncDecl(var->name);
+        if (decl) return &type_voidPointer;
+
+
         error("Variable \"%.*s\" is not declared.",
             var->name.length,
             var->name.start);
@@ -164,6 +165,9 @@ inline void validateType(StrSpan typename) {
 
 }
 
+// TODO: remove this when we add funcpointers
+static StringBuilder sb_FuncPtr;
+
 static PlangType* validateFuncCall(FuncCall* call) {
     
     if (call->funcExpr->expressionType != ExprType_Variable) {
@@ -173,32 +177,68 @@ static PlangType* validateFuncCall(FuncCall* call) {
 
     VariableExpression* var = (VariableExpression*)call->funcExpr;
     StrSpan name = var->name;
-    call->function = getFuncDecl(name);
-    if (!call->function) {
+    call->functionName = name;
+    FuncDeclaration* func = getFuncDecl(name);
+    if (!func) {
+
+        // calling function pointer? 
+        PlangType* varType = getDeclaredVariable(name);
+        if (varType) {
+            // NOTE: we are not even asserting that it is a void pointer
+            call->base.expressionType = ExprType_FuncPointerCall;
+
+            // NOTE: lots of beautifull code here to make function pointers work.
+            // It's very hacky, and probably wont be necessary when we get properly typed function pointers
+
+            sbClear(&sb_FuncPtr);
+            sbAppend(&sb_FuncPtr, "((void (*)(");
+
+            u32 argLen = call->args ? darrayLength(call->args) : 0;
+            for (u32 i = 0; i < argLen; i++) {
+                PlangType* t = validateExpression(call->args[0]);
+                sbAppendSpan(&sb_FuncPtr, t->structName);
+                for (u32 j = 0; j < t->numPointers; j++) sbAppendChar(&sb_FuncPtr, '*');
+                sbAppend(&sb_FuncPtr, ", ");
+            }
+            if (argLen) sb_FuncPtr.length -= 2;
+            sbAppend(&sb_FuncPtr, "))");
+            sbAppendSpan(&sb_FuncPtr, name);
+            sbAppendChar(&sb_FuncPtr, ')');
+
+            StrSpan funcPtr;
+            funcPtr.length = sb_FuncPtr.length;
+            funcPtr.start = malloc(sb_FuncPtr.length);
+            sbCopyIntoBuffer(&sb_FuncPtr, funcPtr.start, funcPtr.length);
+
+            call->functionName = funcPtr;
+
+            return null; // temporary til we get function pointers
+        }
+
         error("Function \"%.*s\" does not exist.", name.length, name.start);
         return null;
     }
 
     u32 argLen = call->args ? darrayLength(call->args) : 0;
-    u32 expArgLen = call->function->arguments ? darrayLength(call->function->arguments) : 0;
+    u32 expArgLen = func->arguments ? darrayLength(func->arguments) : 0;
 
     if (argLen != expArgLen) {
         // TODO: print proper types with pointers
         error("Unexpected number of arguments passed to \"%.*s\", expected %d, but got %d.", 
-            call->function->name.length, call->function->name.start,
+            func->name.length, func->name.start,
             expArgLen, argLen);
 
         for (u32 i = 0; i < argLen; i++) {
             validateExpression(call->args[i]);
         }
 
-        return &call->function->returnType;
+        return &func->returnType;
     }
     
     for (u32 i = 0; i < argLen; i++) {
         PlangType* passedArgType = validateExpression(call->args[i]);
         if (passedArgType) {
-            PlangType expectedArg = call->function->arguments[i].type;
+            PlangType expectedArg = func->arguments[i].type;
 
             if (!typeEquals(*passedArgType, expectedArg)) {
                 error("Argument type missmatch, expression of type %.*s cannot be passed to argument of type %.*s",
@@ -208,7 +248,7 @@ static PlangType* validateFuncCall(FuncCall* call) {
         }
     }
 
-    return &call->function->returnType;
+    return &func->returnType;
 }
 
 
@@ -340,19 +380,22 @@ static PlangType* validateExpression(Expression* expr) {
             return thenType;
         } break;
 
+        case ExprType_FuncPointerCall:
         case ExprType_FuncCall: {
             FuncCall* fc = (FuncCall*)expr;
             return validateFuncCall(fc);
         } break;
 
         { // literals
-            static PlangType int32type = { .structName = { .start = "int", .length = 3 }, .numPointers = 0 };
-            static PlangType charP     = { .structName = { .start = "char", .length = 4 }, .numPointers = 1 };
+            static PlangType type_int32 = { .structName = { .start = "int", .length = 3 }, .numPointers = 0 };
+            static PlangType type_float32 = { .structName = { .start = "float", .length = 5 }, .numPointers = 0 };
+            static PlangType type_charPointer = { .structName = { .start = "char", .length = 4 }, .numPointers = 1 };
             
-            case ExprType_Literal_Number: return &int32type;
-            case ExprType_Literal_String: return &charP;
-            case ExprType_Literal_Bool:   return &int32type;
-            case ExprType_Literal_Null:   return &type_voidPointer;
+            case ExprType_Literal_Integer: return &type_int32;
+            case ExprType_Literal_Decimal: return &type_float32;
+            case ExprType_Literal_String:  return &type_charPointer;
+            case ExprType_Literal_Bool:    return &type_int32;
+            case ExprType_Literal_Null:    return &type_voidPointer;
         }
 
     }
@@ -528,6 +571,10 @@ static void validateFunction(PlangFunction* func) {
 
     currentScope = null;
     validateScope(&func->scope);
+
+    if (func->mustInferReturnType) {
+        func->decl.returnType = type_void;
+    }
 }
 
 static void validateStruct(PlangStruct* stru) {
@@ -564,6 +611,8 @@ static void validateGlobalVar(VarDecl* decl) {
 }
 
 u32 validate() {
+
+    sb_FuncPtr = sbCreate();
 
     u32 struLen = darrayLength(structs);
     for (u32 i = 0; i < struLen; i++) {

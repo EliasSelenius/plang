@@ -19,7 +19,8 @@
         - function overloads
         - localy defined structs
         *- clasic for loop: for (int i = 0; i < 10; i++)
-        - for in range loop: for i in 0..10
+        - for in range loop: for (i in 0..10)
+        - for int loop: for (12) { }
         - loop block: loop { } == while (true) { }
         - modules or namespaces ?
         *- better number literal type inference: 10 => int, 10.0 => f32, 10d => f64 ?

@@ -23,17 +23,6 @@ typedef struct PlangType {
 
 
 typedef enum ExprType {
-    ExprType_Literal_Number,
-    ExprType_Literal_String,
-    ExprType_Literal_Bool,
-    ExprType_Literal_Null,
-    ExprType_Variable,
-    ExprType_Alloc,
-    ExprType_Ternary,
-    ExprType_FuncCall,
-    ExprType_Deref,
-
-
     ExprType_Plus = Tok_Plus,
     ExprType_Minus = Tok_Minus,
     ExprType_Mul = Tok_Mul,
@@ -45,13 +34,24 @@ typedef enum ExprType {
     ExprType_GreaterEquals = Tok_GreaterThanOrEqual,
     ExprType_Equals = Tok_Equals,
     ExprType_NotEquals = Tok_NotEquals,
-    // NOTE: we might get into trouble if we add more ExprTypes 
     ExprType_BooleanAnd = Tok_Keyword_And,
     ExprType_BooleanOr = Tok_Keyword_Or,
 
     ExprType_Unary_Not,
     ExprType_Unary_AddressOf,
     ExprType_Unary_ValueOf,
+
+    ExprType_Literal_Integer,
+    ExprType_Literal_Decimal,
+    ExprType_Literal_String,
+    ExprType_Literal_Bool,
+    ExprType_Literal_Null,
+    ExprType_Variable,
+    ExprType_Alloc,
+    ExprType_Ternary,
+    ExprType_FuncCall,
+    ExprType_FuncPointerCall,
+    ExprType_Deref,
 
 } ExprType;
 
@@ -201,7 +201,8 @@ typedef struct PlangFunction {
 
 typedef struct FuncCall {
     Expression base;
-    FuncDeclaration* function;
+    // FuncDeclaration* function;
+    StrSpan functionName;
     Expression* funcExpr;
     Expression** args; // darray of Expression pointers
 } FuncCall;
