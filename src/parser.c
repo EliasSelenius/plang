@@ -89,13 +89,24 @@ static void unexpectedToken() {
     token_index++;
 }
 
+inline bool tok(TokenType type) {
+    if (tokens[token_index].type == type) {
+        token_index++;
+        return true;
+    }
+    return false;
+}
 
 // returns false if the token can not be interpreted as a type
-// TODO: rewrite this to return Datatype
-static bool parseType(Datatype* type) {
+static bool parseInferableType(Datatype* type) {
+    if (tok(Tok_Keyword_Let)) {
+        *type = type_null;
+        return true;
+    }
+
     if (tokens[token_index].type == Tok_Word) {
         
-        type->typeIndex = ensureTypeExistence(tokens[token_index].value);
+        type->typeId = ensureTypeExistence(tokens[token_index].value);
         token_index++;
 
         u32 np = 0;
@@ -109,9 +120,21 @@ static bool parseType(Datatype* type) {
     return false;
 }
 
-static Datatype expectType() {
+// returns false if the token can not be interpreted as a type
+inline bool parseType(Datatype* type) {
+    if (parseInferableType(type)) {
+        if (typeMustBeInfered(*type)) {
+            error("Type cannot be infered here.");
+        }
+        return true;
+    }
+
+    return false;
+}
+
+inline Datatype expectInferableType() {
     Datatype res = {0};
-    if (!parseType(&res)) {
+    if (!parseInferableType(&res)) {
         error("Expected type, but got \"%.*s\" instead.",
             tokens[token_index].value.length,
             tokens[token_index].value.start);
@@ -119,13 +142,10 @@ static Datatype expectType() {
     return res;
 }
 
-
-inline bool tok(TokenType type) {
-    if (tokens[token_index].type == type) {
-        token_index++;
-        return true;
-    }
-    return false;
+inline Datatype expectType() {
+    Datatype res = expectInferableType();
+    if (typeMustBeInfered(res)) error("Type cannot be infered here.");
+    return res;
 }
 
 static Token* anyof(u32 count, ...) {
@@ -464,20 +484,13 @@ static IfStatement* expectIfStatement() {
 static VarDecl* expectVarDecl() {
     VarDecl* decl = malloc(sizeof(VarDecl));
     decl->base.statementType = Statement_Declaration;
-
-    if (tok(Tok_Keyword_Let)) {
-        decl->mustInferType = true;
-    } else {
-        decl->mustInferType = false;
-        decl->type = expectType();
-    }
-
+    decl->type = expectInferableType();
     decl->name = identifier();
 
     decl->assignmentOrNull = null;
     if (tok(Tok_Assign)) {
         decl->assignmentOrNull = expectExpression();
-    } else if (decl->mustInferType) {
+    } else if (typeMustBeInfered(decl->type)) {
         error("Variable \"%.*s\" must be assigned to, to be type inferred.", decl->name.length, decl->name.start);
     }
 
@@ -554,8 +567,7 @@ static Statement* expectStatement() {
 
                         VarDecl* decl = malloc(sizeof(VarDecl));
                         decl->base.statementType = Statement_Declaration;
-                        decl->mustInferType = false;
-                        decl->type = expectType();
+                        decl->type = expectInferableType();
                         decl->name = identifier();
                         decl->assignmentOrNull = tok(Tok_Assign) ? expectExpression() : null;
 
@@ -672,18 +684,14 @@ static FuncArg* expectFuncArgList() {
     return res;
 }
 
-static void funcOrGlobal(bool typeinfer) {
-    Datatype type;
-    if (typeinfer) token_index++;
-    else type = expectType();
-
+static void funcOrGlobal() {
+    Datatype type = expectInferableType();
     StrSpan name = identifier();
 
     if (tok(Tok_OpenParen)) {
         // function
 
         PlangFunction func;
-        func.mustInferReturnType = typeinfer;
         func.decl.returnType = type;
         func.decl.name = name;
         func.decl.arguments = expectFuncArgList();
@@ -696,12 +704,11 @@ static void funcOrGlobal(bool typeinfer) {
         VarDecl decl;
         decl.assignmentOrNull = null;
         decl.name = name;
-        decl.mustInferType = typeinfer;    
         decl.type = type;
         
         if (tok(Tok_Assign)) {
             decl.assignmentOrNull = expectExpression();
-        } else if (typeinfer) {
+        } else if (typeMustBeInfered(decl.type)) {
             error("Global variable \"%.*s\" must be assigned to, to be type inferred.", decl.name.length, decl.name.start);
         }
 
@@ -746,8 +753,8 @@ u32 parse() {
 
             } break;
             
-            case Tok_Keyword_Let: funcOrGlobal(true); break;
-            case Tok_Word: funcOrGlobal(false); break;
+            case Tok_Keyword_Let:
+            case Tok_Word: funcOrGlobal(); break;
 
             case Tok_Keyword_Declare: {
                 // function declaration

@@ -8,7 +8,6 @@ declare void glfwSwapBuffers(void* window);
 declare int glfwWindowShouldClose(void* window);
 declare void glfwMakeContextCurrent(void* window);
 declare void* glfwGetProcAddress(char* name);
-declare int gladLoadGL(void* load);
 
 // declare void glClearColor(float r, float g, float b, float a);
 // declare void glClear(int bitfield);
@@ -16,34 +15,40 @@ declare int gladLoadGL(void* load);
 // use global variable for now, as we dont have constants nor defines nor enums
 let GL_COLOR_BUFFER_BIT = 16384; // 0x00004000
 
-let getString(char** out_string) {
-    @out_string = "pli da ŝanĝo";
+void* glClearColor;
+void* glClear;
+// void(float, float, float, float) glClearColor;
+// void(int) glClear;
+
+void loadGL() {
+    glClearColor = glfwGetProcAddress("glClearColor");
+    glClear      = glfwGetProcAddress("glClear");
 }
 
-int main() {
+struct Shader {
+    int id;
+}
+
+let main() {
     if (!glfwInit()) {
         return -1;
     }
 
-    let constructTitleFunc = getString;
-    char* title = "dwa";
-    constructTitleFunc(*title);
 
-    let width = 1600;
+    int width = 1600;
     let height = 900;
-    let window = glfwCreateWindow(width, height, title, null, null);
+    let window = glfwCreateWindow(width, height, "title", null, null);
     if (!window) {
         glfwTerminate();
         return -1;
     }
 
     glfwMakeContextCurrent(window);
-    // gladLoadGL(glfwGetProcAddress);
 
-    void* glClearColor = glfwGetProcAddress("glClearColor");
-    void* glClear      = glfwGetProcAddress("glClear");
+    loadGL();
 
     // void func(char**) myFunction = getString;
+    // void(char**, void()(int)) myFunction = getString;
 
     glClearColor(0.0, 1.0, 0.0, 1.0);
 

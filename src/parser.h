@@ -7,6 +7,7 @@
 
 u32 parse();
 
+typedef struct PlangStruct PlangStruct;
 typedef struct PlangFunction PlangFunction;
 typedef struct FuncDeclaration FuncDeclaration;
 
@@ -15,26 +16,36 @@ typedef struct Node {
 } Node;
 
 typedef enum Typekind {
-    Typekind_Struct,
+    Typekind_Invalid = 0,
     Typekind_Primitive,
+    Typekind_Struct,
+    Typekind_Enum,
     Typekind_FuncPtr
 } Typekind;
 
 typedef struct PlangType {
     Typekind kind;
     StrSpan name;
+    union {
+        PlangStruct* type_struct;
+    };
 } PlangType;
 
 typedef struct Datatype {
-    u32 typeIndex;
+    u32 typeId;
     u32 numPointers;
 } Datatype;
 
 extern PlangType* g_Types; // darray
 extern Datatype type_null;
 
+
 inline PlangType* getType(Datatype dt) {
-    return &g_Types[dt.typeIndex - 1];
+    return &g_Types[dt.typeId - 1];
+}
+
+inline bool typeMustBeInfered(Datatype dt) {
+    return dt.typeId == 0;
 }
 
 inline u32 ensureTypeExistence(StrSpan name) {
@@ -47,6 +58,7 @@ inline u32 ensureTypeExistence(StrSpan name) {
 
     PlangType newType;
     newType.name = name;
+    newType.kind = Typekind_Invalid;
     darrayAdd(g_Types, newType);
     return len + 1;
 }
@@ -173,7 +185,6 @@ typedef struct VarDecl {
     Statement base;
     Datatype type;
     StrSpan name;
-    bool mustInferType;
     Expression* assignmentOrNull;
 } VarDecl;
 
@@ -228,7 +239,6 @@ typedef struct FuncDeclaration {
 typedef struct PlangFunction {
     FuncDeclaration decl;
     Codeblock scope;
-    bool mustInferReturnType;
 } PlangFunction;
 
 typedef struct FuncCall {
@@ -265,3 +275,4 @@ extern PlangFunction* functions;
 extern FuncDeclaration* functionDeclarations;
 extern PlangStruct* structs;
 extern VarDecl* globalVariables;
+

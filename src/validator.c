@@ -97,7 +97,7 @@ static FuncDeclaration* getFuncDecl(StrSpan name) {
 }
 
 inline bool typeEquals(Datatype a, Datatype b) {
-    return a.typeIndex == b.typeIndex && a.numPointers == b.numPointers;
+    return a.typeId == b.typeId && a.numPointers == b.numPointers;
 }
 
 static Datatype getDeclaredVariable(StrSpan name) {
@@ -137,7 +137,7 @@ static Datatype getDeclaredVariable(StrSpan name) {
 static Datatype validateVariable(VariableExpression* var) {
     Datatype type = getDeclaredVariable(var->name);
 
-    if (!type.typeIndex) {
+    if (!type.typeId) {
 
         // TODO: temporary soulution until we get function pointers
         FuncDeclaration* decl = getFuncDecl(var->name);
@@ -153,19 +153,18 @@ static Datatype validateVariable(VariableExpression* var) {
     return type;
 }
 
-inline void validateType(StrSpan typename) {
-    // TODO: primitive types
+inline void validateType(Datatype type) {
+    PlangType* pt = getType(type);
+    if (pt->kind != Typekind_Invalid) return;
 
-    if (spanEquals(typename, "char"));
-    else if (spanEquals(typename, "int"));
-    else if (spanEquals(typename, "float"));
-    else if (spanEquals(typename, "void"));
-    else {
-        if (!getStructByName(typename)) {
-            error("Type \"%.*s\" does not exist.", typename.length, typename.start);
-        } 
+    PlangStruct* stru = getStructByName(pt->name);
+    if (stru) {
+        pt->kind = Typekind_Struct;
+        pt->type_struct = stru;
+        return;
     }
 
+    error("Type \"%.*s\" does not exist.", pt->name.length, pt->name.start);
 }
 
 // TODO: remove this when we add funcpointers
@@ -186,7 +185,7 @@ static Datatype validateFuncCall(FuncCall* call) {
 
         // calling function pointer? 
         Datatype varType = getDeclaredVariable(name);
-        if (varType.typeIndex) {
+        if (varType.typeId) {
             // NOTE: we are not even asserting that it is a void pointer
             call->base.expressionType = ExprType_FuncPointerCall;
 
@@ -240,7 +239,7 @@ static Datatype validateFuncCall(FuncCall* call) {
     
     for (u32 i = 0; i < argLen; i++) {
         Datatype passedArgType = validateExpression(call->args[i]);
-        if (passedArgType.typeIndex) {
+        if (passedArgType.typeId) {
             Datatype expectedArg = func->arguments[i].type;
 
             if (!typeEquals(passedArgType, expectedArg)) {
@@ -267,7 +266,7 @@ static Datatype validateExpression(Expression* expr) {
         case ExprType_Deref: {
             DerefOperator* deref = (DerefOperator*)expr;
             Datatype type = validateExpression(deref->expr);
-            if (!type.typeIndex) return type_null;
+            if (!type.typeId) return type_null;
             
             if (type.numPointers > 1) {
                 error("Attempted to dereference a %dth-degree pointer.", type.numPointers);
@@ -333,7 +332,7 @@ static Datatype validateExpression(Expression* expr) {
             Datatype leftType = validateExpression(bop->left);
             Datatype rightType = validateExpression(bop->right);
             
-            if (leftType.typeIndex && rightType.typeIndex) {
+            if (leftType.typeId && rightType.typeId) {
                 // TODO: is a valid operator operands pair?
             } else return type_null;
 
@@ -342,13 +341,13 @@ static Datatype validateExpression(Expression* expr) {
         
         case ExprType_Alloc: {
             AllocExpression* alloc = (AllocExpression*)expr;
-            validateType(getType(alloc->type)->name);
+            validateType(alloc->type);
 
             // recurse on possibe size-subexpression
             if (alloc->sizeExpr) {
                 Datatype size = validateExpression(alloc->sizeExpr);
 
-                if (size.typeIndex) {
+                if (size.typeId) {
                     // TODO: is this a valid integer expression?
                 }
             }
@@ -406,7 +405,7 @@ static void validateScope(Codeblock* scope) {
                 VarDecl* decl = (VarDecl*)sta;
 
                 // Check wheter there already is a variable with this name
-                if (getDeclaredVariable(decl->name).typeIndex) {
+                if (getDeclaredVariable(decl->name).typeId) {
                     error("Variable \"%.*s\" is already declared.", 
                         decl->name.length,
                         decl->name.start);
@@ -423,12 +422,12 @@ static void validateScope(Codeblock* scope) {
 
                 if (decl->assignmentOrNull) {
                     Datatype assType = validateExpression(decl->assignmentOrNull);
-                    if (!assType.typeIndex) break; // if type could not be determined then we should not continue, act as if this statement does not exist 
+                    if (!assType.typeId) break; // if type could not be determined then we should not continue, act as if this statement does not exist 
 
-                    if (decl->mustInferType) {
+                    if (typeMustBeInfered(decl->type)) {
                         decl->type = assType;
                     } else {
-                        validateType(getType(decl->type)->name);
+                        validateType(decl->type);
 
                         if (!typeEquals(decl->type, assType)) {
                             error("Type missmatch in declaration.");
@@ -436,7 +435,7 @@ static void validateScope(Codeblock* scope) {
                     }
 
                 } else {
-                    validateType(getType(decl->type)->name);
+                    validateType(decl->type);
                 }
 
                 Variable var;
@@ -452,7 +451,7 @@ static void validateScope(Codeblock* scope) {
                 Datatype toType = validateExpression(ass->assigneeExpr);
                 Datatype fromType = validateExpression(ass->expr);
 
-                if (toType.typeIndex && fromType.typeIndex) {
+                if (toType.typeId && fromType.typeId) {
                     if (!typeEquals(toType, fromType)) {
                         error("Type missmatch in assignment.");
                     }
@@ -496,11 +495,10 @@ static void validateScope(Codeblock* scope) {
                 Datatype type = type_void;
                 if (retSta->returnExpr) type = validateExpression(retSta->returnExpr);
 
-                if (!type.typeIndex) break; 
+                if (!type.typeId) break;
 
-                if (function->mustInferReturnType) {
+                if (typeMustBeInfered(function->decl.returnType)) {
                     function->decl.returnType = type;
-                    function->mustInferReturnType = false;
                 } else {
                     if (!typeEquals(type, function->decl.returnType)) {
                         error("Return type missmatch in function \"%.*s\".", function->decl.name.length, function->decl.name.start);
@@ -541,25 +539,37 @@ static void validateScope(Codeblock* scope) {
     currentScope = parentScope;
 }
 
+static void validateFunctionDeclaration(FuncDeclaration* decl) {
+    
+    validateType(decl->returnType);
+
+    if (decl->arguments) {
+        u32 len = darrayLength(decl->arguments);
+        for (u32 i = 0; i < len; i++) validateType(decl->arguments[i].type);
+    }
+}
+
 static void validateFunction(PlangFunction* func) {
     function = func;
 
-    if (!func->mustInferReturnType) {
+    if (!typeMustBeInfered(func->decl.returnType)) {
         // TODO: factor all validateType calls out into own loop
-        validateType(getType(func->decl.returnType)->name);
+        validateType(func->decl.returnType);
     }
 
     if (func->decl.arguments) {
         u32 len = darrayLength(func->decl.arguments);
-        for (u32 i = 0; i < len; i++) validateType(getType(func->decl.arguments[i].type)->name);
+        for (u32 i = 0; i < len; i++) {
+            FuncArg arg = func->decl.arguments[i];
+            validateType(arg.type);
+        }
     }
 
     currentScope = null;
     validateScope(&func->scope);
 
-    if (func->mustInferReturnType) {
+    if (typeMustBeInfered(func->decl.returnType)) {
         func->decl.returnType = type_void;
-        func->mustInferReturnType = false;
     }
 }
 
@@ -567,9 +577,10 @@ static void validateStruct(PlangStruct* stru) {
     u32 fieldLen = darrayLength(stru->fields);
     for (u32 i = 0; i < fieldLen; i++) {
         Field* field = &stru->fields[i];
+        validateType(field->type);
         StrSpan fieldTypeName = getType(field->type)->name;
-        validateType(fieldTypeName);
 
+        // TODO: PlangStruct may contain its typeid so we dont have to do the spanEqualsSpan() call
         if (field->type.numPointers == 0 && spanEqualsSpan(fieldTypeName, stru->name)) {
             errorLine(field->nodebase.lineNumber, "Struct \"%.*s\" self reference by value.",
                 stru->name.length, stru->name.start);
@@ -580,12 +591,12 @@ static void validateStruct(PlangStruct* stru) {
 static void validateGlobalVar(VarDecl* decl) {
     if (decl->assignmentOrNull) {
         Datatype assType = validateExpression(decl->assignmentOrNull);
-        if (!assType.typeIndex) return; // if type could not be determined then we should not continue.
+        if (!assType.typeId) return; // if type could not be determined then we should not continue.
 
-        if (decl->mustInferType) {
+        if (typeMustBeInfered(decl->type)) {
             decl->type = assType;
         } else {
-            validateType(getType(decl->type)->name);
+            validateType(decl->type);
 
             if (!typeEquals(decl->type, assType)) {
                 error("Type missmatch in global.");
@@ -593,25 +604,33 @@ static void validateGlobalVar(VarDecl* decl) {
         }
 
     } else {
-        validateType(getType(decl->type)->name);
+        validateType(decl->type);
     }
 }
 
 u32 validate() {
 
-    type_void           = (Datatype) { .typeIndex = ensureTypeExistence(spFrom("void")), .numPointers = 0 };
-    type_voidPointer    = (Datatype) { .typeIndex = ensureTypeExistence(spFrom("void")), .numPointers = 1 };
-    type_int32          = (Datatype) { .typeIndex = ensureTypeExistence(spFrom("int")),  .numPointers = 0 };
-    type_float32        = (Datatype) { .typeIndex = ensureTypeExistence(spFrom("float")), .numPointers = 0 };
-    type_charPointer    = (Datatype) { .typeIndex = ensureTypeExistence(spFrom("char")), .numPointers = 1 };
+    type_void           = (Datatype) { .typeId = ensureTypeExistence(spFrom("void")), .numPointers = 0 };
+    type_voidPointer    = (Datatype) { .typeId = ensureTypeExistence(spFrom("void")), .numPointers = 1 };
+    type_int32          = (Datatype) { .typeId = ensureTypeExistence(spFrom("int")),  .numPointers = 0 };
+    type_float32        = (Datatype) { .typeId = ensureTypeExistence(spFrom("float")), .numPointers = 0 };
+    type_charPointer    = (Datatype) { .typeId = ensureTypeExistence(spFrom("char")), .numPointers = 1 };
 
     sb_FuncPtr = sbCreate();
 
+    // validate types
+    // u32 typeLen = darrayLength(g_Types);
+    // for (u32 i = 0; i < typeLen; i++) {
+
+    // }
+
+    // validate structs
     u32 struLen = darrayLength(structs);
     for (u32 i = 0; i < struLen; i++) {
         validateStruct(&structs[i]);
     }
 
+    // validate global variables
     u32 globLen = darrayLength(globalVariables);
     for (u32 i = 0; i < globLen; i++) {
         VarDecl* decl = &globalVariables[i];
@@ -625,13 +644,18 @@ u32 validate() {
         }
     }
 
-    variables = darrayCreate(Variable);
+    // validate func declarations
+    u32 funcDeclLen = darrayLength(functionDeclarations);
+    for (u32 i = 0; i < funcDeclLen; i++) {
+        validateFunctionDeclaration(&functionDeclarations[i]);
+    }
 
+    // validate functions
+    variables = darrayCreate(Variable);
     u32 funcLen = darrayLength(functions);
     for (u32 i = 0; i < funcLen; i++) {
         validateFunction(&functions[i]);
     }
-
     darrayDelete(variables);
 
     return numberOfErrors;
