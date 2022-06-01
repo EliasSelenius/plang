@@ -10,7 +10,7 @@
 
 typedef struct Variable {
     StrSpan name;
-    PlangType* type;
+    Datatype* type;
 } Variable;
 
 static PlangFunction* function;
@@ -19,11 +19,14 @@ static Codeblock* currentScope;
 static Statement* currentStatement;
 static u32 numberOfErrors = 0;
 
-static PlangType type_voidPointer = { .structName = { .start = "void", .length = 4 }, .numPointers = 1 };
-static PlangType type_void = { .structName = { .start = "void", .length = 4 }, .numPointers = 0 };
+static Datatype type_void;
+static Datatype type_voidPointer;
+static Datatype type_int32;
+static Datatype type_float32;
+static Datatype type_charPointer;
 
-PlangType* validateExpression(Expression* expr);
-PlangType* getDeclaredVariable(StrSpan name);
+Datatype validateExpression(Expression* expr);
+Datatype getDeclaredVariable(StrSpan name);
 
 inline void error(char* format, ...) {
     // TODO: better line of not only statements
@@ -93,18 +96,18 @@ static FuncDeclaration* getFuncDecl(StrSpan name) {
     return null;
 }
 
-inline bool typeEquals(PlangType a, PlangType b) {
-    return spanEqualsSpan(a.structName, b.structName) && a.numPointers == b.numPointers;
+inline bool typeEquals(Datatype a, Datatype b) {
+    return a.typeIndex == b.typeIndex && a.numPointers == b.numPointers;
 }
 
-static PlangType* getDeclaredVariable(StrSpan name) {
+static Datatype getDeclaredVariable(StrSpan name) {
 
     // look for local var
     if (variables) {
         u32 len = darrayLength(variables);
         for (u32 i = 0; i < len; i++) {
             if (spanEqualsSpan(name, variables[i].name)) {
-                return variables[i].type;
+                return *variables[i].type;
             }
         }
     }
@@ -116,7 +119,7 @@ static PlangType* getDeclaredVariable(StrSpan name) {
             for (u32 i = 0; i < len; i++) {
                 FuncArg* arg = &function->decl.arguments[i];
                 if (spanEqualsSpan(name, arg->name)) {
-                    return &arg->type;
+                    return arg->type;
                 }
             }
         }
@@ -125,27 +128,27 @@ static PlangType* getDeclaredVariable(StrSpan name) {
     // look for global var
     u32 len = darrayLength(globalVariables);
     for (u32 i = 0; i < len; i++) {
-        if (spanEqualsSpan(name, globalVariables[i].name)) return &globalVariables[i].type;
+        if (spanEqualsSpan(name, globalVariables[i].name)) return globalVariables[i].type;
     }
 
-    return null;
+    return type_null;
 }
 
-static PlangType* validateVariable(VariableExpression* var) {
-    PlangType* type = getDeclaredVariable(var->name);
+static Datatype validateVariable(VariableExpression* var) {
+    Datatype type = getDeclaredVariable(var->name);
 
-    if (!type) {
+    if (!type.typeIndex) {
 
         // TODO: temporary soulution until we get function pointers
         FuncDeclaration* decl = getFuncDecl(var->name);
-        if (decl) return &type_voidPointer;
+        if (decl) return type_voidPointer;
 
 
         error("Variable \"%.*s\" is not declared.",
             var->name.length,
             var->name.start);
 
-        return null;
+        return type_null;
     }
     return type;
 }
@@ -168,11 +171,11 @@ inline void validateType(StrSpan typename) {
 // TODO: remove this when we add funcpointers
 static StringBuilder sb_FuncPtr;
 
-static PlangType* validateFuncCall(FuncCall* call) {
+static Datatype validateFuncCall(FuncCall* call) {
     
     if (call->funcExpr->expressionType != ExprType_Variable) {
         printf("Feature not implemented yet.\n");
-        return null;
+        return type_null;
     }
 
     VariableExpression* var = (VariableExpression*)call->funcExpr;
@@ -182,8 +185,8 @@ static PlangType* validateFuncCall(FuncCall* call) {
     if (!func) {
 
         // calling function pointer? 
-        PlangType* varType = getDeclaredVariable(name);
-        if (varType) {
+        Datatype varType = getDeclaredVariable(name);
+        if (varType.typeIndex) {
             // NOTE: we are not even asserting that it is a void pointer
             call->base.expressionType = ExprType_FuncPointerCall;
 
@@ -195,9 +198,9 @@ static PlangType* validateFuncCall(FuncCall* call) {
 
             u32 argLen = call->args ? darrayLength(call->args) : 0;
             for (u32 i = 0; i < argLen; i++) {
-                PlangType* t = validateExpression(call->args[0]);
-                sbAppendSpan(&sb_FuncPtr, t->structName);
-                for (u32 j = 0; j < t->numPointers; j++) sbAppendChar(&sb_FuncPtr, '*');
+                Datatype t = validateExpression(call->args[0]);
+                sbAppendSpan(&sb_FuncPtr, getType(t)->name);
+                for (u32 j = 0; j < t.numPointers; j++) sbAppendChar(&sb_FuncPtr, '*');
                 sbAppend(&sb_FuncPtr, ", ");
             }
             if (argLen) sb_FuncPtr.length -= 2;
@@ -212,11 +215,11 @@ static PlangType* validateFuncCall(FuncCall* call) {
 
             call->functionName = funcPtr;
 
-            return null; // temporary til we get function pointers
+            return type_null; // temporary til we get function pointers
         }
 
         error("Function \"%.*s\" does not exist.", name.length, name.start);
-        return null;
+        return type_null;
     }
 
     u32 argLen = call->args ? darrayLength(call->args) : 0;
@@ -232,27 +235,29 @@ static PlangType* validateFuncCall(FuncCall* call) {
             validateExpression(call->args[i]);
         }
 
-        return &func->returnType;
+        return func->returnType;
     }
     
     for (u32 i = 0; i < argLen; i++) {
-        PlangType* passedArgType = validateExpression(call->args[i]);
-        if (passedArgType) {
-            PlangType expectedArg = func->arguments[i].type;
+        Datatype passedArgType = validateExpression(call->args[i]);
+        if (passedArgType.typeIndex) {
+            Datatype expectedArg = func->arguments[i].type;
 
-            if (!typeEquals(*passedArgType, expectedArg)) {
+            if (!typeEquals(passedArgType, expectedArg)) {
+                StrSpan passedName = getType(passedArgType)->name;
+                StrSpan expectedName = getType(expectedArg)->name;
                 error("Argument type missmatch, expression of type %.*s cannot be passed to argument of type %.*s",
-                    passedArgType->structName.length, passedArgType->structName.start,
-                    expectedArg.structName.length, expectedArg.structName.start);
+                    passedName.length, passedName.start,
+                    expectedName.length, expectedName.start);
             }
         }
     }
 
-    return &func->returnType;
+    return func->returnType;
 }
 
 
-static PlangType* validateExpression(Expression* expr) {
+static Datatype validateExpression(Expression* expr) {
     switch (expr->expressionType) {        
         case ExprType_Variable: {
             VariableExpression* var = (VariableExpression*)expr;
@@ -261,60 +266,55 @@ static PlangType* validateExpression(Expression* expr) {
 
         case ExprType_Deref: {
             DerefOperator* deref = (DerefOperator*)expr;
-            PlangType* type = validateExpression(deref->expr);
-            if (!type) return null;
+            Datatype type = validateExpression(deref->expr);
+            if (!type.typeIndex) return type_null;
             
-            if (type->numPointers > 1) {
-                error("Attempted to dereference a %dth-degree pointer.", type->numPointers);
-                return null;
+            if (type.numPointers > 1) {
+                error("Attempted to dereference a %dth-degree pointer.", type.numPointers);
+                return type_null;
             }
 
-            deref->derefOp = type->numPointers ? "->" : ".";
+            deref->derefOp = type.numPointers ? "->" : ".";
 
-            PlangStruct* stru = getStructByName(type->structName);
+            StrSpan name = getType(type)->name;
+            PlangStruct* stru = getStructByName(name);
             if (stru) {
                 Field* field = getField(stru, deref->name);                
                 if (!field) {
                     error("Field \"%.*s\" does not exist on type \"%.*s\".",
                             field->name.length, field->name.start,
                             stru->name.length, stru->name.start);
-                    return null;
+                    return type_null;
                 }
-                return &field->type;
+                return field->type;
             } else {
-                error("%.*s cannot be dereferenced.", type->structName.length, type->structName.start);
-                return null;
+                error("%.*s cannot be dereferenced.", name.length, name.start);
+                return type_null;
             }
 
         } break;
 
         case ExprType_Unary_Not: {
             UnaryExpression* unary = (UnaryExpression*)expr;
-            PlangType* type = validateExpression(unary->expr);
+            Datatype type = validateExpression(unary->expr);
             // TODO: is type a boolean type?
             return type; // TODO: return boolean
         } break;
         case ExprType_Unary_AddressOf: {
             UnaryExpression* unary = (UnaryExpression*)expr;
-            PlangType* type = validateExpression(unary->expr);
+            Datatype type = validateExpression(unary->expr);
             // TODO: is unary->expr an expression we can take the address of?
 
-            // TODO: this is a memory leak! find better storage for types
-            PlangType* unaryType = malloc(sizeof(PlangType));
-            *unaryType = *type;
-            unaryType->numPointers++;
-            return unaryType;
+            type.numPointers++;
+            return type;
         } break;
         case ExprType_Unary_ValueOf: {
             UnaryExpression* unary = (UnaryExpression*)expr;
-            PlangType* type = validateExpression(unary->expr);
+            Datatype type = validateExpression(unary->expr);
             // TODO: is unary->expr an expression we can take the value of?
 
-            // TODO: this is a memory leak! find better storage for types
-            PlangType* unaryType = malloc(sizeof(PlangType));
-            *unaryType = *type;
-            unaryType->numPointers--;
-            return unaryType;
+            type.numPointers--;
+            return type;
         } break;
 
         case ExprType_Less:
@@ -330,49 +330,39 @@ static PlangType* validateExpression(Expression* expr) {
         case ExprType_Mul:
         case ExprType_Div: {
             BinaryExpression* bop = (BinaryExpression*)expr;
-            PlangType* leftType = validateExpression(bop->left);
-            PlangType* rightType = validateExpression(bop->right);
+            Datatype leftType = validateExpression(bop->left);
+            Datatype rightType = validateExpression(bop->right);
             
-            if (leftType && rightType) {
+            if (leftType.typeIndex && rightType.typeIndex) {
                 // TODO: is a valid operator operands pair?
-            } else return null;
+            } else return type_null;
 
             return leftType;
         } break;
         
         case ExprType_Alloc: {
             AllocExpression* alloc = (AllocExpression*)expr;
-            validateType(alloc->type.structName);
+            validateType(getType(alloc->type)->name);
 
             // recurse on possibe size-subexpression
             if (alloc->sizeExpr) {
-                PlangType* size = validateExpression(alloc->sizeExpr);
+                Datatype size = validateExpression(alloc->sizeExpr);
 
-                if (size) {
+                if (size.typeIndex) {
                     // TODO: is this a valid integer expression?
                 }
             }
 
-
-
-            // TODO: Ugly hack here, find better memory storage for types. 
-            alloc->type.numPointers++;
-            return &alloc->type;
-
-            // Or return PlangType by value perhaps? no, I have decided not to. Because we want to return null sometimes.
-            // This is a memory leak!
-            // PlangType* type = malloc(sizeof(PlangType));
-            // *type = alloc->type;
-            // type->numPointers++;
-            // return type;
-
+            Datatype type = alloc->type;
+            type.numPointers++;
+            return type;
         } break;
         
         case ExprType_Ternary: {
             TernaryExpression* ter = (TernaryExpression*)expr;
-            PlangType* conditionType = validateExpression(ter->condition);
-            PlangType* thenType = validateExpression(ter->thenExpr);
-            PlangType* elseType = validateExpression(ter->elseExpr);
+            Datatype conditionType = validateExpression(ter->condition);
+            Datatype thenType = validateExpression(ter->thenExpr);
+            Datatype elseType = validateExpression(ter->elseExpr);
 
             // TODO: is condition a valid boolean expression
             // TODO: does thenExpr and elseExpr have a common type? 
@@ -387,21 +377,17 @@ static PlangType* validateExpression(Expression* expr) {
         } break;
 
         { // literals
-            static PlangType type_int32 = { .structName = { .start = "int", .length = 3 }, .numPointers = 0 };
-            static PlangType type_float32 = { .structName = { .start = "float", .length = 5 }, .numPointers = 0 };
-            static PlangType type_charPointer = { .structName = { .start = "char", .length = 4 }, .numPointers = 1 };
-            
-            case ExprType_Literal_Integer: return &type_int32;
-            case ExprType_Literal_Decimal: return &type_float32;
-            case ExprType_Literal_String:  return &type_charPointer;
-            case ExprType_Literal_Bool:    return &type_int32;
-            case ExprType_Literal_Null:    return &type_voidPointer;
+            case ExprType_Literal_Integer: return type_int32;
+            case ExprType_Literal_Decimal: return type_float32;
+            case ExprType_Literal_String:  return type_charPointer;
+            case ExprType_Literal_Bool:    return type_int32;
+            case ExprType_Literal_Null:    return type_voidPointer;
         }
 
     }
 
     error("Unknown expression type. This is a bug!");
-    return null;
+    return type_null;
 }
 
 
@@ -420,7 +406,7 @@ static void validateScope(Codeblock* scope) {
                 VarDecl* decl = (VarDecl*)sta;
 
                 // Check wheter there already is a variable with this name
-                if (getDeclaredVariable(decl->name)) {
+                if (getDeclaredVariable(decl->name).typeIndex) {
                     error("Variable \"%.*s\" is already declared.", 
                         decl->name.length,
                         decl->name.start);
@@ -436,21 +422,21 @@ static void validateScope(Codeblock* scope) {
                 */
 
                 if (decl->assignmentOrNull) {
-                    PlangType* assType = validateExpression(decl->assignmentOrNull);
-                    if (!assType) break; // if type could not be determined then we should not continue, act as if this statement does not exist 
+                    Datatype assType = validateExpression(decl->assignmentOrNull);
+                    if (!assType.typeIndex) break; // if type could not be determined then we should not continue, act as if this statement does not exist 
 
                     if (decl->mustInferType) {
-                        decl->type = *assType;
+                        decl->type = assType;
                     } else {
-                        validateType(decl->type.structName);
+                        validateType(getType(decl->type)->name);
 
-                        if (!typeEquals(decl->type, *assType)) {
+                        if (!typeEquals(decl->type, assType)) {
                             error("Type missmatch in declaration.");
                         }
                     }
 
                 } else {
-                    validateType(decl->type.structName);
+                    validateType(getType(decl->type)->name);
                 }
 
                 Variable var;
@@ -463,11 +449,11 @@ static void validateScope(Codeblock* scope) {
             case Statement_Assignment: {
                 Assignement* ass = (Assignement*)sta;
 
-                PlangType* toType = validateExpression(ass->assigneeExpr);
-                PlangType* fromType = validateExpression(ass->expr);
+                Datatype toType = validateExpression(ass->assigneeExpr);
+                Datatype fromType = validateExpression(ass->expr);
 
-                if (toType && fromType) {
-                    if (!typeEquals(*toType, *fromType)) {
+                if (toType.typeIndex && fromType.typeIndex) {
+                    if (!typeEquals(toType, fromType)) {
                         error("Type missmatch in assignment.");
                     }
                 }
@@ -507,18 +493,16 @@ static void validateScope(Codeblock* scope) {
             case Statement_Return: {
                 ReturnStatement* retSta = (ReturnStatement*)sta;
 
-                static PlangType voidType = { .structName = { .start = "void", .length = 4 }, .numPointers = 0 };
-
-                PlangType* type = &voidType;
+                Datatype type = type_void;
                 if (retSta->returnExpr) type = validateExpression(retSta->returnExpr);
 
-                if (!type) break; 
+                if (!type.typeIndex) break; 
 
                 if (function->mustInferReturnType) {
-                    function->decl.returnType = *type;
+                    function->decl.returnType = type;
                     function->mustInferReturnType = false;
                 } else {
-                    if (!typeEquals(*type, function->decl.returnType)) {
+                    if (!typeEquals(type, function->decl.returnType)) {
                         error("Return type missmatch in function \"%.*s\".", function->decl.name.length, function->decl.name.start);
                     }
                 }
@@ -561,12 +545,13 @@ static void validateFunction(PlangFunction* func) {
     function = func;
 
     if (!func->mustInferReturnType) {
-        validateType(func->decl.returnType.structName);
+        // TODO: factor all validateType calls out into own loop
+        validateType(getType(func->decl.returnType)->name);
     }
 
     if (func->decl.arguments) {
         u32 len = darrayLength(func->decl.arguments);
-        for (u32 i = 0; i < len; i++) validateType(func->decl.arguments[i].type.structName);
+        for (u32 i = 0; i < len; i++) validateType(getType(func->decl.arguments[i].type)->name);
     }
 
     currentScope = null;
@@ -574,16 +559,18 @@ static void validateFunction(PlangFunction* func) {
 
     if (func->mustInferReturnType) {
         func->decl.returnType = type_void;
+        func->mustInferReturnType = false;
     }
 }
 
 static void validateStruct(PlangStruct* stru) {
     u32 fieldLen = darrayLength(stru->fields);
     for (u32 i = 0; i < fieldLen; i++) {
-        Field* field = &stru->fields[i]; 
-        validateType(field->type.structName);
+        Field* field = &stru->fields[i];
+        StrSpan fieldTypeName = getType(field->type)->name;
+        validateType(fieldTypeName);
 
-        if (field->type.numPointers == 0 && spanEqualsSpan(field->type.structName, stru->name)) {
+        if (field->type.numPointers == 0 && spanEqualsSpan(fieldTypeName, stru->name)) {
             errorLine(field->nodebase.lineNumber, "Struct \"%.*s\" self reference by value.",
                 stru->name.length, stru->name.start);
         }
@@ -592,25 +579,31 @@ static void validateStruct(PlangStruct* stru) {
 
 static void validateGlobalVar(VarDecl* decl) {
     if (decl->assignmentOrNull) {
-        PlangType* assType = validateExpression(decl->assignmentOrNull);
-        if (!assType) return; // if type could not be determined then we should not continue.
+        Datatype assType = validateExpression(decl->assignmentOrNull);
+        if (!assType.typeIndex) return; // if type could not be determined then we should not continue.
 
         if (decl->mustInferType) {
-            decl->type = *assType;
+            decl->type = assType;
         } else {
-            validateType(decl->type.structName);
+            validateType(getType(decl->type)->name);
 
-            if (!typeEquals(decl->type, *assType)) {
+            if (!typeEquals(decl->type, assType)) {
                 error("Type missmatch in global.");
             }
         }
 
     } else {
-        validateType(decl->type.structName);
+        validateType(getType(decl->type)->name);
     }
 }
 
 u32 validate() {
+
+    type_void           = (Datatype) { .typeIndex = ensureTypeExistence(spFrom("void")), .numPointers = 0 };
+    type_voidPointer    = (Datatype) { .typeIndex = ensureTypeExistence(spFrom("void")), .numPointers = 1 };
+    type_int32          = (Datatype) { .typeIndex = ensureTypeExistence(spFrom("int")),  .numPointers = 0 };
+    type_float32        = (Datatype) { .typeIndex = ensureTypeExistence(spFrom("float")), .numPointers = 0 };
+    type_charPointer    = (Datatype) { .typeIndex = ensureTypeExistence(spFrom("char")), .numPointers = 1 };
 
     sb_FuncPtr = sbCreate();
 

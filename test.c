@@ -10,12 +10,16 @@ typedef struct String {
 #define false 0
 
 typedef struct Test {
-    int i;
-    int i1;
-    char c;
+    int i, j;
 } Test;
 
 int main() {
+
+    Test t;
+
+    if (t.i) {
+        printf("Yes\n");
+    }
 
     Test tests[2];
 

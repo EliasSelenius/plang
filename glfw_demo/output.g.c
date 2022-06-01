@@ -1,10 +1,10 @@
 #include <stdlib.h>
-#include <stdio.h>
 #define true 1
 #define false 0
 // Structs
 
 // Forward declarations
+void getString(char** out_string);
 int main();
 int glfwInit();
 void glfwTerminate();
@@ -41,7 +41,7 @@ int main() {
     glfwMakeContextCurrent(window);
     void* glClearColor = glfwGetProcAddress("glClearColor");
     void* glClear = glfwGetProcAddress("glClear");
-    ((void (*)(float, float, float, float))glClearColor)(1.0, 1.0, 0.0, 1.0);
+    ((void (*)(float, float, float, float))glClearColor)(0.0, 1.0, 0.0, 1.0);
     while (!glfwWindowShouldClose(window)) {
         ((void (*)(int))glClear)(GL_COLOR_BUFFER_BIT);
         glfwSwapBuffers(window);

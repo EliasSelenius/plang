@@ -22,8 +22,8 @@ inline void newline() {
     sbAppend(sb, tabs[tabing]);
 }
 
-static void transpileType(PlangType type) {
-    sbAppendSpan(sb, type.structName);
+static void transpileType(Datatype type) {
+    sbAppendSpan(sb, getType(type)->name);
     u32 np = type.numPointers;
     while (np-- > 0) {
         sbAppend(sb, "*");
@@ -114,8 +114,6 @@ static void transpileExpression(Expression* expr) {
         case ExprType_Alloc: {
             AllocExpression* allocExpr = (AllocExpression*)expr;
             sbAppend(sb, "malloc(sizeof(");
-            // TODO: Ugly hack here, find better memory storage for types.
-            allocExpr->type.numPointers--;
             transpileType(allocExpr->type);
             sbAppend(sb, ")");
             if (allocExpr->sizeExpr) {
@@ -310,7 +308,7 @@ void transpile() {
     sb = &builder;
 
     sbAppend(sb, "#include <stdlib.h>\n"); // malloc
-    sbAppend(sb, "#include <stdio.h>\n"); // printf
+    // sbAppend(sb, "#include <stdio.h>\n"); // printf
     sbAppend(sb, "#define true 1\n#define false 0\n");
 
     sbAppend(sb, "// Structs\n");
@@ -330,8 +328,6 @@ void transpile() {
     u32 functionsLen = darrayLength(functions);
     for (u32 i = 0; i < functionsLen; i++) {
         PlangFunction* func = &functions[i];
-
-        if (func->mustInferReturnType) continue; // TODO: remove this
 
         transpileFunctionSignature(&func->decl);
         sbAppend(sb, ";\n");

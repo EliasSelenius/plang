@@ -12,6 +12,8 @@ Expression* expectExpression();
 
 static u32 token_index = 0;
 
+PlangType* g_Types; // darray
+Datatype type_null = {0};
 PlangFunction* functions = null;
 FuncDeclaration* functionDeclarations = null;
 PlangStruct* structs = null;
@@ -89,13 +91,14 @@ static void unexpectedToken() {
 
 
 // returns false if the token can not be interpreted as a type
-static bool parseType(PlangType* type) {
+// TODO: rewrite this to return Datatype
+static bool parseType(Datatype* type) {
     if (tokens[token_index].type == Tok_Word) {
         
-        type->structName = tokens[token_index].value;
+        type->typeIndex = ensureTypeExistence(tokens[token_index].value);
         token_index++;
 
-        u8 np = 0;
+        u32 np = 0;
         while (tokens[token_index++].type == Tok_Mul) np++;
         type->numPointers = np;
         token_index--;
@@ -106,8 +109,8 @@ static bool parseType(PlangType* type) {
     return false;
 }
 
-static PlangType expectType() {
-    PlangType res = {0};
+static Datatype expectType() {
+    Datatype res = {0};
     if (!parseType(&res)) {
         error("Expected type, but got \"%.*s\" instead.",
             tokens[token_index].value.length,
@@ -670,7 +673,7 @@ static FuncArg* expectFuncArgList() {
 }
 
 static void funcOrGlobal(bool typeinfer) {
-    PlangType type;
+    Datatype type;
     if (typeinfer) token_index++;
     else type = expectType();
 

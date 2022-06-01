@@ -133,6 +133,7 @@ int main(int argc, char* argv[]) {
 
     // TODO: use higher default capacity here, to minimize the amount of reallocs 
     tokens = darrayCreate(Token);
+    g_Types = darrayCreate(PlangType);
 
     if (argc == 1) {
         printf("Insufficent arguments.\n");
@@ -155,6 +156,13 @@ int main(int argc, char* argv[]) {
     while (i < argc) {
         sbAppend(&sb, argv[i++]);
         sbAppendChar(&sb, ' ');
+    }
+
+    { // print type table
+        u32 len = darrayLength(g_Types);
+        for (u32 i = 0; i < len; i++) {
+            printf("    %d. %.*s\n", i, g_Types[i].name.length, g_Types[i].name.start);
+        }
     }
 
     printf("Validate...\n");

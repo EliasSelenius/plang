@@ -3,6 +3,7 @@
 #include "types.h"
 #include "essh-string.h"
 #include "lexer.h"
+#include "darray.h"
 
 u32 parse();
 
@@ -13,11 +14,42 @@ typedef struct Node {
     u32 lineNumber;
 } Node;
 
+typedef enum Typekind {
+    Typekind_Struct,
+    Typekind_Primitive,
+    Typekind_FuncPtr
+} Typekind;
+
 typedef struct PlangType {
-    StrSpan structName;
-    u8 numPointers;
+    Typekind kind;
+    StrSpan name;
 } PlangType;
 
+typedef struct Datatype {
+    u32 typeIndex;
+    u32 numPointers;
+} Datatype;
+
+extern PlangType* g_Types; // darray
+extern Datatype type_null;
+
+inline PlangType* getType(Datatype dt) {
+    return &g_Types[dt.typeIndex - 1];
+}
+
+inline u32 ensureTypeExistence(StrSpan name) {
+    u32 len = darrayLength(g_Types);
+    for (u32 i = 0; i < len; i++) {
+        if (spanEqualsSpan(g_Types[i].name, name)) {
+            return i + 1;
+        }
+    }
+
+    PlangType newType;
+    newType.name = name;
+    darrayAdd(g_Types, newType);
+    return len + 1;
+}
 
 // ----Expressions---------------------------------------------
 
@@ -86,7 +118,7 @@ typedef struct BinaryExpression {
 typedef struct AllocExpression {
     Expression base;
     Expression* sizeExpr;
-    PlangType type;
+    Datatype type;
 } AllocExpression;
 
 typedef struct DerefOperator {
@@ -139,7 +171,7 @@ typedef struct StatementExpression {
 
 typedef struct VarDecl {
     Statement base;
-    PlangType type;
+    Datatype type;
     StrSpan name;
     bool mustInferType;
     Expression* assignmentOrNull;
@@ -183,13 +215,13 @@ typedef struct ReturnStatement {
 // ----Functions----------------------------------------------
 
 typedef struct FuncArg {
-    PlangType type;
+    Datatype type;
     StrSpan name;
 } FuncArg;
 
 typedef struct FuncDeclaration {
     StrSpan name;
-    PlangType returnType;
+    Datatype returnType;
     FuncArg* arguments; // darray
 } FuncDeclaration;
 
@@ -211,7 +243,7 @@ typedef struct FuncCall {
 
 typedef struct Field {
     Node nodebase;
-    PlangType type;
+    Datatype type;
     StrSpan name;
 } Field;
 

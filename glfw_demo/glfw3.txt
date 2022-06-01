@@ -43,7 +43,9 @@ int main() {
     void* glClearColor = glfwGetProcAddress("glClearColor");
     void* glClear      = glfwGetProcAddress("glClear");
 
-    glClearColor(1.0, 1.0, 0.0, 1.0);
+    // void func(char**) myFunction = getString;
+
+    glClearColor(0.0, 1.0, 0.0, 1.0);
 
     while (!glfwWindowShouldClose(window)) {
 
