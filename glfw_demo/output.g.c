@@ -1,19 +1,26 @@
 #include <stdlib.h>
 #define true 1
 #define false 0
-// basic types
+
+// types
 typedef unsigned int uint;
-// Structs
+typedef void (*f_void)();
 typedef struct Shader Shader;
+typedef Shader* (*f_Shaderp)();
+typedef char* (*f_charp)();
+
+// Structs
 typedef struct Shader {
     uint id;
-    void* func;
+    f_void func;
 } Shader;
 
 // Forward declarations
 void loadGL();
-void invoke(void* my_voidFunction);
+Shader* getShader();
+char* invoke(f_charp func);
 void sayHello();
+char* getTitle();
 int main();
 int glfwInit();
 void glfwTerminate();
@@ -28,38 +35,46 @@ void printf(char* format, char* arg1);
 
 // Globals
 int GL_COLOR_BUFFER_BIT = 16384;
-void* glClearColor;
-void* glClear;
-void* shaderRetrivalFunc;
+f_void glClearColor;
+f_void glClear;
+f_Shaderp shaderRetrivalFunc;
 
 // Implementations
 void loadGL() {
-    glClearColor = glfwGetProcAddress("glClearColor");
-    glClear = glfwGetProcAddress("glClear");
 }
-void invoke(void* my_voidFunction) {
-    ((void (*)())my_voidFunction)();
+Shader* getShader() {
+    return malloc(sizeof(Shader));
+}
+char* invoke(f_charp func) {
+    return func();
 }
 void sayHello() {
     printf("%s\n", "Hello");
+}
+char* getTitle() {
+    return "The Title Of The Window";
 }
 int main() {
     if (!glfwInit()) {
         return -1;
     }
-    sayHello();
+    f_charp titleFunc = getTitle;
+    shaderRetrivalFunc = getShader;
+    f_Shaderp srf = shaderRetrivalFunc;
+    Shader* shader = srf();
+    shader->func = sayHello;
+    f_void sfunc = shader->func;
+    sfunc();
     int width = 1600;
     int height = 900;
-    void* window = glfwCreateWindow(width, height, "title", 0, 0);
+    void* window = glfwCreateWindow(width, height, invoke(titleFunc), 0, 0);
     if (!window) {
         glfwTerminate();
         return -1;
     }
     glfwMakeContextCurrent(window);
     loadGL();
-    ((void (*)(float, float, char*, float))glClearColor)(0.0, 1.0, "dawd", 1.0);
     while (!glfwWindowShouldClose(window)) {
-        ((void (*)(int))glClear)(GL_COLOR_BUFFER_BIT);
         glfwSwapBuffers(window);
         glfwPollEvents();
     }

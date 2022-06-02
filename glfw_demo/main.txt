@@ -15,14 +15,14 @@ declare void* glfwGetProcAddress(char* name);
 // use global variable for now, as we dont have constants nor defines nor enums
 let GL_COLOR_BUFFER_BIT = 16384; // 0x00004000
 
-void* glClearColor;
-void* glClear;
+void() glClearColor;
+void() glClear;
 // void(float, float, float, float) glClearColor;
 // void(int) glClear;
 
 void loadGL() {
-    glClearColor = glfwGetProcAddress("glClearColor");
-    glClear      = glfwGetProcAddress("glClear");
+    // glClearColor = glfwGetProcAddress("glClearColor");
+    // glClear      = glfwGetProcAddress("glClear");
 }
 
 struct Shader {
@@ -30,10 +30,15 @@ struct Shader {
     void() func;
 }
 
+
 Shader*() shaderRetrivalFunc;
 
-let invoke(void() my_voidFunction) {
-    my_voidFunction();
+let getShader() {
+    return alloc Shader;
+}
+
+let invoke(char*() func) {
+    return func();
 }
 
 declare void printf(char* format, char* arg1);
@@ -42,22 +47,29 @@ let sayHello() {
     printf("%s\n", "Hello");
 }
 
+let getTitle() {
+    return "The Title Of The Window";
+}
+
 let main() {
     if (!glfwInit()) {
         return -1;
     }
 
+    let titleFunc = getTitle;
+    
+    shaderRetrivalFunc = getShader;
+    let srf = shaderRetrivalFunc;
+    let shader = srf();
+    shader.func = sayHello;
 
-    sayHello();
-    // invoke(sayHello);
-
-    // let srf = shaderRetrivalFunc();
-
+    let sfunc = shader.func;
+    sfunc();
 
 
     int width = 1600;
     let height = 900;
-    let window = glfwCreateWindow(width, height, "title", null, null);
+    let window = glfwCreateWindow(width, height, invoke(titleFunc), null, null);
     if (!window) {
         glfwTerminate();
         return -1;
@@ -70,11 +82,11 @@ let main() {
     // void func(char**) myFunction = getString;
     // void(char**, void()(int)) myFunction = getString;
 
-    glClearColor(0.0, 1.0, "dawd", 1.0);
+    // glClearColor(0.0, 1.0, "dawd", 1.0);
 
     while (!glfwWindowShouldClose(window)) {
 
-        glClear(GL_COLOR_BUFFER_BIT);
+        // glClear(GL_COLOR_BUFFER_BIT);
 
         glfwSwapBuffers(window);
         glfwPollEvents();

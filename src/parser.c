@@ -109,6 +109,68 @@ inline bool funcPtrEquivalence(FuncPtr* a, FuncPtr* b) {
         a->returnType.numPointers == b->returnType.numPointers;
 }
 
+static StrSpan constructNameForFuncPtr(FuncPtr* funcPtr) {
+    StrSpan retName = getType(funcPtr->returnType)->name;
+    u32 len = 2 + retName.length + funcPtr->returnType.numPointers;
+    char* buf = malloc(len);
+    u32 i = 0;
+    buf[i++] = 'f';
+    buf[i++] = '_';
+    
+    for (u32 j = 0; j < retName.length; j++) {
+        buf[i++] = retName.start[j];
+    }
+
+    u32 np = funcPtr->returnType.numPointers;
+    while (0 < np--) buf[i++] = 'p';
+
+    // TODO: args
+
+    StrSpan res;
+    res.length = len;
+    res.start = buf;
+    return res;
+}
+
+Datatype ensureFuncPtrExistsFromFuncDeclaration(FuncDeclaration* decl) {
+    
+    u32 oldLength = g_Unit->funcPtrTypes->length; // remember the old length in case we have a duplicate
+    u32 fpRef = dyReserve(&g_Unit->funcPtrTypes, sizeof(FuncPtr));
+
+    FuncPtr* funcPtr = getFuncPtr(fpRef);
+    funcPtr->returnType = decl->returnType;
+    funcPtr->argCount = 0;
+
+    Datatype funcType;
+    funcType.numPointers = 0;
+
+    { // look if the function pointer is a duplicate
+        u32 i = 0;
+        while (i < oldLength) {
+            FuncPtr* f = getFuncPtr(i);
+
+            if (funcPtrEquivalence(f, funcPtr)) {
+                // is duplicate 
+                g_Unit->funcPtrTypes->length = oldLength; // reset, 
+                funcType.typeId = queryFuncPtrTypeId(i);
+                return funcType;
+            }
+
+            i += sizeof(FuncPtr) + sizeof(Datatype) * f->argCount;
+        }
+
+        // is not a duplicate, create a new entry in the typetable
+        PlangType newType;
+        newType.name = constructNameForFuncPtr(funcPtr);
+        newType.kind = Typekind_FuncPtr;
+        newType.type_funcPtr = fpRef;
+        darrayAdd(g_Unit->types, newType);
+
+        funcType.typeId = darrayLength(g_Unit->types);
+        return funcType;
+    }
+}
+
 static Datatype parseFuncPtrArgs(Datatype retType) {
     if (tok(Tok_OpenParen)) {
 
@@ -125,7 +187,7 @@ static Datatype parseFuncPtrArgs(Datatype retType) {
         expect(Tok_CloseParen);
         
         Datatype funcType;
-        funcType.numPointers = 1;
+        funcType.numPointers = 0;
         
         { // look if the function pointer is a duplicate
             u32 i = 0;
@@ -144,7 +206,7 @@ static Datatype parseFuncPtrArgs(Datatype retType) {
 
             // is not a duplicate, create a new entry in the typetable
             PlangType newType;
-            newType.name = spFrom("void");
+            newType.name = constructNameForFuncPtr(funcPtr);
             newType.kind = Typekind_FuncPtr;
             newType.type_funcPtr = fpRef;
             darrayAdd(g_Unit->types, newType);

@@ -141,8 +141,9 @@ static Datatype validateVariable(VariableExpression* var) {
 
         // TODO: temporary soulution until we get function pointers
         FuncDeclaration* decl = getFuncDecl(var->name);
-        if (decl) return type_voidPointer;
-
+        if (decl) {
+            return ensureFuncPtrExistsFromFuncDeclaration(decl);
+        }
 
         error("Variable \"%.*s\" is not declared.",
             var->name.length,
@@ -160,8 +161,6 @@ inline void validateType(Datatype type) {
     error("Type \"%.*s\" does not exist.", pt->name.length, pt->name.start);
 }
 
-// TODO: remove this when we add funcpointers
-static StringBuilder sb_FuncPtr;
 
 static Datatype validateFuncCall(FuncCall* call) {
     
@@ -179,35 +178,18 @@ static Datatype validateFuncCall(FuncCall* call) {
         // calling function pointer? 
         Datatype varType = getDeclaredVariable(name);
         if (varType.typeId) {
-            // NOTE: we are not even asserting that it is a void pointer
-            call->base.expressionType = ExprType_FuncPointerCall;
+            PlangType* type = getType(varType);
+            if (type->kind == Typekind_FuncPtr) {
+                call->base.expressionType = ExprType_FuncPointerCall;
+                FuncPtr* funcPtr = getFuncPtr(type->type_funcPtr);
 
-            // NOTE: lots of beautifull code here to make function pointers work.
-            // It's very hacky, and probably wont be necessary when we get properly typed function pointers
+                u32 argLen = call->args ? darrayLength(call->args) : 0;
+                for (u32 i = 0; i < argLen; i++) {
+                    Datatype t = validateExpression(call->args[i]);
+                }
 
-            sbClear(&sb_FuncPtr);
-            sbAppend(&sb_FuncPtr, "((void (*)(");
-
-            u32 argLen = call->args ? darrayLength(call->args) : 0;
-            for (u32 i = 0; i < argLen; i++) {
-                Datatype t = validateExpression(call->args[i]);
-                sbAppendSpan(&sb_FuncPtr, getType(t)->name);
-                for (u32 j = 0; j < t.numPointers; j++) sbAppendChar(&sb_FuncPtr, '*');
-                sbAppend(&sb_FuncPtr, ", ");
+                return funcPtr->returnType;
             }
-            if (argLen) sb_FuncPtr.length -= 2;
-            sbAppend(&sb_FuncPtr, "))");
-            sbAppendSpan(&sb_FuncPtr, name);
-            sbAppendChar(&sb_FuncPtr, ')');
-
-            StrSpan funcPtr;
-            funcPtr.length = sb_FuncPtr.length;
-            funcPtr.start = malloc(sb_FuncPtr.length);
-            sbCopyIntoBuffer(&sb_FuncPtr, funcPtr.start, funcPtr.length);
-
-            call->functionName = funcPtr;
-
-            return type_null; // temporary til we get function pointers
         }
 
         error("Function \"%.*s\" does not exist.", name.length, name.start);
@@ -609,7 +591,6 @@ u32 validate() {
     type_float32        = (Datatype) { .typeId = ensureTypeExistence(spFrom("float")), .numPointers = 0 };
     type_charPointer    = (Datatype) { .typeId = ensureTypeExistence(spFrom("char")), .numPointers = 1 };
 
-    sb_FuncPtr = sbCreate();
 
     // validate types
     u32 typeLen = darrayLength(g_Unit->types);

@@ -311,18 +311,40 @@ void transpile() {
     // sbAppend(sb, "#include <stdio.h>\n"); // printf
     sbAppend(sb, "#define true 1\n#define false 0\n");
 
-    sbAppend(sb, "// basic types\n");
+    sbAppend(sb, "\n// types\n");
     sbAppend(sb, "typedef unsigned int uint;\n");
 
-    sbAppend(sb, "// Structs\n");
-    u32 structsLen = darrayLength(g_Unit->structs);
-    for (u32 i = 0; i < structsLen; i++) {
-        sbAppend(sb, "typedef struct ");
-        sbAppendSpan(sb, g_Unit->structs[i].name);
-        sbAppend(sb, " ");
-        sbAppendSpan(sb, g_Unit->structs[i].name);
-        sbAppend(sb, ";\n");
+    u32 typesLen = darrayLength(g_Unit->types);
+    for (u32 i = 0; i < typesLen; i++) {
+        PlangType* type = &g_Unit->types[i];
+        switch (type->kind) {
+
+            case Typekind_Invalid: break;
+            case Typekind_Primitive: break;
+
+            case Typekind_Struct: {
+                sbAppend(sb, "typedef struct ");
+                sbAppendSpan(sb, type->type_struct->name);
+                sbAppend(sb, " ");
+                sbAppendSpan(sb, type->type_struct->name);
+                sbAppend(sb, ";\n");
+            } break;
+
+            case Typekind_Enum: break;
+
+            case Typekind_FuncPtr: {
+                FuncPtr* funcPtr = getFuncPtr(type->type_funcPtr);
+                sbAppend(sb, "typedef ");
+                transpileType(funcPtr->returnType);
+                sbAppend(sb, " (*");
+                sbAppendSpan(sb, type->name);
+                sbAppend(sb, ")();\n"); // TODO: args
+            } break;
+        }
     }
+
+    sbAppend(sb, "\n// Structs\n");
+    u32 structsLen = darrayLength(g_Unit->structs);
     for (u32 i = 0; i < structsLen; i++) {
         transpileStruct(&g_Unit->structs[i]);
     }

@@ -74,8 +74,15 @@ inline bool typeMustBeInfered(Datatype dt) {
 inline u32 ensureTypeExistence(StrSpan name) {
     u32 len = darrayLength(g_Unit->types);
     for (u32 i = 0; i < len; i++) {
-        if (spanEqualsSpan(g_Unit->types[i].name, name)) {
-            return i + 1;
+        switch (g_Unit->types[i].kind) {
+            case Typekind_Invalid:
+            case Typekind_Primitive: {
+                if (spanEqualsSpan(g_Unit->types[i].name, name)) {
+                    return i + 1;
+                }
+            } break;
+
+            default: break;
         }
     }
 
@@ -87,7 +94,7 @@ inline u32 ensureTypeExistence(StrSpan name) {
 }
 
 inline FuncPtr* getFuncPtr(u32 id) { return (FuncPtr*)&g_Unit->funcPtrTypes->bytes[id]; }
-
+Datatype ensureFuncPtrExistsFromFuncDeclaration(FuncDeclaration* decl);
 
 
 // ----Expressions---------------------------------------------
