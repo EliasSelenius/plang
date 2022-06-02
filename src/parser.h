@@ -4,12 +4,29 @@
 #include "essh-string.h"
 #include "lexer.h"
 #include "darray.h"
+#include "dynamic_buffer.h"
 
 u32 parse();
 
-typedef struct PlangStruct PlangStruct;
 typedef struct PlangFunction PlangFunction;
 typedef struct FuncDeclaration FuncDeclaration;
+typedef struct PlangStruct PlangStruct;
+typedef struct VarDecl VarDecl;
+typedef struct PlangType PlangType;
+
+typedef struct TranslationUnit {
+    PlangFunction* functions; // darray
+    FuncDeclaration* functionDeclarations; // darray
+    PlangStruct* structs; // darray
+    VarDecl* globalVariables; // darray
+
+    // darray of all ocuring types, no duplicates
+    PlangType* types;
+    DynamicBuffer* funcPtrTypes;
+
+} TranslationUnit;
+
+extern TranslationUnit* g_Unit;
 
 typedef struct Node {
     u32 lineNumber;
@@ -28,6 +45,7 @@ typedef struct PlangType {
     StrSpan name;
     union {
         PlangStruct* type_struct;
+        u32          type_funcPtr;
     };
 } PlangType;
 
@@ -36,12 +54,17 @@ typedef struct Datatype {
     u32 numPointers;
 } Datatype;
 
-extern PlangType* g_Types; // darray
-extern Datatype type_null;
+typedef struct FuncPtr {
+    Datatype returnType;
+    u32 argCount;
+    Datatype argTypes[];
+} FuncPtr;
+
+#define type_null ((Datatype){0})
 
 
 inline PlangType* getType(Datatype dt) {
-    return &g_Types[dt.typeId - 1];
+    return &g_Unit->types[dt.typeId - 1];
 }
 
 inline bool typeMustBeInfered(Datatype dt) {
@@ -49,9 +72,9 @@ inline bool typeMustBeInfered(Datatype dt) {
 }
 
 inline u32 ensureTypeExistence(StrSpan name) {
-    u32 len = darrayLength(g_Types);
+    u32 len = darrayLength(g_Unit->types);
     for (u32 i = 0; i < len; i++) {
-        if (spanEqualsSpan(g_Types[i].name, name)) {
+        if (spanEqualsSpan(g_Unit->types[i].name, name)) {
             return i + 1;
         }
     }
@@ -59,9 +82,13 @@ inline u32 ensureTypeExistence(StrSpan name) {
     PlangType newType;
     newType.name = name;
     newType.kind = Typekind_Invalid;
-    darrayAdd(g_Types, newType);
+    darrayAdd(g_Unit->types, newType);
     return len + 1;
 }
+
+inline FuncPtr* getFuncPtr(u32 id) { return (FuncPtr*)&g_Unit->funcPtrTypes->bytes[id]; }
+
+
 
 // ----Expressions---------------------------------------------
 
@@ -262,17 +289,3 @@ typedef struct PlangStruct {
     StrSpan name;
     Field* fields; // darray
 } PlangStruct;
-
-
-typedef struct TranslationUnit {
-    PlangFunction* functions; // darray
-    FuncDeclaration* functionDeclarations; // darray
-    PlangStruct* structs; // darray
-    VarDecl* globalVariables; // darray
-} TranslationUnit;
-
-extern PlangFunction* functions;
-extern FuncDeclaration* functionDeclarations;
-extern PlangStruct* structs;
-extern VarDecl* globalVariables;
-

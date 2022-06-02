@@ -66,19 +66,19 @@ static Field* getField(PlangStruct* stru, StrSpan name) {
 }
 
 static PlangStruct* getStructByName(StrSpan name) {
-    u32 structsLen = darrayLength(structs);
+    u32 structsLen = darrayLength(g_Unit->structs);
 
     for (u32 i = 0; i < structsLen; i++) {
-        if (spanEqualsSpan(structs[i].name, name)) return &structs[i];
+        if (spanEqualsSpan(g_Unit->structs[i].name, name)) return &g_Unit->structs[i];
     }
 
     return null;
 }
 
 static PlangFunction* getFunctionByName(StrSpan name) {
-    u32 len = darrayLength(functions);
+    u32 len = darrayLength(g_Unit->functions);
     for (u32 i = 0; i < len; i++) {
-        if (spanEqualsSpan(name, functions[i].decl.name)) return &functions[i];
+        if (spanEqualsSpan(name, g_Unit->functions[i].decl.name)) return &g_Unit->functions[i];
     }
 
     return null;
@@ -88,9 +88,9 @@ static FuncDeclaration* getFuncDecl(StrSpan name) {
     PlangFunction* func = getFunctionByName(name);
     if (func) return &func->decl;
 
-    u32 len = darrayLength(functionDeclarations);
+    u32 len = darrayLength(g_Unit->functionDeclarations);
     for (u32 i = 0; i < len; i++) {
-        if (spanEqualsSpan(name, functionDeclarations[i].name)) return &functionDeclarations[i];
+        if (spanEqualsSpan(name, g_Unit->functionDeclarations[i].name)) return &g_Unit->functionDeclarations[i];
     }
 
     return null;
@@ -126,9 +126,9 @@ static Datatype getDeclaredVariable(StrSpan name) {
     }
 
     // look for global var
-    u32 len = darrayLength(globalVariables);
+    u32 len = darrayLength(g_Unit->globalVariables);
     for (u32 i = 0; i < len; i++) {
-        if (spanEqualsSpan(name, globalVariables[i].name)) return globalVariables[i].type;
+        if (spanEqualsSpan(name, g_Unit->globalVariables[i].name)) return g_Unit->globalVariables[i].type;
     }
 
     return type_null;
@@ -156,13 +156,6 @@ static Datatype validateVariable(VariableExpression* var) {
 inline void validateType(Datatype type) {
     PlangType* pt = getType(type);
     if (pt->kind != Typekind_Invalid) return;
-
-    PlangStruct* stru = getStructByName(pt->name);
-    if (stru) {
-        pt->kind = Typekind_Struct;
-        pt->type_struct = stru;
-        return;
-    }
 
     error("Type \"%.*s\" does not exist.", pt->name.length, pt->name.start);
 }
@@ -619,25 +612,47 @@ u32 validate() {
     sb_FuncPtr = sbCreate();
 
     // validate types
-    // u32 typeLen = darrayLength(g_Types);
-    // for (u32 i = 0; i < typeLen; i++) {
+    u32 typeLen = darrayLength(g_Unit->types);
+    for (u32 i = 0; i < typeLen; i++) {
+        PlangType* type = &g_Unit->types[i];
+        switch (type->kind) {
+            case Typekind_Invalid: {
 
-    // }
+                // struct
+                PlangStruct* stru = getStructByName(type->name);
+                if (stru) {
+                    type->kind = Typekind_Struct;
+                    type->type_struct = stru;
+                    break;
+                }
+
+                // TODO: enum
+
+            } break;
+
+            // case Typekind_FuncPtr: {
+            //     FuncPtr* fp = getFuncPtr(type->type_funcPtr);
+
+            // } break;
+
+            default: break;
+        }
+    }
 
     // validate structs
-    u32 struLen = darrayLength(structs);
+    u32 struLen = darrayLength(g_Unit->structs);
     for (u32 i = 0; i < struLen; i++) {
-        validateStruct(&structs[i]);
+        validateStruct(&g_Unit->structs[i]);
     }
 
     // validate global variables
-    u32 globLen = darrayLength(globalVariables);
+    u32 globLen = darrayLength(g_Unit->globalVariables);
     for (u32 i = 0; i < globLen; i++) {
-        VarDecl* decl = &globalVariables[i];
-        validateGlobalVar(&globalVariables[i]);
+        VarDecl* decl = &g_Unit->globalVariables[i];
+        validateGlobalVar(&g_Unit->globalVariables[i]);
 
         for (u32 j = i+1; j < globLen; j++) {
-            if (spanEqualsSpan(globalVariables[j].name, decl->name)) {
+            if (spanEqualsSpan(g_Unit->globalVariables[j].name, decl->name)) {
                 error("Global variable \"%.*s\" name conflict.",
                     decl->name.length, decl->name.start);
             }
@@ -645,16 +660,16 @@ u32 validate() {
     }
 
     // validate func declarations
-    u32 funcDeclLen = darrayLength(functionDeclarations);
+    u32 funcDeclLen = darrayLength(g_Unit->functionDeclarations);
     for (u32 i = 0; i < funcDeclLen; i++) {
-        validateFunctionDeclaration(&functionDeclarations[i]);
+        validateFunctionDeclaration(&g_Unit->functionDeclarations[i]);
     }
 
     // validate functions
     variables = darrayCreate(Variable);
-    u32 funcLen = darrayLength(functions);
+    u32 funcLen = darrayLength(g_Unit->functions);
     for (u32 i = 0; i < funcLen; i++) {
-        validateFunction(&functions[i]);
+        validateFunction(&g_Unit->functions[i]);
     }
     darrayDelete(variables);
 

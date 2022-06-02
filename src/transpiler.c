@@ -311,46 +311,49 @@ void transpile() {
     // sbAppend(sb, "#include <stdio.h>\n"); // printf
     sbAppend(sb, "#define true 1\n#define false 0\n");
 
+    sbAppend(sb, "// basic types\n");
+    sbAppend(sb, "typedef unsigned int uint;\n");
+
     sbAppend(sb, "// Structs\n");
-    u32 structsLen = darrayLength(structs);
+    u32 structsLen = darrayLength(g_Unit->structs);
     for (u32 i = 0; i < structsLen; i++) {
         sbAppend(sb, "typedef struct ");
-        sbAppendSpan(sb, structs[i].name);
+        sbAppendSpan(sb, g_Unit->structs[i].name);
         sbAppend(sb, " ");
-        sbAppendSpan(sb, structs[i].name);
+        sbAppendSpan(sb, g_Unit->structs[i].name);
         sbAppend(sb, ";\n");
     }
     for (u32 i = 0; i < structsLen; i++) {
-        transpileStruct(&structs[i]);
+        transpileStruct(&g_Unit->structs[i]);
     }
 
     sbAppend(sb, "\n// Forward declarations\n");
-    u32 functionsLen = darrayLength(functions);
+    u32 functionsLen = darrayLength(g_Unit->functions);
     for (u32 i = 0; i < functionsLen; i++) {
-        PlangFunction* func = &functions[i];
+        PlangFunction* func = &g_Unit->functions[i];
 
         transpileFunctionSignature(&func->decl);
         sbAppend(sb, ";\n");
     }
 
-    u32 declsLength = darrayLength(functionDeclarations);
+    u32 declsLength = darrayLength(g_Unit->functionDeclarations);
     for (u32 i = 0; i < declsLength; i++) {
-        transpileFunctionSignature(&functionDeclarations[i]);
+        transpileFunctionSignature(&g_Unit->functionDeclarations[i]);
         sbAppend(sb, ";\n");
     }
 
     
     sbAppend(sb, "\n// Globals\n");
-    u32 globLen = darrayLength(globalVariables);
+    u32 globLen = darrayLength(g_Unit->globalVariables);
     for (u32 i = 0; i < globLen; i++) {
-        transpileVarDecl(&globalVariables[i]);
+        transpileVarDecl(&g_Unit->globalVariables[i]);
         sbAppend(sb, "\n");
     }
 
     sbAppend(sb, "\n// Implementations\n");
 
     for (u32 i = 0; i < functionsLen; i++) {     
-        PlangFunction* func = &functions[i];
+        PlangFunction* func = &g_Unit->functions[i];
         transpileFunction(func);
     }
 

@@ -12,13 +12,6 @@ Expression* expectExpression();
 
 static u32 token_index = 0;
 
-PlangType* g_Types; // darray
-Datatype type_null = {0};
-PlangFunction* functions = null;
-FuncDeclaration* functionDeclarations = null;
-PlangStruct* structs = null;
-VarDecl* globalVariables = null;
-
 static u32 numberOfErrors;
 static void error(char* format, ...) {
     printf("Error Ln%d: ", tokens[token_index].line);
@@ -97,6 +90,73 @@ inline bool tok(TokenType type) {
     return false;
 }
 
+
+// returns the typeId, and inputs the funcptr reference
+static u32 queryFuncPtrTypeId(u32 funcPtrRef) {
+    u32 len = darrayLength(g_Unit->types);
+    for (u32 i = 0; i < len; i++) {
+        PlangType type = g_Unit->types[i];
+        if (type.kind != Typekind_FuncPtr) continue;
+        if (type.type_funcPtr == funcPtrRef) return i + 1;
+    }
+
+    return 0;
+}
+
+inline bool funcPtrEquivalence(FuncPtr* a, FuncPtr* b) {
+    // TODO: arguments
+    return a->returnType.typeId == b->returnType.typeId && 
+        a->returnType.numPointers == b->returnType.numPointers;
+}
+
+static Datatype parseFuncPtrArgs(Datatype retType) {
+    if (tok(Tok_OpenParen)) {
+
+        // construct a new function pointer by reserving memory for it
+        u32 oldLength = g_Unit->funcPtrTypes->length; // remember the old length in case we have a duplicate
+        u32 fpRef = dyReserve(&g_Unit->funcPtrTypes, sizeof(FuncPtr));
+        
+        // TODO: arguments
+        
+        FuncPtr* funcPtr = getFuncPtr(fpRef);
+        funcPtr->returnType = retType;
+        funcPtr->argCount = 0;
+
+        expect(Tok_CloseParen);
+        
+        Datatype funcType;
+        funcType.numPointers = 1;
+        
+        { // look if the function pointer is a duplicate
+            u32 i = 0;
+            while (i < oldLength) {
+                FuncPtr* f = getFuncPtr(i);
+
+                if (funcPtrEquivalence(f, funcPtr)) {
+                    // is duplicate 
+                    g_Unit->funcPtrTypes->length = oldLength; // reset, 
+                    funcType.typeId = queryFuncPtrTypeId(i);
+                    return funcType;
+                }
+
+                i += sizeof(FuncPtr) + sizeof(Datatype) * f->argCount;
+            }
+
+            // is not a duplicate, create a new entry in the typetable
+            PlangType newType;
+            newType.name = spFrom("void");
+            newType.kind = Typekind_FuncPtr;
+            newType.type_funcPtr = fpRef;
+            darrayAdd(g_Unit->types, newType);
+
+            funcType.typeId = darrayLength(g_Unit->types);
+            return funcType;
+        }
+    }
+
+    return retType;
+}
+
 // returns false if the token can not be interpreted as a type
 static bool parseInferableType(Datatype* type) {
     if (tok(Tok_Keyword_Let)) {
@@ -105,14 +165,12 @@ static bool parseInferableType(Datatype* type) {
     }
 
     if (tokens[token_index].type == Tok_Word) {
-        
         type->typeId = ensureTypeExistence(tokens[token_index].value);
         token_index++;
+        type->numPointers = 0;
+        while (tok(Tok_Mul)) type->numPointers++;
 
-        u32 np = 0;
-        while (tokens[token_index++].type == Tok_Mul) np++;
-        type->numPointers = np;
-        token_index--;
+        *type = parseFuncPtrArgs(*type);        
 
         return true;
     }
@@ -697,7 +755,7 @@ static void funcOrGlobal() {
         func.decl.arguments = expectFuncArgList();
         
         expectBlock(&func.scope);
-        darrayAdd(functions, func);
+        darrayAdd(g_Unit->functions, func);
 
     } else {
         // global variable
@@ -712,21 +770,13 @@ static void funcOrGlobal() {
             error("Global variable \"%.*s\" must be assigned to, to be type inferred.", decl.name.length, decl.name.start);
         }
 
-        darrayAdd(globalVariables, decl);
+        darrayAdd(g_Unit->globalVariables, decl);
 
         semicolon();
     }
 }
 
 u32 parse() {
-
-    // TODO: PlangFile
-    if (!functions) {
-        functions = darrayCreate(PlangFunction);
-        functionDeclarations = darrayCreate(FuncDeclaration);
-        structs = darrayCreate(PlangStruct);
-        globalVariables = darrayCreate(VarDecl);
-    }
 
     // token_index = 0;
 
@@ -741,15 +791,15 @@ u32 parse() {
                 token_index++;
                 PlangStruct stru = expectStruct();
                 stru.nodebase.lineNumber = lineNum;
-                u32 struLen = darrayLength(structs);
+                u32 struLen = darrayLength(g_Unit->structs);
                 for (u32 i = 0; i < struLen; i++) {
-                    if (spanEqualsSpan(structs[i].name, stru.name)) {
+                    if (spanEqualsSpan(g_Unit->structs[i].name, stru.name)) {
                         errorLine(stru.nodebase.lineNumber, "Struct \"%.*s\" is already defined.", stru.name.length, stru.name.start);
                         break;
                     }
                 }
                 
-                darrayAdd(structs, stru);
+                darrayAdd(g_Unit->structs, stru);
 
             } break;
             
@@ -766,7 +816,7 @@ u32 parse() {
                 funcDecl.arguments = expectFuncArgList();
                 semicolon();
 
-                darrayAdd(functionDeclarations, funcDecl);
+                darrayAdd(g_Unit->functionDeclarations, funcDecl);
             } break;
             
             default: {

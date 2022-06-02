@@ -15,7 +15,6 @@
 
 
     TODO list:
-        - function pointers
         - function overloads
         - localy defined structs
         *- clasic for loop: for (int i = 0; i < 10; i++)
@@ -33,6 +32,7 @@
     InProgress:
         - line numbers in validation errors
         - localy defined functions
+        - function pointers
 
 
     DONE list:
@@ -67,6 +67,7 @@
 
 void transpile();
 
+TranslationUnit* g_Unit;
 
 char* fileread(const char* filename, u32* strLength) {
     FILE* file;
@@ -131,7 +132,7 @@ void addPrimitiveType(char* name) {
     PlangType newType;
     newType.kind = Typekind_Primitive;
     newType.name = spFrom(name);
-    darrayAdd(g_Types, newType);
+    darrayAdd(g_Unit->types, newType);
 }
 
 // plang glfw.txt cflags -g -lglfw3dll.lib
@@ -144,15 +145,23 @@ int main(int argc, char* argv[]) {
 
     // TODO: use higher default capacity here, to minimize the amount of reallocs 
     tokens = darrayCreate(Token);
-    g_Types = darrayCreate(PlangType);
 
     static char* TypekindNames[] = {
         [Typekind_Invalid]   = "invalid  ",
         [Typekind_Primitive] = "primitive",
         [Typekind_Struct]    = "struct   ",
         [Typekind_Enum]      = "enum     ",
-        [Typekind_FuncPtr]   = "struct   ",
+        [Typekind_FuncPtr]   = "func*    ",
     };
+
+    TranslationUnit unit;
+    unit.functions = darrayCreate(PlangFunction);
+    unit.functionDeclarations = darrayCreate(FuncDeclaration);
+    unit.structs = darrayCreate(PlangStruct);
+    unit.globalVariables = darrayCreate(VarDecl);
+    unit.types = darrayCreate(PlangType);
+    unit.funcPtrTypes = dyCreate();
+    g_Unit = &unit;
 
     { // add default types to typetable
         addPrimitiveType("void");
@@ -196,9 +205,9 @@ int main(int argc, char* argv[]) {
     }
 
     { // print type table
-        u32 len = darrayLength(g_Types);
+        u32 len = darrayLength(g_Unit->types);
         for (u32 i = 0; i < len; i++) {
-            printf("    %d. %s : %.*s\n", i, TypekindNames[g_Types[i].kind], g_Types[i].name.length, g_Types[i].name.start);
+            printf("    %d. %s : %.*s\n", i, TypekindNames[g_Unit->types[i].kind], g_Unit->types[i].name.length, g_Unit->types[i].name.start);
         }
     }
 

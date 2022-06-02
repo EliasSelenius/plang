@@ -1,14 +1,19 @@
 #include <stdlib.h>
 #define true 1
 #define false 0
+// basic types
+typedef unsigned int uint;
 // Structs
 typedef struct Shader Shader;
 typedef struct Shader {
-    int id;
+    uint id;
+    void* func;
 } Shader;
 
 // Forward declarations
 void loadGL();
+void invoke(void* my_voidFunction);
+void sayHello();
 int main();
 int glfwInit();
 void glfwTerminate();
@@ -19,21 +24,31 @@ void glfwSwapBuffers(void* window);
 int glfwWindowShouldClose(void* window);
 void glfwMakeContextCurrent(void* window);
 void* glfwGetProcAddress(char* name);
+void printf(char* format, char* arg1);
 
 // Globals
 int GL_COLOR_BUFFER_BIT = 16384;
 void* glClearColor;
 void* glClear;
+void* shaderRetrivalFunc;
 
 // Implementations
 void loadGL() {
     glClearColor = glfwGetProcAddress("glClearColor");
     glClear = glfwGetProcAddress("glClear");
 }
+void invoke(void* my_voidFunction) {
+    ((void (*)())my_voidFunction)();
+}
+void sayHello() {
+    printf("%s", "Hello");
+}
 int main() {
     if (!glfwInit()) {
         return -1;
     }
+    Shader s;
+    sayHello();
     int width = 1600;
     int height = 900;
     void* window = glfwCreateWindow(width, height, "title", 0, 0);
