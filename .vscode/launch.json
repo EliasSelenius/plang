@@ -6,7 +6,7 @@
             "type": "lldb",
             "request": "launch",
             "program": "${workspaceFolder}/bin/plang.exe",
-            "args": ["glfw_demo/glfw3.txt"],
+            "args": ["glfw_demo/main.txt"],
             "cwd": "${workspaceFolder}",
             // "preLaunchTask": "c_project_build"
         },

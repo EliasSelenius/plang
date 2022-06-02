@@ -41,13 +41,12 @@ void invoke(void* my_voidFunction) {
     ((void (*)())my_voidFunction)();
 }
 void sayHello() {
-    printf("%s", "Hello");
+    printf("%s\n", "Hello");
 }
 int main() {
     if (!glfwInit()) {
         return -1;
     }
-    Shader s;
     sayHello();
     int width = 1600;
     int height = 900;
@@ -58,7 +57,7 @@ int main() {
     }
     glfwMakeContextCurrent(window);
     loadGL();
-    ((void (*)(float, float, float, float))glClearColor)(0.0, 1.0, 0.0, 1.0);
+    ((void (*)(float, float, char*, float))glClearColor)(0.0, 1.0, "dawd", 1.0);
     while (!glfwWindowShouldClose(window)) {
         ((void (*)(int))glClear)(GL_COLOR_BUFFER_BIT);
         glfwSwapBuffers(window);

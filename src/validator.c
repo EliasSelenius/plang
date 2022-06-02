@@ -190,7 +190,7 @@ static Datatype validateFuncCall(FuncCall* call) {
 
             u32 argLen = call->args ? darrayLength(call->args) : 0;
             for (u32 i = 0; i < argLen; i++) {
-                Datatype t = validateExpression(call->args[0]);
+                Datatype t = validateExpression(call->args[i]);
                 sbAppendSpan(&sb_FuncPtr, getType(t)->name);
                 for (u32 j = 0; j < t.numPointers; j++) sbAppendChar(&sb_FuncPtr, '*');
                 sbAppend(&sb_FuncPtr, ", ");

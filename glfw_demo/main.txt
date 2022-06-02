@@ -47,10 +47,13 @@ let main() {
         return -1;
     }
 
-    Shader s;
 
     sayHello();
-    invoke(sayHello);
+    // invoke(sayHello);
+
+    // let srf = shaderRetrivalFunc();
+
+
 
     int width = 1600;
     let height = 900;
@@ -67,7 +70,7 @@ let main() {
     // void func(char**) myFunction = getString;
     // void(char**, void()(int)) myFunction = getString;
 
-    glClearColor(0.0, 1.0, 0.0, 1.0);
+    glClearColor(0.0, 1.0, "dawd", 1.0);
 
     while (!glfwWindowShouldClose(window)) {
 
