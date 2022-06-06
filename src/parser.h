@@ -282,8 +282,6 @@ typedef struct PlangFunction {
 
 typedef struct FuncCall {
     Expression base;
-    // FuncDeclaration* function;
-    StrSpan functionName;
     Expression* funcExpr;
     Expression** args; // darray of Expression pointers
 } FuncCall;

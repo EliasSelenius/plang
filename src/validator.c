@@ -155,70 +155,75 @@ inline void validateType(Datatype type) {
 
 static Datatype validateFuncCall(FuncCall* call) {
     
-    if (call->funcExpr->expressionType != ExprType_Variable) {
-        printf("Feature not implemented yet.\n");
-        return type_null;
+    // calling a declared function?
+    if (call->funcExpr->expressionType == ExprType_Variable) {
+        VariableExpression* var = (VariableExpression*)call->funcExpr;
+        FuncDeclaration* func = getFuncDecl(var->name);
+        if (func) {
+            u32 argLen = call->args ? darrayLength(call->args) : 0;
+            u32 expArgLen = func->arguments ? darrayLength(func->arguments) : 0;
+
+            if (argLen != expArgLen) {
+                // TODO: print proper types with pointers
+                error("Unexpected number of arguments passed to \"%.*s\", expected %d, but got %d.", 
+                    func->name.length, func->name.start,
+                    expArgLen, argLen);
+
+                for (u32 i = 0; i < argLen; i++) validateExpression(call->args[i]);
+
+                return func->returnType;
+            }
+            
+            for (u32 i = 0; i < argLen; i++) {
+                Datatype passedArgType = validateExpression(call->args[i]);
+                if (passedArgType.typeId) {
+                    Datatype expectedArg = func->arguments[i].type;
+
+                    if (!typeEquals(passedArgType, expectedArg)) {
+                        StrSpan passedName = getType(passedArgType)->name;
+                        StrSpan expectedName = getType(expectedArg)->name;
+                        error("Argument type missmatch, expression of type %.*s cannot be passed to argument of type %.*s",
+                            passedName.length, passedName.start,
+                            expectedName.length, expectedName.start);
+                    }
+                }
+            }
+            return func->returnType;
+        }
     }
 
-    VariableExpression* var = (VariableExpression*)call->funcExpr;
-    StrSpan name = var->name;
-    call->functionName = name;
-    FuncDeclaration* func = getFuncDecl(name);
-    if (!func) {
 
-        // calling function pointer? 
-        Datatype varType = getDeclaredVariable(name);
-        if (varType.typeId) {
-            PlangType* type = getType(varType);
-            if (type->kind == Typekind_FuncPtr) {
-                call->base.expressionType = ExprType_FuncPointerCall;
-                FuncPtr* funcPtr = getFuncPtr(type->type_funcPtr);
+    // calling function pointer? 
+    Datatype calleeExprType = validateExpression(call->funcExpr);
+    if (calleeExprType.typeId) {
+        PlangType* type = getType(calleeExprType);
+        if (type->kind == Typekind_FuncPtr) {
+            call->base.expressionType = ExprType_FuncPointerCall;
+            FuncPtr* funcPtr = getFuncPtr(type->type_funcPtr);
 
-                u32 argLen = call->args ? darrayLength(call->args) : 0;
-                for (u32 i = 0; i < argLen; i++) {
-                    Datatype t = validateExpression(call->args[i]);
-                }
+            u32 argLen = call->args ? darrayLength(call->args) : 0;
+
+            if (argLen != funcPtr->argCount) {
+                error("Unexpected number of arguments passed to function pointer, expected %d, but got %d.", funcPtr->argCount, argLen);
+
+                for (u32 i = 0; i < argLen; i++) validateExpression(call->args[i]);
 
                 return funcPtr->returnType;
             }
-        }
 
-        error("Function \"%.*s\" does not exist.", name.length, name.start);
-        return type_null;
-    }
-
-    u32 argLen = call->args ? darrayLength(call->args) : 0;
-    u32 expArgLen = func->arguments ? darrayLength(func->arguments) : 0;
-
-    if (argLen != expArgLen) {
-        // TODO: print proper types with pointers
-        error("Unexpected number of arguments passed to \"%.*s\", expected %d, but got %d.", 
-            func->name.length, func->name.start,
-            expArgLen, argLen);
-
-        for (u32 i = 0; i < argLen; i++) {
-            validateExpression(call->args[i]);
-        }
-
-        return func->returnType;
-    }
-    
-    for (u32 i = 0; i < argLen; i++) {
-        Datatype passedArgType = validateExpression(call->args[i]);
-        if (passedArgType.typeId) {
-            Datatype expectedArg = func->arguments[i].type;
-
-            if (!typeEquals(passedArgType, expectedArg)) {
-                StrSpan passedName = getType(passedArgType)->name;
-                StrSpan expectedName = getType(expectedArg)->name;
-                error("Argument type missmatch, expression of type %.*s cannot be passed to argument of type %.*s",
-                    passedName.length, passedName.start,
-                    expectedName.length, expectedName.start);
+            for (u32 i = 0; i < argLen; i++) {
+                Datatype t = validateExpression(call->args[i]);
+                if (!typeEquals(t, funcPtr->argTypes[i])) {
+                    error("Argument type missmatch");
+                }
             }
+
+            return funcPtr->returnType;
         }
     }
 
-    return func->returnType;
+    error("Function does not exist.");
+    return type_null;
 }
 
 

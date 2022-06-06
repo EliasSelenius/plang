@@ -16,8 +16,6 @@ declare void* glfwGetProcAddress(char* name);
 let GL_COLOR_BUFFER_BIT = 16384; // 0x00004000
 
 
-// void() glClearColor;
-// void() glClear;
 void(float, float, float, float) glClearColor;
 void(int) glClear;
 
@@ -83,12 +81,16 @@ let main() {
     let shader = srf();
     shader.func = sayHello;
 
-    let sfunc = shader.func;
-    sfunc();
+    let c = shader.func();
+
+    void i;
+
+    // x();
 
     /*
-        - arguments
-        - call expr: shader.func();
+        done - arguments
+        done - call expr: shader.func();
+        done - validate funcptr call
         - decl funcptr in scope
         - 
     */

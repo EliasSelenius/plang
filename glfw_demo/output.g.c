@@ -71,8 +71,8 @@ int main() {
     f_Shaderp srf = shaderRetrivalFunc;
     Shader* shader = srf();
     shader->func = sayHello;
-    f_void sfunc = shader->func;
-    sfunc();
+    void c = shader->func();
+    void i;
     int width = 1600;
     int height = 900;
     void* window = glfwCreateWindow(width, height, invoke(titleFunc), 0, 0);

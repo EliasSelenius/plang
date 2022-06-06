@@ -28,6 +28,9 @@
         - omit curl brackets in if/while etc. for single statement block
         - hash identifiers (Tok_Word tokens) for faster string equals and to free the file buffer
         - nested multi-line comments
+        - declare function pointer type in local scope
+        - disallow void as variable type in declaration
+        - make void* implicitly castable to any other first degree pointer 
 
     InProgress:
         - line numbers in validation errors
@@ -204,16 +207,6 @@ int main(int argc, char* argv[]) {
         u32 len = darrayLength(g_Unit->types);
         for (u32 i = 0; i < len; i++) {
             printf("    %d. %s : %.*s\n", i, TypekindNames[g_Unit->types[i].kind], g_Unit->types[i].name.length, g_Unit->types[i].name.start);
-        }
-    }
-    { // iterate over funcptr buffer
-        u32 i = 0;
-        while (i < g_Unit->funcPtrTypes->length) {
-            FuncPtr* p = getFuncPtr(i);
-            
-            StrSpan name = getType(p->returnType)->name;
-            printf("%d    %.*s%d(%d)\n", i, name.length, name.start, p->returnType.numPointers, p->argCount);
-            i += sizeof(FuncPtr) + sizeof(Datatype) * p->argCount;
         }
     }
     if (numErrors) {

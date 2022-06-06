@@ -31,7 +31,7 @@ static void transpileType(Datatype type) {
 }
 
 static void transpileFuncCall(FuncCall* func) {
-    sbAppendSpan(sb, func->functionName);
+    transpileExpression(func->funcExpr);
     sbAppend(sb, "(");
     if (func->args) {
         transpileExpression(func->args[0]);
