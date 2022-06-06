@@ -151,7 +151,7 @@ int main(int argc, char* argv[]) {
         [Typekind_Primitive] = "primitive",
         [Typekind_Struct]    = "struct   ",
         [Typekind_Enum]      = "enum     ",
-        [Typekind_FuncPtr]   = "func*    ",
+        [Typekind_FuncPtr]   = "function ",
     };
 
     TranslationUnit unit;
@@ -189,6 +189,7 @@ int main(int argc, char* argv[]) {
         addFile(arg);
     }
 
+    
     StringBuilder sb = sbCreate();
     sbAppend(&sb, "clang output.g.c -o output.exe ");
 
@@ -199,16 +200,25 @@ int main(int argc, char* argv[]) {
 
     printf("Validate...\n");
     u32 numErrors = validate();
-    if (numErrors) {
-        printf("There were %d errors during validation.\nFix errors and try again.\n", numErrors);
-        return 0;
-    }
-
     { // print type table
         u32 len = darrayLength(g_Unit->types);
         for (u32 i = 0; i < len; i++) {
             printf("    %d. %s : %.*s\n", i, TypekindNames[g_Unit->types[i].kind], g_Unit->types[i].name.length, g_Unit->types[i].name.start);
         }
+    }
+    { // iterate over funcptr buffer
+        u32 i = 0;
+        while (i < g_Unit->funcPtrTypes->length) {
+            FuncPtr* p = getFuncPtr(i);
+            
+            StrSpan name = getType(p->returnType)->name;
+            printf("%d    %.*s%d(%d)\n", i, name.length, name.start, p->returnType.numPointers, p->argCount);
+            i += sizeof(FuncPtr) + sizeof(Datatype) * p->argCount;
+        }
+    }
+    if (numErrors) {
+        printf("There were %d errors during validation.\nFix errors and try again.\n", numErrors);
+        return 0;
     }
 
     printf("Transpile...\n");

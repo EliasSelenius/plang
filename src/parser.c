@@ -9,6 +9,8 @@
 void expectBlock(Codeblock* scope);
 Expression* parseExpression();
 Expression* expectExpression();
+bool parseType(Datatype* type);
+Datatype expectType();
 
 static u32 token_index = 0;
 
@@ -103,28 +105,37 @@ static u32 queryFuncPtrTypeId(u32 funcPtrRef) {
     return 0;
 }
 
-inline bool funcPtrEquivalence(FuncPtr* a, FuncPtr* b) {
-    // TODO: arguments
-    return a->returnType.typeId == b->returnType.typeId && 
-        a->returnType.numPointers == b->returnType.numPointers;
+inline bool funcPtrEquivalence(FuncPtr* a, FuncPtr* b) {    
+    if (a->argCount != b->argCount) return false;
+    if (!typeEquals(a->returnType, b->returnType)) return false;
+    for (u32 i = 0; i < a->argCount; i++) {
+        if (!typeEquals(a->argTypes[i], b->argTypes[i])) return false;
+    }
+
+    return true;
+}
+
+static StringBuilder sb_funcPtrName = {0};
+
+static void funcPtrName_append(Datatype type) {
+    sbAppendChar(&sb_funcPtrName, '_');
+    sbAppendSpan(&sb_funcPtrName, getType(type)->name);
+    for (u32 i = 0; i < type.numPointers; i++) sbAppendChar(&sb_funcPtrName, 'p');
 }
 
 static StrSpan constructNameForFuncPtr(FuncPtr* funcPtr) {
-    StrSpan retName = getType(funcPtr->returnType)->name;
-    u32 len = 2 + retName.length + funcPtr->returnType.numPointers;
-    char* buf = malloc(len);
-    u32 i = 0;
-    buf[i++] = 'f';
-    buf[i++] = '_';
-    
-    for (u32 j = 0; j < retName.length; j++) {
-        buf[i++] = retName.start[j];
+
+    sbClear(&sb_funcPtrName);
+
+    sbAppendChar(&sb_funcPtrName, 'f');
+    funcPtrName_append(funcPtr->returnType);
+    for (u32 i = 0; i < funcPtr->argCount; i++) {
+        funcPtrName_append(funcPtr->argTypes[i]);
     }
 
-    u32 np = funcPtr->returnType.numPointers;
-    while (0 < np--) buf[i++] = 'p';
-
-    // TODO: args
+    u32 len = sb_funcPtrName.length;
+    char* buf = malloc(len);
+    sbCopyIntoBuffer(&sb_funcPtrName, buf, len);
 
     StrSpan res;
     res.length = len;
@@ -137,9 +148,15 @@ Datatype ensureFuncPtrExistsFromFuncDeclaration(FuncDeclaration* decl) {
     u32 oldLength = g_Unit->funcPtrTypes->length; // remember the old length in case we have a duplicate
     u32 fpRef = dyReserve(&g_Unit->funcPtrTypes, sizeof(FuncPtr));
 
+    u32 argCount = decl->arguments ? darrayLength(decl->arguments) : 0;
+    for (u32 i = 0; i < argCount; i++) {
+        u32 argRef = dyReserve(&g_Unit->funcPtrTypes, sizeof(Datatype));
+        *(Datatype*)(&g_Unit->funcPtrTypes->bytes[argRef]) = decl->arguments[i].type;
+    }
+
     FuncPtr* funcPtr = getFuncPtr(fpRef);
     funcPtr->returnType = decl->returnType;
-    funcPtr->argCount = 0;
+    funcPtr->argCount = argCount;
 
     Datatype funcType;
     funcType.numPointers = 0;
@@ -177,12 +194,26 @@ static Datatype parseFuncPtrArgs(Datatype retType) {
         // construct a new function pointer by reserving memory for it
         u32 oldLength = g_Unit->funcPtrTypes->length; // remember the old length in case we have a duplicate
         u32 fpRef = dyReserve(&g_Unit->funcPtrTypes, sizeof(FuncPtr));
-        
-        // TODO: arguments
+
+        // arguments
+        u32 argCount = 0;        
+        Datatype argType;
+        if (parseType(&argType)) {
+            argCount++;
+            u32 argRef = dyReserve(&g_Unit->funcPtrTypes, sizeof(Datatype));
+            *(Datatype*)(&g_Unit->funcPtrTypes->bytes[argRef]) = argType;
+
+            while (tok(Tok_Comma)) {
+                argCount++;
+                argType = expectType();
+                argRef = dyReserve(&g_Unit->funcPtrTypes, sizeof(Datatype));
+                *(Datatype*)(&g_Unit->funcPtrTypes->bytes[argRef]) = argType;
+            }
+        }
         
         FuncPtr* funcPtr = getFuncPtr(fpRef);
         funcPtr->returnType = retType;
-        funcPtr->argCount = 0;
+        funcPtr->argCount = argCount;
 
         expect(Tok_CloseParen);
         
@@ -839,6 +870,10 @@ static void funcOrGlobal() {
 }
 
 u32 parse() {
+
+    if (!sb_funcPtrName.content) {
+        sb_funcPtrName = sbCreate();
+    }
 
     // token_index = 0;
 

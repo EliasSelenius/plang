@@ -96,10 +96,6 @@ static FuncDeclaration* getFuncDecl(StrSpan name) {
     return null;
 }
 
-inline bool typeEquals(Datatype a, Datatype b) {
-    return a.typeId == b.typeId && a.numPointers == b.numPointers;
-}
-
 static Datatype getDeclaredVariable(StrSpan name) {
 
     // look for local var
@@ -135,23 +131,18 @@ static Datatype getDeclaredVariable(StrSpan name) {
 }
 
 static Datatype validateVariable(VariableExpression* var) {
+    
     Datatype type = getDeclaredVariable(var->name);
+    if (type.typeId) return type;
 
-    if (!type.typeId) {
+    FuncDeclaration* decl = getFuncDecl(var->name);
+    if (decl) return ensureFuncPtrExistsFromFuncDeclaration(decl);
 
-        // TODO: temporary soulution until we get function pointers
-        FuncDeclaration* decl = getFuncDecl(var->name);
-        if (decl) {
-            return ensureFuncPtrExistsFromFuncDeclaration(decl);
-        }
 
-        error("Variable \"%.*s\" is not declared.",
-            var->name.length,
-            var->name.start);
-
-        return type_null;
-    }
-    return type;
+    error("Variable \"%.*s\" is not declared.",
+        var->name.length,
+        var->name.start);
+    return type_null;
 }
 
 inline void validateType(Datatype type) {
@@ -613,7 +604,7 @@ u32 validate() {
 
             // case Typekind_FuncPtr: {
             //     FuncPtr* fp = getFuncPtr(type->type_funcPtr);
-
+                
             // } break;
 
             default: break;

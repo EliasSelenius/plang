@@ -338,7 +338,16 @@ void transpile() {
                 transpileType(funcPtr->returnType);
                 sbAppend(sb, " (*");
                 sbAppendSpan(sb, type->name);
-                sbAppend(sb, ")();\n"); // TODO: args
+                sbAppend(sb, ")(");
+                if (funcPtr->argCount) {
+                    transpileType(funcPtr->argTypes[0]);
+                    for (u32 i = 1; i < funcPtr->argCount; i++) {
+                        sbAppend(sb, ", ");
+                        transpileType(funcPtr->argTypes[i]);
+                    }
+                }
+                sbAppend(sb, ");\n");
+
             } break;
         }
     }

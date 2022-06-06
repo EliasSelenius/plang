@@ -4,9 +4,13 @@
 
 // types
 typedef unsigned int uint;
+typedef void (*f_void_float_float_float_float)(float, float, float, float);
+typedef void (*f_void_int)(int);
 typedef void (*f_void)();
 typedef struct Shader Shader;
 typedef Shader* (*f_Shaderp)();
+typedef struct Test Test;
+typedef int* (*f_intp_int_Test)(int, Test);
 typedef char* (*f_charp)();
 
 // Structs
@@ -14,6 +18,9 @@ typedef struct Shader {
     uint id;
     f_void func;
 } Shader;
+typedef struct Test {
+    float c;
+} Test;
 
 // Forward declarations
 void loadGL();
@@ -35,9 +42,10 @@ void printf(char* format, char* arg1);
 
 // Globals
 int GL_COLOR_BUFFER_BIT = 16384;
-f_void glClearColor;
-f_void glClear;
+f_void_float_float_float_float glClearColor;
+f_void_int glClear;
 f_Shaderp shaderRetrivalFunc;
+f_intp_int_Test ptrOfInt;
 
 // Implementations
 void loadGL() {

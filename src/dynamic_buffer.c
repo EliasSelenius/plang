@@ -3,7 +3,7 @@
 #include <stdlib.h> // malloc
 
 DynamicBuffer* dyCreate() {
-    u32 cap = 16;
+    u32 cap = 16;//1024;
     DynamicBuffer* buffer = malloc(sizeof(DynamicBuffer) + cap);
     buffer->length = 0;
     buffer->capacity = cap;
@@ -21,8 +21,8 @@ u32 dyReserve(DynamicBuffer** buffer, u32 size) {
     if (newlen > cap) {
         cap *= 2;
         while (newlen > cap) cap *= 2;
-        *buffer = realloc(*buffer, cap);
         (*buffer)->capacity = cap;
+        *buffer = realloc(*buffer, sizeof(DynamicBuffer) + cap);
     }
 
     return oldlen;

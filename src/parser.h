@@ -71,6 +71,11 @@ inline bool typeMustBeInfered(Datatype dt) {
     return dt.typeId == 0;
 }
 
+inline bool typeEquals(Datatype a, Datatype b) {
+    return a.typeId == b.typeId && a.numPointers == b.numPointers;
+}
+
+
 inline u32 ensureTypeExistence(StrSpan name) {
     u32 len = darrayLength(g_Unit->types);
     for (u32 i = 0; i < len; i++) {

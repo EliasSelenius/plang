@@ -15,10 +15,11 @@ declare void* glfwGetProcAddress(char* name);
 // use global variable for now, as we dont have constants nor defines nor enums
 let GL_COLOR_BUFFER_BIT = 16384; // 0x00004000
 
-void() glClearColor;
-void() glClear;
-// void(float, float, float, float) glClearColor;
-// void(int) glClear;
+
+// void() glClearColor;
+// void() glClear;
+void(float, float, float, float) glClearColor;
+void(int) glClear;
 
 void loadGL() {
     // glClearColor = glfwGetProcAddress("glClearColor");
@@ -31,7 +32,14 @@ struct Shader {
 }
 
 
+
 Shader*() shaderRetrivalFunc;
+
+struct Test {
+    float c;
+}
+
+int*(int, Test) ptrOfInt;
 
 let getShader() {
     return alloc Shader;
@@ -51,10 +59,22 @@ let getTitle() {
     return "The Title Of The Window";
 }
 
+// type someOpaqueType;
+// type vec2 = (float x, float y);
+// vec2 operator+ (vec2 a, vec2 b) { }
+// type vec3 = (float x, float y, float z) | (vec2 xy, float) | (float, vec2 yz);
+// type event = void(void* sender, EventArgs args);
+// type int64 = long;
+// type bytes4 = (byte a, byte b, byte c, byte d); 
+// type data = bytes4 | int32 | float | long;
+// type ref<T> = T*;
+// type list<T> = (int capacity, int length, T elements[]);
+
 let main() {
     if (!glfwInit()) {
         return -1;
     }
+
 
     let titleFunc = getTitle;
     
@@ -65,6 +85,13 @@ let main() {
 
     let sfunc = shader.func;
     sfunc();
+
+    /*
+        - arguments
+        - call expr: shader.func();
+        - decl funcptr in scope
+        - 
+    */
 
 
     int width = 1600;
@@ -78,9 +105,6 @@ let main() {
     glfwMakeContextCurrent(window);
 
     loadGL();
-
-    // void func(char**) myFunction = getString;
-    // void(char**, void()(int)) myFunction = getString;
 
     // glClearColor(0.0, 1.0, "dawd", 1.0);
 
