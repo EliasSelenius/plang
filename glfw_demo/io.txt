@@ -1,0 +1,35 @@
+
+
+declare int fopen_s(void** stream, char* filename, char* mode);
+declare int fclose(void* stream);
+
+declare int fseek(void* stream, int offset, int origin);
+declare int ftell(void* stream);
+declare void rewind(void* stream);
+declare /*ulong*/int fread(void* buffer, /*ulong*/int elementSize, /*ulong*/int elementCount, void* stream);
+
+declare void printf(char* format, char* arg1);
+declare void* calloc(/*ulong*/int count, /*ulong*/int size);
+
+let println(char* str) {
+    printf("%s\n", str);
+}
+
+char* fileread(char* filename) {
+    void* stream;
+    if (fopen_s(*stream, filename, "r")) {
+        println("Could not open file");
+        return null;
+    }
+
+    fseek(stream, 0, 2); // 2 = SEEK_END
+    int len = ftell(stream);
+    rewind(stream);
+    
+    char* res = calloc(len + 1, 1);
+    fread(res, 1, len, stream);
+
+    fclose(stream);
+
+    return res;
+}

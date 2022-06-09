@@ -4,31 +4,21 @@
 
 // types
 typedef unsigned int uint;
-typedef void (*f_void_float_float_float_float)(float, float, float, float);
-typedef void (*f_void_int)(int);
-typedef void (*f_void)();
-typedef struct Shader Shader;
-typedef Shader* (*f_Shaderp)();
-typedef struct Test Test;
-typedef int* (*f_intp_int_Test)(int, Test);
-typedef char* (*f_charp)();
+typedef void f_void_float_float_float_float(float, float, float, float);
+typedef void f_void_int(int);
+typedef uint f_uint_uint(uint);
+typedef void f_void_uint_int_charpp_intp(uint, int, char**, int*);
+typedef void f_void_uint_uint(uint, uint);
+typedef void f_void_uint(uint);
+typedef uint f_uint();
 
 // Structs
-typedef struct Shader {
-    uint id;
-    f_void func;
-} Shader;
-typedef struct Test {
-    float c;
-} Test;
 
 // Forward declarations
 void loadGL();
-Shader* getShader();
-char* invoke(f_charp func);
-void sayHello();
-char* getTitle();
 int main();
+void println(char* str);
+char* fileread(char* filename);
 int glfwInit();
 void glfwTerminate();
 void* glfwCreateWindow(int width, int height, char* title, void* monitor, void* share);
@@ -38,54 +28,78 @@ void glfwSwapBuffers(void* window);
 int glfwWindowShouldClose(void* window);
 void glfwMakeContextCurrent(void* window);
 void* glfwGetProcAddress(char* name);
+int fopen_s(void** stream, char* filename, char* mode);
+int fclose(void* stream);
+int fseek(void* stream, int offset, int origin);
+int ftell(void* stream);
+void rewind(void* stream);
+int fread(void* buffer, int elementSize, int elementCount, void* stream);
 void printf(char* format, char* arg1);
+void* calloc(int count, int size);
 
 // Globals
 int GL_COLOR_BUFFER_BIT = 16384;
-f_void_float_float_float_float glClearColor;
-f_void_int glClear;
-f_Shaderp shaderRetrivalFunc;
-f_intp_int_Test ptrOfInt;
+f_void_float_float_float_float* glClearColor;
+f_void_int* glClear;
+f_uint_uint* glCreateShader;
+f_void_uint_int_charpp_intp* glShaderSource;
+f_void_uint_uint* glAttachShader;
+f_void_uint_uint* glDetachShader;
+f_void_uint* glDeleteShader;
+f_uint* glCreateProgram;
+f_void_uint* glLinkProgram;
 
 // Implementations
 void loadGL() {
-}
-Shader* getShader() {
-    return malloc(sizeof(Shader));
-}
-char* invoke(f_charp func) {
-    return func();
-}
-void sayHello() {
-    printf("%s\n", "Hello");
-}
-char* getTitle() {
-    return "The Title Of The Window";
+    glClearColor = glfwGetProcAddress("glClearColor");
+    glClear = glfwGetProcAddress("glClear");
+    glCreateShader = glfwGetProcAddress("glCreateShader");
+    glShaderSource = glfwGetProcAddress("glShaderSource");
+    glAttachShader = glfwGetProcAddress("glAttachShader");
+    glDetachShader = glfwGetProcAddress("glDetachShader");
+    glDeleteShader = glfwGetProcAddress("glDeleteShader");
+    glCreateProgram = glfwGetProcAddress("glCreateProgram");
+    glLinkProgram = glfwGetProcAddress("glLinkProgram");
 }
 int main() {
+    char* content = fileread("io.txt");
+    println(content);
     if (!glfwInit()) {
         return -1;
     }
-    f_charp titleFunc = getTitle;
-    shaderRetrivalFunc = getShader;
-    f_Shaderp srf = shaderRetrivalFunc;
-    Shader* shader = srf();
-    shader->func = sayHello;
-    void c = shader->func();
-    void i;
     int width = 1600;
     int height = 900;
-    void* window = glfwCreateWindow(width, height, invoke(titleFunc), 0, 0);
+    void* window = glfwCreateWindow(width, height, "Window", 0, 0);
     if (!window) {
         glfwTerminate();
         return -1;
     }
     glfwMakeContextCurrent(window);
     loadGL();
+    uint shader = glCreateProgram();
+    glClearColor(0.0, 1.0, 1.0, 1.0);
     while (!glfwWindowShouldClose(window)) {
+        glClear(GL_COLOR_BUFFER_BIT);
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
     glfwDestroyWindow(window);
     glfwTerminate();
+}
+void println(char* str) {
+    printf("%s\n", str);
+}
+char* fileread(char* filename) {
+    void* stream;
+    if (fopen_s(&stream, filename, "r")) {
+        println("Could not open file");
+        return 0;
+    }
+    fseek(stream, 0, 2);
+    int len = ftell(stream);
+    rewind(stream);
+    char* res = calloc((len + 1), 1);
+    fread(res, 1, len, stream);
+    fclose(stream);
+    return res;
 }

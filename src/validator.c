@@ -152,6 +152,15 @@ inline void validateType(Datatype type) {
     error("Type \"%.*s\" does not exist.", pt->name.length, pt->name.start);
 }
 
+static bool typeAssignable(Datatype toType, Datatype fromType) {
+    if (typeEquals(toType, fromType)) return true;
+
+    if (toType.typeId == type_void.typeId || fromType.typeId == type_void.typeId) {
+        if (toType.numPointers == fromType.numPointers && toType.numPointers) return true;
+    }
+
+    return false;
+}
 
 static Datatype validateFuncCall(FuncCall* call) {
     
@@ -179,7 +188,7 @@ static Datatype validateFuncCall(FuncCall* call) {
                 if (passedArgType.typeId) {
                     Datatype expectedArg = func->arguments[i].type;
 
-                    if (!typeEquals(passedArgType, expectedArg)) {
+                    if (!typeAssignable(expectedArg, passedArgType)) {
                         StrSpan passedName = getType(passedArgType)->name;
                         StrSpan expectedName = getType(expectedArg)->name;
                         error("Argument type missmatch, expression of type %.*s cannot be passed to argument of type %.*s",
@@ -213,7 +222,7 @@ static Datatype validateFuncCall(FuncCall* call) {
 
             for (u32 i = 0; i < argLen; i++) {
                 Datatype t = validateExpression(call->args[i]);
-                if (!typeEquals(t, funcPtr->argTypes[i])) {
+                if (!typeAssignable(funcPtr->argTypes[i], t)) {
                     error("Argument type missmatch");
                 }
             }
@@ -400,7 +409,7 @@ static void validateScope(Codeblock* scope) {
                     } else {
                         validateType(decl->type);
 
-                        if (!typeEquals(decl->type, assType)) {
+                        if (!typeAssignable(decl->type, assType)) {
                             error("Type missmatch in declaration.");
                         }
                     }
@@ -423,7 +432,7 @@ static void validateScope(Codeblock* scope) {
                 Datatype fromType = validateExpression(ass->expr);
 
                 if (toType.typeId && fromType.typeId) {
-                    if (!typeEquals(toType, fromType)) {
+                    if (!typeAssignable(toType, fromType)) {
                         error("Type missmatch in assignment.");
                     }
                 }
@@ -471,7 +480,7 @@ static void validateScope(Codeblock* scope) {
                 if (typeMustBeInfered(function->decl.returnType)) {
                     function->decl.returnType = type;
                 } else {
-                    if (!typeEquals(type, function->decl.returnType)) {
+                    if (!typeAssignable(function->decl.returnType, type)) {
                         error("Return type missmatch in function \"%.*s\".", function->decl.name.length, function->decl.name.start);
                     }
                 }

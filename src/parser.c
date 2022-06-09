@@ -159,7 +159,7 @@ Datatype ensureFuncPtrExistsFromFuncDeclaration(FuncDeclaration* decl) {
     funcPtr->argCount = argCount;
 
     Datatype funcType;
-    funcType.numPointers = 0;
+    funcType.numPointers = 1;
 
     { // look if the function pointer is a duplicate
         u32 i = 0;
@@ -218,7 +218,7 @@ static Datatype parseFuncPtrArgs(Datatype retType) {
         expect(Tok_CloseParen);
         
         Datatype funcType;
-        funcType.numPointers = 0;
+        funcType.numPointers = 1;
         
         { // look if the function pointer is a duplicate
             u32 i = 0;

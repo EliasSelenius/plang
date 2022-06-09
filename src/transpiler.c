@@ -307,7 +307,7 @@ void transpile() {
     StringBuilder builder = sbCreate();
     sb = &builder;
 
-    sbAppend(sb, "#include <stdlib.h>\n"); // malloc
+    // sbAppend(sb, "#include <stdlib.h>\n"); // malloc
     // sbAppend(sb, "#include <stdio.h>\n"); // printf
     sbAppend(sb, "#define true 1\n#define false 0\n");
 
@@ -336,9 +336,9 @@ void transpile() {
                 FuncPtr* funcPtr = getFuncPtr(type->type_funcPtr);
                 sbAppend(sb, "typedef ");
                 transpileType(funcPtr->returnType);
-                sbAppend(sb, " (*");
+                sbAppend(sb, " ");
                 sbAppendSpan(sb, type->name);
-                sbAppend(sb, ")(");
+                sbAppend(sb, "(");
                 if (funcPtr->argCount) {
                     transpileType(funcPtr->argTypes[0]);
                     for (u32 i = 1; i < funcPtr->argCount; i++) {

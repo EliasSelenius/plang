@@ -13,7 +13,6 @@
 
 /*
 
-
     TODO list:
         - function overloads
         - localy defined structs
@@ -30,7 +29,6 @@
         - nested multi-line comments
         - declare function pointer type in local scope
         - disallow void as variable type in declaration
-        - make void* implicitly castable to any other first degree pointer 
 
     InProgress:
         - line numbers in validation errors
@@ -39,6 +37,7 @@
 
 
     DONE list:
+        - make void* implicitly castable to any other same degree pointer 
         - return type inference
         *- global variables
         *- unary not operator

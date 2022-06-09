@@ -1,0 +1,10 @@
+type someOpaqueType;
+type vec2 = (float x, float y);
+vec2 operator+ (vec2 a, vec2 b) { }
+type vec3 = (float x, float y, float z) | (vec2 xy, float) | (float, vec2 yz);
+type event = void(void* sender, EventArgs args);
+type int64 = long;
+type bytes4 = (byte a, byte b, byte c, byte d); 
+type data = bytes4 | int32 | float | long;
+type ref<T> = T*;
+type list<T> = (int capacity, int length, T elements[]);
