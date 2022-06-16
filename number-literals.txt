@@ -1,4 +1,5 @@
 
+/*
 
 bitsize    signed          unsigned
 
@@ -23,3 +24,21 @@ floatingpoint types:
 0f -> float32
 0d -> float64
 
+*/
+
+int main() {
+    let a = 1;
+    let b = 1u;
+    let c = 1l;
+    let d = 1ul;
+
+    let e = 1.0;
+    let f = 1.0f;
+    let g = 1.0d;
+
+    let h = 1f;
+    let i = 1d;
+    
+
+    return 0;
+}

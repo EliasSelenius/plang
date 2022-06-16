@@ -125,7 +125,13 @@ typedef enum ExprType {
     ExprType_Unary_ValueOf,
 
     ExprType_Literal_Integer,
+    ExprType_Literal_Uint,
+    ExprType_Literal_Long,
+    ExprType_Literal_ULong,
     ExprType_Literal_Decimal,
+    ExprType_Literal_Float,
+    ExprType_Literal_Double,
+
     ExprType_Literal_String,
     ExprType_Literal_Bool,
     ExprType_Literal_Null,

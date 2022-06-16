@@ -21,9 +21,14 @@ static u32 numberOfErrors = 0;
 
 static Datatype type_void;
 static Datatype type_voidPointer;
-static Datatype type_int32;
-static Datatype type_float32;
 static Datatype type_charPointer;
+
+static Datatype type_int32;
+static Datatype type_uint32;
+static Datatype type_int64;
+static Datatype type_uint64;
+static Datatype type_float32;
+static Datatype type_float64;
 
 Datatype validateExpression(Expression* expr);
 Datatype getDeclaredVariable(StrSpan name);
@@ -356,8 +361,14 @@ static Datatype validateExpression(Expression* expr) {
         } break;
 
         { // literals
-            case ExprType_Literal_Integer: return type_int32;
-            case ExprType_Literal_Decimal: return type_float32;
+            case ExprType_Literal_Integer:  return type_int32;
+            case ExprType_Literal_Uint:     return type_uint32;
+            case ExprType_Literal_Long:     return type_int64;
+            case ExprType_Literal_ULong:    return type_uint64;
+            case ExprType_Literal_Decimal:  return type_float32;
+            case ExprType_Literal_Float:    return type_float32;
+            case ExprType_Literal_Double:   return type_float64;
+
             case ExprType_Literal_String:  return type_charPointer;
             case ExprType_Literal_Bool:    return type_int32;
             case ExprType_Literal_Null:    return type_voidPointer;
@@ -592,10 +603,15 @@ u32 validate() {
 
     type_void           = (Datatype) { .typeId = ensureTypeExistence(spFrom("void")), .numPointers = 0 };
     type_voidPointer    = (Datatype) { .typeId = ensureTypeExistence(spFrom("void")), .numPointers = 1 };
-    type_int32          = (Datatype) { .typeId = ensureTypeExistence(spFrom("int")),  .numPointers = 0 };
-    type_float32        = (Datatype) { .typeId = ensureTypeExistence(spFrom("float")), .numPointers = 0 };
     type_charPointer    = (Datatype) { .typeId = ensureTypeExistence(spFrom("char")), .numPointers = 1 };
 
+    type_int32          = (Datatype) { .typeId = ensureTypeExistence(spFrom("int")),  .numPointers = 0 };
+    type_uint32         = (Datatype) { .typeId = ensureTypeExistence(spFrom("uint")),  .numPointers = 0 };
+    type_int64          = (Datatype) { .typeId = ensureTypeExistence(spFrom("long")),  .numPointers = 0 };
+    type_uint64         = (Datatype) { .typeId = ensureTypeExistence(spFrom("ulong")),  .numPointers = 0 };
+
+    type_float32        = (Datatype) { .typeId = ensureTypeExistence(spFrom("float")), .numPointers = 0 };
+    type_float64        = (Datatype) { .typeId = ensureTypeExistence(spFrom("double")), .numPointers = 0 };
 
     // validate types
     u32 typeLen = darrayLength(g_Unit->types);

@@ -441,8 +441,14 @@ static Expression* parseLeafExpression() {
         } break;
 
 
-        case Tok_Integer:       res = createLiteral(ExprType_Literal_Integer); break;
-        case Tok_Decimal:       res = createLiteral(ExprType_Literal_Decimal); break;
+        case Tok_Integer:        res = createLiteral(ExprType_Literal_Integer); break;
+        case Tok_Integer_Uint:   res = createLiteral(ExprType_Literal_Uint); break;
+        case Tok_Integer_Long:   res = createLiteral(ExprType_Literal_Long); break;
+        case Tok_Integer_Ulong:  res = createLiteral(ExprType_Literal_ULong); break;
+        case Tok_Decimal:        res = createLiteral(ExprType_Literal_Decimal); break;
+        case Tok_Decimal_Float:  res = createLiteral(ExprType_Literal_Float); break;
+        case Tok_Decimal_Double: res = createLiteral(ExprType_Literal_Double); break;
+
         case Tok_String:        res = createLiteral(ExprType_Literal_String); break;
         case Tok_Keyword_True:  res = createLiteral(ExprType_Literal_Bool); break;
         case Tok_Keyword_False: res = createLiteral(ExprType_Literal_Bool); break;

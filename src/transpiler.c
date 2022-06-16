@@ -22,8 +22,28 @@ inline void newline() {
     sbAppend(sb, tabs[tabing]);
 }
 
+StrSpan getTypeCname(Datatype type) {
+    PlangType* ptype = getType(type);
+
+    switch (ptype->kind) {
+        case Typekind_Invalid: break;
+        case Typekind_Primitive: {
+
+            // TODO: this is obviously temporarly hard coded
+            if (type.typeId == 8) return spFrom("signed long long");
+            if (type.typeId == 9) return spFrom("unsigned long long");
+
+        } break;
+        case Typekind_Struct: break;
+        case Typekind_Enum: break;
+        case Typekind_FuncPtr: break;
+    }
+
+    return ptype->name;
+}
+
 static void transpileType(Datatype type) {
-    sbAppendSpan(sb, getType(type)->name);
+    sbAppendSpan(sb, getTypeCname(type));
     u32 np = type.numPointers;
     while (np-- > 0) {
         sbAppend(sb, "*");
@@ -98,10 +118,18 @@ static void transpileExpression(Expression* expr) {
             sbAppend(sb, "0");
         } break;
 
+
         case ExprType_Literal_Bool:
         case ExprType_Literal_String:
+
         case ExprType_Literal_Integer:
-        case ExprType_Literal_Decimal: {
+        case ExprType_Literal_Uint:
+        case ExprType_Literal_Long:
+        case ExprType_Literal_ULong:
+        case ExprType_Literal_Decimal:
+        case ExprType_Literal_Float:
+        case ExprType_Literal_Double:
+        {
             LiteralExpression* lit = (LiteralExpression*)expr;
             sbAppendSpan(sb, lit->value);
         } break;

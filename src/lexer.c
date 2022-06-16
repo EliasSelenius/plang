@@ -21,6 +21,15 @@ inline void appendToken(TokenType type) {
     appendTokenLength(type, 1);
 }
 
+// u32 lex2(char* input) {
+//     while (true) {
+//         switch (*cursor) {
+//             case '\0': return 0;
+//             case ' ': continue;
+//             case '\n': current_line++;
+//         }
+//     }
+// }
 
 u32 lex(char* input) {
     u32 numberOfErrors = 0;
@@ -93,22 +102,54 @@ u32 lex(char* input) {
             // integer part
             char* digitStart = cursor;
             while (isDigit(*++cursor));
-            
+
+            // 123.123
+            u32 length = cursor - digitStart;
+
+            /*
+                f - float
+                d - double
+                u - uint
+                l - long
+                ul - ulong
+            */
+
             TokenType tt = Tok_Integer;
             
-            // decimal part
-            if (*cursor == '.') {
-                tt = Tok_Decimal;
-                while (isDigit(*++cursor));
+            switch (*cursor) {
+                case 'u': {
+                    if (*(cursor + 1) == 'l') {
+                        tt = Tok_Integer_Ulong;
+                        cursor++;
+                    } else {
+                        tt = Tok_Integer_Uint;
+                    }
+                } break;
+
+                case 'l': tt = Tok_Integer_Long; break;
+                case 'f': tt = Tok_Decimal_Float; break;
+                case 'd': tt = Tok_Decimal_Double; break;
+
+                case '.': {
+                    tt = Tok_Decimal;
+                    while (isDigit(*++cursor));
+                    length = cursor - digitStart;
+
+                    if (*cursor == 'f') tt = Tok_Decimal_Float;
+                    else if (*cursor == 'd') tt = Tok_Decimal_Double;
+                    else cursor--;
+                    
+                } break;
+
+                default: cursor--; break;
             }
-            cursor--;
 
             Token token = {
                 .type = tt,
                 .line = current_line,
                 .value = {
                     .start = digitStart,
-                    .length = cursor - (digitStart - 1)
+                    .length = length
                 }
             };
             darrayAdd(tokens, token);
