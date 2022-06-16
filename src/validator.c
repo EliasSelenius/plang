@@ -160,6 +160,12 @@ inline void validateType(Datatype type) {
 static bool typeAssignable(Datatype toType, Datatype fromType) {
     if (typeEquals(toType, fromType)) return true;
 
+    if (toType.numPointers == fromType.numPointers) {
+        if (toType.typeId == type_uint64.typeId) { // when converting to ulong
+            if (fromType.typeId == type_uint32.typeId) return true; // uint to ulong
+        }
+    }
+    
     if (toType.typeId == type_void.typeId || fromType.typeId == type_void.typeId) {
         if (toType.numPointers == fromType.numPointers && toType.numPointers) return true;
     }
@@ -589,7 +595,7 @@ static void validateGlobalVar(VarDecl* decl) {
         } else {
             validateType(decl->type);
 
-            if (!typeEquals(decl->type, assType)) {
+            if (!typeAssignable(decl->type, assType)) {
                 error("Type missmatch in global.");
             }
         }

@@ -11,12 +11,15 @@ declare void* glfwGetProcAddress(char* name);
 
 
 // use global variable for now, as we dont have constants nor defines nor enums
-let GL_COLOR_BUFFER_BIT = 16384; // 0x00004000
-uint GL_VERTEX_SHADER = 0;
-uint GL_FRAGMENT_SHADER = 0;
+uint GL_COLOR_BUFFER_BIT = 16384u; // 0x00004000
+uint GL_VERTEX_SHADER = 35633u;
+uint GL_FRAGMENT_SHADER = 35632u;
+uint GL_TRIANGLES = 4u; //0x0004
+uint GL_LINK_STATUS = 35714u; // 0x8B82
 
 void(float, float, float, float) glClearColor;
-void(int) glClear;
+void(uint) glClear;
+uint() glGetError;
 
 // shaders
 uint(uint) glCreateShader;
@@ -26,11 +29,19 @@ void(uint, uint) glDetachShader;
 void(uint) glDeleteShader;
 uint() glCreateProgram;
 void(uint) glLinkProgram;
+void(uint) glUseProgram;
+void(uint, uint, int*) glGetProgramiv;
+void(uint, uint, int*, char*) glGetProgramInfoLog;
 
+void(uint, int, int) glDrawArrays;
+
+uint shaderInfoLogSize = 1024u;
+char* shaderInfoLog = null;
 
 void loadGL() {
     glClearColor = glfwGetProcAddress("glClearColor");
     glClear      = glfwGetProcAddress("glClear");
+    glGetError = glfwGetProcAddress("glGetError");
 
     glCreateShader = glfwGetProcAddress("glCreateShader");
     glShaderSource = glfwGetProcAddress("glShaderSource");
@@ -39,6 +50,13 @@ void loadGL() {
     glDeleteShader = glfwGetProcAddress("glDeleteShader");
     glCreateProgram = glfwGetProcAddress("glCreateProgram");
     glLinkProgram = glfwGetProcAddress("glLinkProgram");
+    glUseProgram = glfwGetProcAddress("glUseProgram");
+    glGetProgramiv = glfwGetProcAddress("glGetProgramiv");
+    glGetProgramInfoLog = glfwGetProcAddress("glGetProgramInfoLog");
+
+    glDrawArrays = glfwGetProcAddress("glDrawArrays");
+
+    shaderInfoLog = malloc(shaderInfoLogSize);
 }
 
 uint makeShader(uint program, uint type, char* code) {
@@ -47,6 +65,7 @@ uint makeShader(uint program, uint type, char* code) {
     glAttachShader(program, s);
     return s;
 }
+
 
 uint createShader() {
     let program = glCreateProgram();
@@ -63,6 +82,17 @@ uint createShader() {
 
     glDetachShader(program, f);
     glDeleteShader(f);
+
+    { // check status
+        int status;
+        glGetProgramiv(program, GL_LINK_STATUS, *status);
+
+        if (status == 0) {
+            int len;
+            glGetProgramInfoLog(program, shaderInfoLogSize, *len, shaderInfoLog);
+            println(shaderInfoLog);
+        }
+    }
 
     return program;
 }
@@ -85,12 +115,20 @@ let main() {
     loadGL();
 
     let shader = createShader();
+    glUseProgram(shader);
 
     glClearColor(0.0, 1.0, 1.0, 1.0);
+
+    let error = glGetError();
+    if (error) {
+        printf("%s %d\n", "OpenGL error.", error);
+    }
 
     while (!glfwWindowShouldClose(window)) {
 
         glClear(GL_COLOR_BUFFER_BIT);
+
+        glDrawArrays(GL_TRIANGLES, 0, 3);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
