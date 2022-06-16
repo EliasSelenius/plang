@@ -546,7 +546,9 @@ inline bool isBinaryExpression(Expression* expr) {
 static Expression* expectLeafExpression() {
     Expression* res = parseLeafExpression();
     if (!res)
-        error("..."); // TODO: fill out error message
+        error("Expected expression, but got \"%.*s\" instead.",
+            tokens[token_index].value.length,
+            tokens[token_index].value.start);
     return res;
 }
 
@@ -905,7 +907,21 @@ u32 parse() {
                 darrayAdd(g_Unit->structs, stru);
 
             } break;
-            
+
+            case Tok_Keyword_Type: {
+                u32 lineNum = tokens[token_index].line;
+                token_index++;
+                StrSpan name = identifier();
+                Datatype type = type_null;
+                if (tok(Tok_Assign)) type = expectType();
+                semicolon();
+
+                u32 typeId = ensureTypeExistence(name);
+                PlangType* ptype = getTypeById(typeId);
+                ptype->kind = Typekind_Alias;
+                ptype->type_aliasedType = type;
+            } break;
+
             case Tok_Keyword_Let:
             case Tok_Word: funcOrGlobal(); break;
 

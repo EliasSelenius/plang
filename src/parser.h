@@ -37,22 +37,24 @@ typedef enum Typekind {
     Typekind_Primitive,
     Typekind_Struct,
     Typekind_Enum,
+    Typekind_Alias,
     Typekind_FuncPtr
 } Typekind;
-
-typedef struct PlangType {
-    Typekind kind;
-    StrSpan name;
-    union {
-        PlangStruct* type_struct;
-        u32          type_funcPtr;
-    };
-} PlangType;
 
 typedef struct Datatype {
     u32 typeId;
     u32 numPointers;
 } Datatype;
+
+typedef struct PlangType {
+    Typekind kind;
+    StrSpan name;
+    union {
+        Datatype     type_aliasedType;
+        PlangStruct* type_struct;
+        u32          type_funcPtr;
+    };
+} PlangType;
 
 typedef struct FuncPtr {
     Datatype returnType;
@@ -60,16 +62,12 @@ typedef struct FuncPtr {
     Datatype argTypes[];
 } FuncPtr;
 
+
 #define type_null ((Datatype){0})
 
-
-inline PlangType* getType(Datatype dt) {
-    return &g_Unit->types[dt.typeId - 1];
-}
-
-inline bool typeMustBeInfered(Datatype dt) {
-    return dt.typeId == 0;
-}
+inline PlangType* getTypeById(u32 id) { return &g_Unit->types[id - 1]; }
+inline PlangType* getType(Datatype dt) { return getTypeById(dt.typeId); }
+inline bool typeMustBeInfered(Datatype dt) { return dt.typeId == 0; }
 
 inline bool typeEquals(Datatype a, Datatype b) {
     return a.typeId == b.typeId && a.numPointers == b.numPointers;
@@ -81,6 +79,7 @@ inline u32 ensureTypeExistence(StrSpan name) {
     for (u32 i = 0; i < len; i++) {
         switch (g_Unit->types[i].kind) {
             case Typekind_Invalid:
+            case Typekind_Alias:
             case Typekind_Primitive: {
                 if (spanEqualsSpan(g_Unit->types[i].name, name)) {
                     return i + 1;

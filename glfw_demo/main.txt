@@ -1,13 +1,13 @@
 
-declare int glfwInit();
-declare void glfwTerminate();
-declare void* glfwCreateWindow(int width, int height, char* title, void* monitor, void* share);
-declare void glfwPollEvents();
-declare void glfwDestroyWindow(void* window);
-declare void glfwSwapBuffers(void* window);
-declare int glfwWindowShouldClose(void* window);
-declare void glfwMakeContextCurrent(void* window);
-declare void* glfwGetProcAddress(char* name);
+// declare int glfwInit();
+// declare void glfwTerminate();
+// declare void* glfwCreateWindow(int width, int height, char* title, void* monitor, void* share);
+// declare void glfwPollEvents();
+// declare void glfwDestroyWindow(void* window);
+// declare void glfwSwapBuffers(void* window);
+// declare int glfwWindowShouldClose(void* window);
+// declare void glfwMakeContextCurrent(void* window);
+// declare void* glfwGetProcAddress(char* name);
 
 
 // use global variable for now, as we dont have constants nor defines nor enums
@@ -59,13 +59,12 @@ void loadGL() {
     shaderInfoLog = malloc(shaderInfoLogSize);
 }
 
-uint makeShader(uint program, uint type, char* code) {
-    let s = glCreateShader(type);
+uint makeShader(uint program, uint _type, char* code) {
+    let s = glCreateShader(_type);
     glShaderSource(s, 1, *code, null); // null assumes null-terminated string
     glAttachShader(program, s);
     return s;
 }
-
 
 uint createShader() {
     let program = glCreateProgram();

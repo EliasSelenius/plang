@@ -21,7 +21,6 @@
         - for int loop: for (12) { }
         - loop block: loop { } == while (true) { }
         - modules or namespaces ?
-        *- better number literal type inference: 10 => int, 10.0 => f32, 10d => f64 ?
         - allow underscores in number literals
         *- switch statements
         - omit curl brackets in if/while etc. for single statement block
@@ -37,6 +36,7 @@
 
 
     DONE list:
+        *- better number literal type inference: 10 => int, 10.0 => f32, 10d => f64 ?
         - make void* implicitly castable to any other same degree pointer 
         - return type inference
         *- global variables
@@ -153,6 +153,7 @@ int main(int argc, char* argv[]) {
         [Typekind_Primitive] = "primitive",
         [Typekind_Struct]    = "struct   ",
         [Typekind_Enum]      = "enum     ",
+        [Typekind_Alias]     = "alias    ",
         [Typekind_FuncPtr]   = "function ",
     };
 

@@ -85,6 +85,7 @@ u32 lex(char* input) {
             else if (spanEquals(word, "break")) tokType = Tok_Keyword_Break;
             else if (spanEquals(word, "return")) tokType = Tok_Keyword_Return;
             else if (spanEquals(word, "declare")) tokType = Tok_Keyword_Declare;
+            else if (spanEquals(word, "type")) tokType = Tok_Keyword_Type;
 
             Token token;
             token.type = tokType;
@@ -138,7 +139,7 @@ u32 lex(char* input) {
                     if (*cursor == 'f') tt = Tok_Decimal_Float;
                     else if (*cursor == 'd') tt = Tok_Decimal_Double;
                     else cursor--;
-                    
+
                 } break;
 
                 default: cursor--; break;

@@ -36,6 +36,7 @@ StrSpan getTypeCname(Datatype type) {
         } break;
         case Typekind_Struct: break;
         case Typekind_Enum: break;
+        case Typekind_Alias: break;
         case Typekind_FuncPtr: break;
     }
 
@@ -341,6 +342,8 @@ void transpile() {
 
     sbAppend(sb, "\n// types\n");
     sbAppend(sb, "typedef unsigned int uint;\n");
+    sbAppend(sb, "typedef unsigned char byte;\n");
+    sbAppend(sb, "typedef unsigned short ushort;\n");
 
     u32 typesLen = darrayLength(g_Unit->types);
     for (u32 i = 0; i < typesLen; i++) {
@@ -359,6 +362,19 @@ void transpile() {
             } break;
 
             case Typekind_Enum: break;
+
+            case Typekind_Alias: {
+                sbAppend(sb, "typedef ");
+                if (type->type_aliasedType.typeId) {
+                    transpileType(type->type_aliasedType);
+                } else {
+                    sbAppend(sb, "struct ");
+                    sbAppendSpan(sb, type->name);
+                }
+                sbAppend(sb, " ");
+                sbAppendSpan(sb, type->name);
+                sbAppend(sb, ";\n");
+            } break;
 
             case Typekind_FuncPtr: {
                 FuncPtr* funcPtr = getFuncPtr(type->type_funcPtr);
