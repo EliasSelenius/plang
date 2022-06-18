@@ -1,6 +1,37 @@
 
 // OpenGL 4.3 core
 
+type GLintptr = long;
+type GLint64 = long;
+type GLuint64 = ulong;
+type GLsizeiptr = long;
+
+type __GLsync;
+type GLsync = __GLsync*;
+
+type GLenum = uint;
+type GLboolean = byte;
+type GLbitfield = uint;
+type GLvoid = void;
+type GLbyte = sbyte;
+type GLubyte = byte;
+type GLshort = short;
+type GLushort = ushort;
+type GLint = int;
+type GLuint = uint;
+type GLclampx = int;
+type GLsizei = int;
+type GLfloat = float;
+type GLclampf = float;
+type GLdouble = double;
+type GLclampd = double;
+type GLeglClientBufferEXT = void*;
+type GLeglImageOES = void*;
+type GLchar = char;
+type GLcharARB = char;
+
+type GLDEBUGPROC = void(GLenum /*source*/, GLenum /*type*/, GLuint /*id*/, GLenum /*severity*/, GLsizei /*length*/, /*const*/ GLchar* /*message*/, /*const*/ void* /*userParam*/);
+
 type proc_glActiveShaderProgram                         = void(GLuint /*pipeline*/, GLuint /*program*/);
 type proc_glActiveTexture                               = void(GLenum /*texture*/);
 type proc_glAttachShader                                = void(GLuint /*program*/, GLuint /*shader*/);
@@ -1072,7 +1103,7 @@ proc_glViewportIndexedf glViewportIndexedf = null;
 proc_glViewportIndexedfv glViewportIndexedfv = null;
 proc_glWaitSync glWaitSync = null;
 
-void loadGL() {
+void load_opengl() {
     glActiveShaderProgram                         = glfwGetProcAddress("glActiveShaderProgram")                         as proc_glActiveShaderProgram;
     glActiveTexture                               = glfwGetProcAddress("glActiveTexture")                               as proc_glActiveTexture;
     glAttachShader                                = glfwGetProcAddress("glAttachShader")                                as proc_glAttachShader;
