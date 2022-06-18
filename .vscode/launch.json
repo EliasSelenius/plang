@@ -2,15 +2,6 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "c project",
-            "type": "lldb",
-            "request": "launch",
-            "program": "${workspaceFolder}/bin/plang.exe",
-            "args": ["main.txt", "cflags", "-lglfw3dll.lib"],
-            "cwd": "${workspaceFolder}/glfw_demo",
-            // "preLaunchTask": "c_project_build"
-        },
-        {
             "name": "plang file (output.c)",
             "type": "lldb",
             "request": "launch",
@@ -19,14 +10,22 @@
             "cwd": "${workspaceFolder}",
             // "preLaunchTask": "c_project_build"
         },
+
+        {
+            "name": "compile glfw_demo",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/bin/plang.exe",
+            "args": ["main.txt", "io.txt", "glfw3.txt", "OpenGL.txt", "cflags", "-lglfw3dll.lib"],
+            "cwd": "${workspaceFolder}/glfw_demo",
+            // "preLaunchTask": "c_project_build"
+        },
         {
             "name": "glfw_demo",
             "type": "lldb",
             "request": "launch",
             "program": "${workspaceFolder}/glfw_demo/output.exe",
-            //"args": ["deref.txt"],
             "cwd": "${workspaceFolder}/glfw_demo",
-            // "preLaunchTask": "c_project_build"
         }
     ]
 }
