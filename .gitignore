@@ -445,3 +445,4 @@ $RECYCLE.BIN/
 !.vscode/extensions.json
 glfw3.dll
 glfw3dll.lib
+output.g.c
