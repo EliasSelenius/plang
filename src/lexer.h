@@ -27,6 +27,7 @@ typedef enum TokenType {
     Tok_Keyword_Return,
     Tok_Keyword_Declare,
     Tok_Keyword_Type,
+    Tok_Keyword_As,
 
     Tok_Integer,
     Tok_Integer_Uint,

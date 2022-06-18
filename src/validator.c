@@ -157,6 +157,7 @@ inline void validateType(Datatype type) {
     error("Type \"%.*s\" does not exist.", pt->name.length, pt->name.start);
 }
 
+
 static bool typeAssignable(Datatype toType, Datatype fromType) {
     if (typeEquals(toType, fromType)) return true;
 
@@ -165,12 +166,32 @@ static bool typeAssignable(Datatype toType, Datatype fromType) {
             if (fromType.typeId == type_uint32.typeId) return true; // uint to ulong
         }
     }
+
+    // funcptrs
+    // TODO: what about casting a second-degree funcpointer to a first-degree funcpointer 
+    // if (getActualType(toType)->kind == Typekind_FuncPtr && getActualType(fromType)->kind == Typekind_FuncPtr) return true;
     
+    // void ptr casting
     if (toType.typeId == type_void.typeId || fromType.typeId == type_void.typeId) {
         if (toType.numPointers == fromType.numPointers && toType.numPointers) return true;
     }
 
     return false;
+}
+
+static void assertAssignability(Datatype toType, Datatype fromType) {
+    if (!typeAssignable(toType, fromType)) {
+
+        PlangType* to = getType(toType);
+        PlangType* from = getType(fromType);
+
+        // TODO: print correct type names. (include pointers and the proper name of a function pointers) 
+        error("Type missmatch. \"%.*s\" is not compatible with \"%.*s\".",
+            from->name.length,
+            from->name.start,
+            to->name.length,
+            to->name.start);
+    }
 }
 
 static Datatype validateFuncCall(FuncCall* call) {
@@ -202,6 +223,7 @@ static Datatype validateFuncCall(FuncCall* call) {
                     if (!typeAssignable(expectedArg, passedArgType)) {
                         StrSpan passedName = getType(passedArgType)->name;
                         StrSpan expectedName = getType(expectedArg)->name;
+                        // TODO: print proper type names
                         error("Argument type missmatch, expression of type %.*s cannot be passed to argument of type %.*s",
                             passedName.length, passedName.start,
                             expectedName.length, expectedName.start);
@@ -216,7 +238,7 @@ static Datatype validateFuncCall(FuncCall* call) {
     // calling function pointer? 
     Datatype calleeExprType = validateExpression(call->funcExpr);
     if (calleeExprType.typeId) {
-        PlangType* type = getType(calleeExprType);
+        PlangType* type = getActualType(calleeExprType);
         if (type->kind == Typekind_FuncPtr) {
             call->base.expressionType = ExprType_FuncPointerCall;
             FuncPtr* funcPtr = getFuncPtr(type->type_funcPtr);
@@ -366,6 +388,16 @@ static Datatype validateExpression(Expression* expr) {
             return validateFuncCall(fc);
         } break;
 
+        case ExprType_Cast: {
+            CastExpression* cast = (CastExpression*)expr;
+            // TODO: is this a valid casting operation
+
+            Datatype type = validateExpression(cast->expr);
+            validateType(cast->castToType);
+
+            return cast->castToType;
+        } break;
+
         { // literals
             case ExprType_Literal_Integer:  return type_int32;
             case ExprType_Literal_Uint:     return type_uint32;
@@ -425,10 +457,7 @@ static void validateScope(Codeblock* scope) {
                         decl->type = assType;
                     } else {
                         validateType(decl->type);
-
-                        if (!typeAssignable(decl->type, assType)) {
-                            error("Type missmatch in declaration.");
-                        }
+                        assertAssignability(decl->type, assType);
                     }
 
                 } else {
@@ -449,9 +478,7 @@ static void validateScope(Codeblock* scope) {
                 Datatype fromType = validateExpression(ass->expr);
 
                 if (toType.typeId && fromType.typeId) {
-                    if (!typeAssignable(toType, fromType)) {
-                        error("Type missmatch in assignment.");
-                    }
+                    assertAssignability(toType, fromType);
                 }
             } break;
 
@@ -594,10 +621,7 @@ static void validateGlobalVar(VarDecl* decl) {
             decl->type = assType;
         } else {
             validateType(decl->type);
-
-            if (!typeAssignable(decl->type, assType)) {
-                error("Type missmatch in global.");
-            }
+            assertAssignability(decl->type, assType);
         }
 
     } else {

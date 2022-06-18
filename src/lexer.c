@@ -86,6 +86,7 @@ u32 lex(char* input) {
             else if (spanEquals(word, "return")) tokType = Tok_Keyword_Return;
             else if (spanEquals(word, "declare")) tokType = Tok_Keyword_Declare;
             else if (spanEquals(word, "type")) tokType = Tok_Keyword_Type;
+            else if (spanEquals(word, "as")) tokType = Tok_Keyword_As;
 
             Token token;
             token.type = tokType;

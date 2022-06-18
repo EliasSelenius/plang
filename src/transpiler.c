@@ -152,6 +152,14 @@ static void transpileExpression(Expression* expr) {
             sbAppend(sb, ")");
         } break;
 
+        case ExprType_Cast: {
+            CastExpression* cast = (CastExpression*)expr;
+            sbAppend(sb, "(");
+            transpileType(cast->castToType);
+            sbAppend(sb, ")");
+            transpileExpression(cast->expr);
+        } break;
+
         case ExprType_Ternary: {
             TernaryExpression* ter = (TernaryExpression*)expr;
             transpileExpression(ter->condition);

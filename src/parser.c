@@ -481,6 +481,16 @@ static Expression* parseLeafExpression() {
         res = (Expression*)unary;
     }
 
+    if (tok(Tok_Keyword_As)) {
+        CastExpression* cast = malloc(sizeof(CastExpression));
+        cast->base.expressionType = ExprType_Cast;
+        cast->base.nodebase.lineNumber = tokens[token_index - 1].line;
+
+        cast->expr = res;
+        cast->castToType = expectType();
+        res = (Expression*)cast;
+    }
+
     return res;
 }
 

@@ -28,6 +28,8 @@
         - nested multi-line comments
         - declare function pointer type in local scope
         - disallow void as variable type in declaration
+        *- hex literal
+        *- type agnostic constants (const pi = 3.14)
 
     InProgress:
         - line numbers in validation errors
@@ -36,6 +38,7 @@
 
 
     DONE list:
+        *- casting (my_var as uint)
         *- better number literal type inference: 10 => int, 10.0 => f32, 10d => f64 ?
         - make void* implicitly castable to any other same degree pointer 
         - return type inference

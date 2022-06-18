@@ -69,6 +69,14 @@ inline PlangType* getTypeById(u32 id) { return &g_Unit->types[id - 1]; }
 inline PlangType* getType(Datatype dt) { return getTypeById(dt.typeId); }
 inline bool typeMustBeInfered(Datatype dt) { return dt.typeId == 0; }
 
+inline PlangType* getActualType(Datatype dt) {
+    PlangType* type = getType(dt);
+    if (type->kind == Typekind_Alias) {
+        if (type->type_aliasedType.typeId) type = getActualType(type->type_aliasedType);
+    }
+    return type;
+}
+
 inline bool typeEquals(Datatype a, Datatype b) {
     return a.typeId == b.typeId && a.numPointers == b.numPointers;
 }
@@ -140,6 +148,7 @@ typedef enum ExprType {
     ExprType_FuncCall,
     ExprType_FuncPointerCall,
     ExprType_Deref,
+    ExprType_Cast
 
 } ExprType;
 
@@ -189,6 +198,12 @@ typedef struct VariableExpression {
     Expression base;
     StrSpan name;
 } VariableExpression;
+
+typedef struct CastExpression {
+    Expression base;
+    Expression* expr;
+    Datatype castToType;
+} CastExpression;
 
 typedef struct TernaryExpression {
     Expression base;
