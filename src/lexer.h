@@ -28,6 +28,7 @@ typedef enum TokenType {
     Tok_Keyword_Declare,
     Tok_Keyword_Type,
     Tok_Keyword_As,
+    Tok_Keyword_Const,
 
     Tok_Integer,
     Tok_Integer_Uint,

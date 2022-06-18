@@ -12,6 +12,7 @@ typedef struct PlangFunction PlangFunction;
 typedef struct FuncDeclaration FuncDeclaration;
 typedef struct PlangStruct PlangStruct;
 typedef struct VarDecl VarDecl;
+typedef struct Constant Constant;
 typedef struct PlangType PlangType;
 
 typedef struct TranslationUnit {
@@ -19,6 +20,7 @@ typedef struct TranslationUnit {
     FuncDeclaration* functionDeclarations; // darray
     PlangStruct* structs; // darray
     VarDecl* globalVariables; // darray
+    Constant* constants; // darray
 
     // darray of all ocuring types, no duplicates
     PlangType* types;
@@ -67,7 +69,7 @@ typedef struct FuncPtr {
 
 inline PlangType* getTypeById(u32 id) { return &g_Unit->types[id - 1]; }
 inline PlangType* getType(Datatype dt) { return getTypeById(dt.typeId); }
-inline bool typeMustBeInfered(Datatype dt) { return dt.typeId == 0; }
+inline bool typeExists(Datatype dt) { return dt.typeId != 0; }
 
 inline PlangType* getActualType(Datatype dt) {
     PlangType* type = getType(dt);
@@ -143,6 +145,7 @@ typedef enum ExprType {
     ExprType_Literal_Bool,
     ExprType_Literal_Null,
     ExprType_Variable,
+    ExprType_Constant,
     ExprType_Alloc,
     ExprType_Ternary,
     ExprType_FuncCall,
@@ -196,7 +199,10 @@ typedef struct DerefOperator {
 
 typedef struct VariableExpression {
     Expression base;
-    StrSpan name;
+    union {
+        StrSpan name;
+        Expression* constExpr;
+    };
 } VariableExpression;
 
 typedef struct CastExpression {
@@ -319,3 +325,9 @@ typedef struct PlangStruct {
     StrSpan name;
     Field* fields; // darray
 } PlangStruct;
+
+
+typedef struct Constant {
+    StrSpan name;
+    Expression* expr;
+} Constant;

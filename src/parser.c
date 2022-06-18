@@ -274,7 +274,7 @@ static bool parseInferableType(Datatype* type) {
 // returns false if the token can not be interpreted as a type
 inline bool parseType(Datatype* type) {
     if (parseInferableType(type)) {
-        if (typeMustBeInfered(*type)) {
+        if (!typeExists(*type)) {
             error("Type cannot be infered here.");
         }
         return true;
@@ -295,7 +295,7 @@ inline Datatype expectInferableType() {
 
 inline Datatype expectType() {
     Datatype res = expectInferableType();
-    if (typeMustBeInfered(res)) error("Type cannot be infered here.");
+    if (!typeExists(res)) error("Type cannot be infered here.");
     return res;
 }
 
@@ -659,7 +659,7 @@ static VarDecl* expectVarDecl() {
     decl->assignmentOrNull = null;
     if (tok(Tok_Assign)) {
         decl->assignmentOrNull = expectExpression();
-    } else if (typeMustBeInfered(decl->type)) {
+    } else if (!typeExists(decl->type)) {
         error("Variable \"%.*s\" must be assigned to, to be type inferred.", decl->name.length, decl->name.start);
     }
 
@@ -877,7 +877,7 @@ static void funcOrGlobal() {
         
         if (tok(Tok_Assign)) {
             decl.assignmentOrNull = expectExpression();
-        } else if (typeMustBeInfered(decl.type)) {
+        } else if (!typeExists(decl.type)) {
             error("Global variable \"%.*s\" must be assigned to, to be type inferred.", decl.name.length, decl.name.start);
         }
 
@@ -930,6 +930,19 @@ u32 parse() {
                 PlangType* ptype = getTypeById(typeId);
                 ptype->kind = Typekind_Alias;
                 ptype->type_aliasedType = type;
+            } break;
+
+            case Tok_Keyword_Const: {
+                u32 lineNum = tokens[token_index].line;
+                token_index++;
+
+                Constant constant;
+                constant.name = identifier();
+                expect(Tok_Assign);
+                constant.expr = expectExpression();
+                semicolon();
+
+                darrayAdd(g_Unit->constants, constant);
             } break;
 
             case Tok_Keyword_Let:

@@ -29,7 +29,6 @@
         - declare function pointer type in local scope
         - disallow void as variable type in declaration
         *- hex literal
-        *- type agnostic constants (const pi = 3.14)
 
     InProgress:
         - line numbers in validation errors
@@ -38,6 +37,7 @@
 
 
     DONE list:
+        *- type agnostic constants (const pi = 3.14)
         *- casting (my_var as uint)
         *- better number literal type inference: 10 => int, 10.0 => f32, 10d => f64 ?
         - make void* implicitly castable to any other same degree pointer 
@@ -165,6 +165,7 @@ int main(int argc, char* argv[]) {
     unit.functionDeclarations = darrayCreate(FuncDeclaration);
     unit.structs = darrayCreate(PlangStruct);
     unit.globalVariables = darrayCreate(VarDecl);
+    unit.constants = darrayCreate(Constant);
     unit.types = darrayCreate(PlangType);
     unit.funcPtrTypes = dyCreate();
     g_Unit = &unit;
@@ -173,6 +174,7 @@ int main(int argc, char* argv[]) {
         addPrimitiveType("void");
         addPrimitiveType("char");
 
+        addPrimitiveType("sbyte");
         addPrimitiveType("byte");
         addPrimitiveType("short");
         addPrimitiveType("ushort");
@@ -206,12 +208,12 @@ int main(int argc, char* argv[]) {
 
     printf("Validate...\n");
     u32 numErrors = validate();
-    { // print type table
+    /*{ // print type table
         u32 len = darrayLength(g_Unit->types);
         for (u32 i = 0; i < len; i++) {
             printf("    %d. %s : %.*s\n", i, TypekindNames[g_Unit->types[i].kind], g_Unit->types[i].name.length, g_Unit->types[i].name.start);
         }
-    }
+    }*/
     if (numErrors) {
         printf("There were %d errors during validation.\nFix errors and try again.\n", numErrors);
         return 0;

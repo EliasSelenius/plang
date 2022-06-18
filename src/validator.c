@@ -132,6 +132,7 @@ static Datatype getDeclaredVariable(StrSpan name) {
         if (spanEqualsSpan(name, g_Unit->globalVariables[i].name)) return g_Unit->globalVariables[i].type;
     }
 
+    
     return type_null;
 }
 
@@ -143,6 +144,15 @@ static Datatype validateVariable(VariableExpression* var) {
     FuncDeclaration* decl = getFuncDecl(var->name);
     if (decl) return ensureFuncPtrExistsFromFuncDeclaration(decl);
 
+    // look for constants
+    u32 len = darrayLength(g_Unit->constants);
+    for (u32 i = 0; i < len; i++) {
+        if (spanEqualsSpan(var->name, g_Unit->constants[i].name)) {
+            var->base.expressionType = ExprType_Constant;
+            var->constExpr = g_Unit->constants[i].expr;
+            return validateExpression(var->constExpr);
+        }
+    }
 
     error("Variable \"%.*s\" is not declared.",
         var->name.length,
@@ -152,30 +162,56 @@ static Datatype validateVariable(VariableExpression* var) {
 
 inline void validateType(Datatype type) {
     PlangType* pt = getType(type);
-    if (pt->kind != Typekind_Invalid) return;
+    if (pt->kind == Typekind_Invalid) {
+        error("Type \"%.*s\" does not exist.", pt->name.length, pt->name.start);
+        return;
+    }
 
-    error("Type \"%.*s\" does not exist.", pt->name.length, pt->name.start);
+    if (pt->kind == Typekind_FuncPtr) {
+        FuncPtr* f = getFuncPtr(pt->type_funcPtr);
+        validateType(f->returnType);
+        for (u32 i = 0; i < f->argCount; i++) {
+            validateType(f->argTypes[i]);
+        }
+    }
 }
 
+static u32 numPointers(Datatype dt) {
+    u32 nump = dt.numPointers;
+    PlangType* type = getType(dt);
+    if (type->kind == Typekind_Alias) {
+        if (typeExists(type->type_aliasedType)) {
+            nump += numPointers(type->type_aliasedType);
+        }
+    }
+
+    return nump;
+}
 
 static bool typeAssignable(Datatype toType, Datatype fromType) {
     if (typeEquals(toType, fromType)) return true;
 
-    if (toType.numPointers == fromType.numPointers) {
+    PlangType* to = getActualType(toType);
+    PlangType* from = getActualType(fromType);
+
+    u32 toPointers = numPointers(toType);
+    u32 fromPointers = numPointers(fromType);
+
+    if (toPointers == fromPointers) {
+        
+        if (to == from) return true;
+        
+        // TODO: these checks must also consider the actual type
         if (toType.typeId == type_uint64.typeId) { // when converting to ulong
             if (fromType.typeId == type_uint32.typeId) return true; // uint to ulong
         }
-    }
 
-    // funcptrs
-    // TODO: what about casting a second-degree funcpointer to a first-degree funcpointer 
-    // if (getActualType(toType)->kind == Typekind_FuncPtr && getActualType(fromType)->kind == Typekind_FuncPtr) return true;
+        if (toPointers) { // if we are a pointer to any degree 
+            // void ptr casting
+            if (toType.typeId == type_void.typeId || fromType.typeId == type_void.typeId) return true;
+        }
+    }
     
-    // void ptr casting
-    if (toType.typeId == type_void.typeId || fromType.typeId == type_void.typeId) {
-        if (toType.numPointers == fromType.numPointers && toType.numPointers) return true;
-    }
-
     return false;
 }
 
@@ -185,7 +221,7 @@ static void assertAssignability(Datatype toType, Datatype fromType) {
         PlangType* to = getType(toType);
         PlangType* from = getType(fromType);
 
-        // TODO: print correct type names. (include pointers and the proper name of a function pointers) 
+        // TODO: print correct type names. (include pointers and the proper name of function pointers) 
         error("Type missmatch. \"%.*s\" is not compatible with \"%.*s\".",
             from->name.length,
             from->name.start,
@@ -205,7 +241,6 @@ static Datatype validateFuncCall(FuncCall* call) {
             u32 expArgLen = func->arguments ? darrayLength(func->arguments) : 0;
 
             if (argLen != expArgLen) {
-                // TODO: print proper types with pointers
                 error("Unexpected number of arguments passed to \"%.*s\", expected %d, but got %d.", 
                     func->name.length, func->name.start,
                     expArgLen, argLen);
@@ -220,14 +255,16 @@ static Datatype validateFuncCall(FuncCall* call) {
                 if (passedArgType.typeId) {
                     Datatype expectedArg = func->arguments[i].type;
 
-                    if (!typeAssignable(expectedArg, passedArgType)) {
-                        StrSpan passedName = getType(passedArgType)->name;
-                        StrSpan expectedName = getType(expectedArg)->name;
-                        // TODO: print proper type names
-                        error("Argument type missmatch, expression of type %.*s cannot be passed to argument of type %.*s",
-                            passedName.length, passedName.start,
-                            expectedName.length, expectedName.start);
-                    }
+                    // if (!typeAssignable(expectedArg, passedArgType)) {
+                    //     StrSpan passedName = getType(passedArgType)->name;
+                    //     StrSpan expectedName = getType(expectedArg)->name;
+                    //     // TODO: print proper type names
+                    //     error("Argument type missmatch, expression of type %.*s cannot be passed to argument of type %.*s",
+                    //         passedName.length, passedName.start,
+                    //         expectedName.length, expectedName.start);
+                    // }
+
+                    assertAssignability(expectedArg, passedArgType);
                 }
             }
             return func->returnType;
@@ -255,9 +292,11 @@ static Datatype validateFuncCall(FuncCall* call) {
 
             for (u32 i = 0; i < argLen; i++) {
                 Datatype t = validateExpression(call->args[i]);
-                if (!typeAssignable(funcPtr->argTypes[i], t)) {
-                    error("Argument type missmatch");
-                }
+                // if (!typeAssignable(funcPtr->argTypes[i], t)) {
+                //     error("Argument type missmatch");
+                // }
+
+                assertAssignability(funcPtr->argTypes[i], t);
             }
 
             return funcPtr->returnType;
@@ -270,7 +309,8 @@ static Datatype validateFuncCall(FuncCall* call) {
 
 
 static Datatype validateExpression(Expression* expr) {
-    switch (expr->expressionType) {        
+    switch (expr->expressionType) {
+        case ExprType_Constant:
         case ExprType_Variable: {
             VariableExpression* var = (VariableExpression*)expr;
             return validateVariable(var);
@@ -453,11 +493,12 @@ static void validateScope(Codeblock* scope) {
                     Datatype assType = validateExpression(decl->assignmentOrNull);
                     if (!assType.typeId) break; // if type could not be determined then we should not continue, act as if this statement does not exist 
 
-                    if (typeMustBeInfered(decl->type)) {
-                        decl->type = assType;
-                    } else {
+                    if (typeExists(decl->type)) {
                         validateType(decl->type);
                         assertAssignability(decl->type, assType);
+                    } else {
+                        // type infer
+                        decl->type = assType;
                     }
 
                 } else {
@@ -521,12 +562,12 @@ static void validateScope(Codeblock* scope) {
 
                 if (!type.typeId) break;
 
-                if (typeMustBeInfered(function->decl.returnType)) {
-                    function->decl.returnType = type;
-                } else {
+                if (typeExists(function->decl.returnType)) {
                     if (!typeAssignable(function->decl.returnType, type)) {
                         error("Return type missmatch in function \"%.*s\".", function->decl.name.length, function->decl.name.start);
                     }
+                } else {
+                    function->decl.returnType = type;
                 }
 
 
@@ -576,7 +617,7 @@ static void validateFunctionDeclaration(FuncDeclaration* decl) {
 static void validateFunction(PlangFunction* func) {
     function = func;
 
-    if (!typeMustBeInfered(func->decl.returnType)) {
+    if (typeExists(func->decl.returnType)) {
         // TODO: factor all validateType calls out into own loop
         validateType(func->decl.returnType);
     }
@@ -592,7 +633,7 @@ static void validateFunction(PlangFunction* func) {
     currentScope = null;
     validateScope(&func->scope);
 
-    if (typeMustBeInfered(func->decl.returnType)) {
+    if (!typeExists(func->decl.returnType)) {
         func->decl.returnType = type_void;
     }
 }
@@ -617,11 +658,11 @@ static void validateGlobalVar(VarDecl* decl) {
         Datatype assType = validateExpression(decl->assignmentOrNull);
         if (!assType.typeId) return; // if type could not be determined then we should not continue.
 
-        if (typeMustBeInfered(decl->type)) {
-            decl->type = assType;
-        } else {
+        if (typeExists(decl->type)) {
             validateType(decl->type);
             assertAssignability(decl->type, assType);
+        } else {
+            decl->type = assType;
         }
 
     } else {
@@ -664,10 +705,19 @@ u32 validate() {
 
             // case Typekind_FuncPtr: {
             //     FuncPtr* fp = getFuncPtr(type->type_funcPtr);
-                
             // } break;
 
             default: break;
+        }
+    }
+
+    for (u32 i = 0; i < typeLen; i++) {
+        PlangType* type = &g_Unit->types[i];
+        if (type->kind == Typekind_Alias) {
+            // type does not exist when its an opaque type
+            if (typeExists(type->type_aliasedType)) {
+                validateType(type->type_aliasedType);
+            }
         }
     }
 

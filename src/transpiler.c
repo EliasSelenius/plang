@@ -30,8 +30,8 @@ StrSpan getTypeCname(Datatype type) {
         case Typekind_Primitive: {
 
             // TODO: this is obviously temporarly hard coded
-            if (type.typeId == 8) return spFrom("signed long long");
-            if (type.typeId == 9) return spFrom("unsigned long long");
+            if (type.typeId == 9) return spFrom("signed long long");
+            if (type.typeId == 10) return spFrom("unsigned long long");
 
         } break;
         case Typekind_Struct: break;
@@ -138,6 +138,11 @@ static void transpileExpression(Expression* expr) {
         case ExprType_Variable: {
             VariableExpression* var = (VariableExpression*)expr;
             sbAppendSpan(sb, var->name);
+        } break;
+
+        case ExprType_Constant: {
+            VariableExpression* var = (VariableExpression*)expr;
+            transpileExpression(var->constExpr);
         } break;
 
         case ExprType_Alloc: {
@@ -351,6 +356,7 @@ void transpile() {
     sbAppend(sb, "\n// types\n");
     sbAppend(sb, "typedef unsigned int uint;\n");
     sbAppend(sb, "typedef unsigned char byte;\n");
+    sbAppend(sb, "typedef signed char sbyte;\n");
     sbAppend(sb, "typedef unsigned short ushort;\n");
 
     u32 typesLen = darrayLength(g_Unit->types);
