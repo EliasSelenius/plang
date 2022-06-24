@@ -30,6 +30,7 @@ inline bool isUpperCaseLetter(char c) { return c >= 'A' && c <= 'Z'; }
 inline bool isLowerCaseLetter(char c) { return c >= 'a' && c <= 'z'; }
 inline bool isLetter(char c) { return isLowerCaseLetter(c) || isUpperCaseLetter(c); }
 inline bool isDigit(char c) { return c >= '0' && c <= '9'; }
+inline bool isHexDigit(char c) { return isDigit(c) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'); }
 
 bool spanEquals(StrSpan span, char* str);
 bool spanEqualsSpan(StrSpan span1, StrSpan span2);

@@ -98,6 +98,26 @@ u32 lex(char* input) {
             continue;
         }
 
+        // hex number
+        if (*cursor == '0' && *(cursor + 1) == 'x') {
+            char* digitStart = cursor;
+            cursor++;
+            while (isHexDigit(*++cursor));
+            cursor--;
+
+            Token token = {
+                .type = Tok_Integer_Uint,
+                .line = current_line,
+                .value = {
+                    .start = digitStart,
+                    .length = cursor - digitStart + 1
+                }
+            };
+            darrayAdd(tokens, token);
+
+            continue;
+        }
+
         // number
         if ( isDigit(*cursor) ||
                 (isDigit(*(cursor + 1)) && *cursor == '-')
