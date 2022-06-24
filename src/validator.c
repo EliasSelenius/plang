@@ -32,6 +32,7 @@ static Datatype type_float64;
 
 Datatype validateExpression(Expression* expr);
 Datatype getDeclaredVariable(StrSpan name);
+bool typeAssignable(Datatype toType, Datatype fromType);
 
 inline void error(char* format, ...) {
     // TODO: better line of not only statements
@@ -188,6 +189,18 @@ static u32 numPointers(Datatype dt) {
     return nump;
 }
 
+static bool funcPtrAssignable(FuncPtr* to, FuncPtr* from) {
+    if (to->argCount != from->argCount) return false;
+
+    if (!typeAssignable(to->returnType, from->returnType)) return false;
+
+    for (u32 i = 0; i < to->argCount; i++) {
+        if (!typeAssignable(to->argTypes[i], from->argTypes[i])) return false;
+    }
+
+    return true;
+}
+
 static bool typeAssignable(Datatype toType, Datatype fromType) {
     if (typeEquals(toType, fromType)) return true;
 
@@ -209,6 +222,13 @@ static bool typeAssignable(Datatype toType, Datatype fromType) {
         if (toPointers) { // if we are a pointer to any degree 
             // void ptr casting
             if (toType.typeId == type_void.typeId || fromType.typeId == type_void.typeId) return true;
+
+            // func ptr casting
+            if (to->kind == Typekind_FuncPtr && from->kind == Typekind_FuncPtr) {
+                FuncPtr* toPtr = getFuncPtr(to->type_funcPtr);
+                FuncPtr* fromPtr = getFuncPtr(from->type_funcPtr);
+                if (funcPtrAssignable(toPtr, fromPtr)) return true;
+            }
         }
     }
     

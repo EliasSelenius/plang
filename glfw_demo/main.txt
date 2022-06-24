@@ -11,7 +11,7 @@ float cam_zoom = 1f;
 
 void loadGL() {
 
-    load_opengl();
+    load_opengl(glfwGetProcAddress);
 
     shaderInfoLog = malloc(shaderInfoLogSize as ulong);
 
