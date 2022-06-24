@@ -1,11 +1,18 @@
 #version 330 core
 
-vec2 verts[] = vec2[3](
-    vec2(0.0, 0.5),
-    vec2(-0.5, -0.5),
-    vec2(0.5, -0.5)
-);
+in vec2 aPos;
+
+uniform float aspect = 9.0 / 16.0;
+uniform float zoom = 1.0;
+uniform vec2 cam_pos = vec2(0.0);
 
 void main() {
-    gl_Position = vec4(verts[gl_VertexID], 0.0, 1.0);
+    vec2 v = aPos;
+    v.x *= aspect;
+
+    v *= zoom;
+
+    v -= cam_pos;
+
+    gl_Position = vec4(v, 0.0, 1.0);
 }

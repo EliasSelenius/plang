@@ -1,21 +1,38 @@
 
-
-const GL_COLOR_BUFFER_BIT = 16384u; // 0x00004000
-const GL_VERTEX_SHADER = 35633u;
-const GL_FRAGMENT_SHADER = 35632u;
-const GL_TRIANGLES = 4u; //0x0004
-const GL_LINK_STATUS = 35714u; // 0x8B82
-
-
 int shaderInfoLogSize = 1024;
 char* shaderInfoLog = null;
 
+GLFWwindow* window;
+uint shader;
+uint vbo;
+
+vec2 cam_pos;
+float cam_zoom = 1f;
 
 void loadGL() {
 
     load_opengl();
 
     shaderInfoLog = malloc(shaderInfoLogSize as ulong);
+
+    glfwSetFramebufferSizeCallback(window, GLFWframebuffersizefunCallback);
+    glfwSetScrollCallback(window, GLFWscrollfunCallback);
+    
+    shader = createShader();
+    glUseProgram(shader);
+
+    glGenBuffers(1, *vbo);
+    glBindBuffer(GL_ARRAY_BUFFER , vbo);
+}
+
+void GLFWframebuffersizefunCallback(GLFWwindow* window, int w, int h) {
+    println("Resize");
+    let aspect = h as float / w;
+    glUniform1f(glGetUniformLocation(shader, "aspect"), aspect);
+}
+
+void GLFWscrollfunCallback(GLFWwindow* window, double x, double y) {
+    cam_zoom += y as float;
 }
 
 uint makeShader(uint program, uint _type, char* code) {
@@ -24,6 +41,7 @@ uint makeShader(uint program, uint _type, char* code) {
     glAttachShader(program, s);
     return s;
 }
+
 
 uint createShader() {
     let program = glCreateProgram();
@@ -55,6 +73,15 @@ uint createShader() {
     return program;
 }
 
+struct vec2 {
+    float x;
+    float y;
+}
+
+int key(char* str) {
+    return @str as int;
+}
+
 let main() {
     if (!glfwInit()) {
         return -1;
@@ -63,7 +90,7 @@ let main() {
 
     let width = 1600;
     let height = 900;
-    let window = glfwCreateWindow(width, height, "Window", null, null);
+    window = glfwCreateWindow(width, height, "Window", null, null);
     if (!window) {
         glfwTerminate();
         return -1;
@@ -73,9 +100,6 @@ let main() {
 
     loadGL();
 
-    let shader = createShader();
-    glUseProgram(shader);
-
     glClearColor(0.0, 1.0, 1.0, 1.0);
 
     let error = glGetError();
@@ -84,6 +108,23 @@ let main() {
     }
 
     while (!glfwWindowShouldClose(window)) {
+
+        vec2 wasd;
+        wasd.x = 0f;
+        wasd.y = 0f;
+        if (glfwGetKey(window, key("W"))) { wasd.y += 1f; }
+        if (glfwGetKey(window, key("S"))) { wasd.y -= 1f; }
+        if (glfwGetKey(window, key("A"))) { wasd.x -= 1f; }
+        if (glfwGetKey(window, key("D"))) { wasd.x += 1f; }
+        // if (wasd.x != 0.0f or wasd.y != 0.0f) {
+        //     vec2Normalize(&wasd);
+        // }
+
+        cam_pos.x += wasd.x * 0.1;
+        cam_pos.y += wasd.y * 0.1;
+
+        glUniform2f(glGetUniformLocation(shader, "cam_pos"), cam_pos.x, cam_pos.y);
+        glUniform1f(glGetUniformLocation(shader, "zoom"), cam_zoom);
 
         int w;
         int h;
