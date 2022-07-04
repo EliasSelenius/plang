@@ -141,6 +141,7 @@ typedef enum ExprType {
     ExprType_Literal_Float,
     ExprType_Literal_Double,
 
+    ExprType_Literal_Char,
     ExprType_Literal_String,
     ExprType_Literal_Bool,
     ExprType_Literal_Null,

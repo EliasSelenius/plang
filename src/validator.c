@@ -22,6 +22,7 @@ static u32 numberOfErrors = 0;
 static Datatype type_void;
 static Datatype type_voidPointer;
 static Datatype type_charPointer;
+static Datatype type_char;
 
 static Datatype type_int32;
 static Datatype type_uint32;
@@ -467,6 +468,7 @@ static Datatype validateExpression(Expression* expr) {
             case ExprType_Literal_Float:    return type_float32;
             case ExprType_Literal_Double:   return type_float64;
 
+            case ExprType_Literal_Char:    return type_char;
             case ExprType_Literal_String:  return type_charPointer;
             case ExprType_Literal_Bool:    return type_int32;
             case ExprType_Literal_Null:    return type_voidPointer;
@@ -695,6 +697,7 @@ u32 validate() {
     type_void           = (Datatype) { .typeId = ensureTypeExistence(spFrom("void")), .numPointers = 0 };
     type_voidPointer    = (Datatype) { .typeId = ensureTypeExistence(spFrom("void")), .numPointers = 1 };
     type_charPointer    = (Datatype) { .typeId = ensureTypeExistence(spFrom("char")), .numPointers = 1 };
+    type_char           = (Datatype) { .typeId = ensureTypeExistence(spFrom("char")), .numPointers = 0 };
 
     type_int32          = (Datatype) { .typeId = ensureTypeExistence(spFrom("int")),  .numPointers = 0 };
     type_uint32         = (Datatype) { .typeId = ensureTypeExistence(spFrom("uint")),  .numPointers = 0 };

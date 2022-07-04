@@ -38,6 +38,7 @@ typedef enum TokenType {
     Tok_Decimal_Float,
     Tok_Decimal_Double,
     Tok_String,
+    Tok_Char,
 
     Tok_Comment,
     Tok_MultiComment,

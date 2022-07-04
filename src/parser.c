@@ -449,6 +449,7 @@ static Expression* parseLeafExpression() {
         case Tok_Decimal_Float:  res = createLiteral(ExprType_Literal_Float); break;
         case Tok_Decimal_Double: res = createLiteral(ExprType_Literal_Double); break;
 
+        case Tok_Char:          res = createLiteral(ExprType_Literal_Char); break;
         case Tok_String:        res = createLiteral(ExprType_Literal_String); break;
         case Tok_Keyword_True:  res = createLiteral(ExprType_Literal_Bool); break;
         case Tok_Keyword_False: res = createLiteral(ExprType_Literal_Bool); break;
@@ -625,10 +626,7 @@ static IfStatement* expectIfStatement() {
     IfStatement* res = malloc(sizeof(IfStatement));
     res->base.statementType = Statement_If;
     res->next = null;
-
-    expect(Tok_OpenParen);
     res->condition = expectExpression();
-    expect(Tok_CloseParen);
 
     expectBlock(&res->scope);
 
@@ -686,9 +684,7 @@ static Statement* expectStatement() {
             WhileStatement* whileStatement = malloc(sizeof(WhileStatement));
             whileStatement->base.statementType = Statement_While;
 
-            expect(Tok_OpenParen);
             whileStatement->condition = expectExpression();
-            expect(Tok_CloseParen);
 
             expectBlock(&whileStatement->scope);
 

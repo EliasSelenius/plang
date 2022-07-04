@@ -180,6 +180,26 @@ u32 lex(char* input) {
             continue;
         }
 
+        // chars
+        if (*cursor == '\'') {
+            char* strStart = cursor++;
+            cursor++;
+            if (*cursor != '\'') {
+                printf("Error: Missing closing single quote. At line %d\n", current_line);
+                numberOfErrors++;                
+            }
+            Token token = {
+                .type = Tok_Char,
+                .line = current_line,
+                .value = {
+                    .start = strStart,
+                    .length = cursor - (strStart - 1)
+                }
+            };
+            darrayAdd(tokens, token);
+            continue;            
+        }
+
         // string
         if (*cursor == '"') {
             char* strStart = cursor;

@@ -23,6 +23,9 @@ void loadGL() {
 
     glGenBuffers(1, *vbo);
     glBindBuffer(GL_ARRAY_BUFFER , vbo);
+    vec2* verts = alloc vec2[3];
+    glBufferData(GL_ARRAY_BUFFER, (8 * 3) as long, verts, GL_STATIC_DRAW);
+
 }
 
 void GLFWframebuffersizefunCallback(GLFWwindow* window, int w, int h) {
@@ -63,7 +66,7 @@ uint createShader() {
         int status;
         glGetProgramiv(program, GL_LINK_STATUS, *status);
 
-        if (status == 0) {
+        if status == 0 {
             int len;
             glGetProgramInfoLog(program, shaderInfoLogSize, *len, shaderInfoLog);
             println(shaderInfoLog);
@@ -78,12 +81,13 @@ struct vec2 {
     float y;
 }
 
-int key(char* str) {
-    return @str as int;
+int key(char c) {
+    return glfwGetKey(window, c as int);
 }
 
+
 let main() {
-    if (!glfwInit()) {
+    if !glfwInit() {
         return -1;
     }
 
@@ -91,7 +95,7 @@ let main() {
     let width = 1600;
     let height = 900;
     window = glfwCreateWindow(width, height, "Window", null, null);
-    if (!window) {
+    if !window {
         glfwTerminate();
         return -1;
     }
@@ -103,19 +107,20 @@ let main() {
     glClearColor(0.0, 1.0, 1.0, 1.0);
 
     let error = glGetError();
-    if (error) {
+    if error {
         printf("%s %d\n", "OpenGL error.", error);
     }
 
-    while (!glfwWindowShouldClose(window)) {
+
+    while !glfwWindowShouldClose(window) {
 
         vec2 wasd;
         wasd.x = 0f;
         wasd.y = 0f;
-        if (glfwGetKey(window, key("W"))) { wasd.y += 1f; }
-        if (glfwGetKey(window, key("S"))) { wasd.y -= 1f; }
-        if (glfwGetKey(window, key("A"))) { wasd.x -= 1f; }
-        if (glfwGetKey(window, key("D"))) { wasd.x += 1f; }
+        if key('W') { wasd.y += 1f; }
+        if key('S') { wasd.y -= 1f; }
+        if key('A') { wasd.x -= 1f; }
+        if key('D') { wasd.x += 1f; }
         // if (wasd.x != 0.0f or wasd.y != 0.0f) {
         //     vec2Normalize(&wasd);
         // }

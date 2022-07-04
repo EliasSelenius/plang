@@ -122,6 +122,7 @@ static void transpileExpression(Expression* expr) {
 
         case ExprType_Literal_Bool:
         case ExprType_Literal_String:
+        case ExprType_Literal_Char:
 
         case ExprType_Literal_Integer:
         case ExprType_Literal_Uint:
