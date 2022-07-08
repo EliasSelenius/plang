@@ -16,7 +16,7 @@
             "type": "lldb",
             "request": "launch",
             "program": "${workspaceFolder}/bin/plang.exe",
-            "args": ["main.txt", "io.txt", "glfw3.txt", "OpenGL.txt", "cflags", "-lglfw3dll.lib"],
+            "args": ["main.pog", "io.txt", "glfw3.txt", "OpenGL.txt", "cflags", "-lglfw3dll.lib"],
             "cwd": "${workspaceFolder}/glfw_demo",
             // "preLaunchTask": "c_project_build"
         },

@@ -10,9 +10,8 @@ void main() {
     vec2 v = aPos;
     v.x *= aspect;
 
-    v *= zoom;
-
     v -= cam_pos;
+    v *= zoom;
 
     gl_Position = vec4(v, 0.0, 1.0);
 }
