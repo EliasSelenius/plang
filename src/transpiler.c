@@ -4,6 +4,7 @@
 #include "darray.h"
 
 #include <stdio.h>
+#include <assert.h>
 
 void transpileBlock(Codeblock* scope);
 void filewrite(const char* filename, char* content);
@@ -115,6 +116,14 @@ static void transpileExpression(Expression* expr) {
             sbAppendSpan(sb, deref->name);
         } break;
 
+        case ExprType_Indexing: {
+            IndexingExpression* ind = (IndexingExpression*)expr;
+            transpileExpression(ind->indexed);
+            sbAppend(sb, "[");
+            transpileExpression(ind->index);
+            sbAppend(sb, "]");
+        } break;
+
         case ExprType_Literal_Null: {
             sbAppend(sb, "0");
         } break;
@@ -184,11 +193,21 @@ static void transpileExpression(Expression* expr) {
 
 }
 
+static void transpileCondition(Expression* cond) {
+    if (isBinaryExpression(cond)) {
+        transpileExpression(cond);
+    } else {
+        sbAppend(sb, "(");
+        transpileExpression(cond);
+        sbAppend(sb, ")");
+    }
+}
+
 static void transpileIfStatement(IfStatement* ifst) {
     if (ifst->condition) {
-        sbAppend(sb, "if (");
-        transpileExpression(ifst->condition);
-        sbAppend(sb, ") ");
+        sbAppend(sb, "if ");
+        transpileCondition(ifst->condition);
+        sbAppend(sb, " ");
     }
 
     transpileBlock(&ifst->scope);
@@ -200,13 +219,25 @@ static void transpileIfStatement(IfStatement* ifst) {
 }
 
 static void transpileVarDecl(VarDecl* decl) {
-    transpileType(decl->type);
-    sbAppend(sb, " ");
-    sbAppendSpan(sb, decl->name);
+    if (decl->base.statementType == Statement_FixedArray_Declaration) {
+        decl->type.numPointers--;
+        transpileType(decl->type);
+        decl->type.numPointers++;
+        sbAppend(sb, " ");
+        sbAppendSpan(sb, decl->name);
 
-    if (decl->assignmentOrNull) {
-        sbAppend(sb, " = ");
+        sbAppend(sb, "[");
         transpileExpression(decl->assignmentOrNull);
+        sbAppend(sb, "]");
+    } else {
+        transpileType(decl->type);
+        sbAppend(sb, " ");
+        sbAppendSpan(sb, decl->name);
+
+        if (decl->assignmentOrNull) {
+            sbAppend(sb, " = ");
+            transpileExpression(decl->assignmentOrNull);
+        }
     }
 
     sbAppend(sb, ";");
@@ -214,6 +245,7 @@ static void transpileVarDecl(VarDecl* decl) {
 
 static void transpileStatement(Statement* statement) {
     switch (statement->statementType) {
+        case Statement_FixedArray_Declaration:
         case Statement_Declaration: {
             VarDecl* decl = (VarDecl*)statement;
             transpileVarDecl(decl);
@@ -243,9 +275,9 @@ static void transpileStatement(Statement* statement) {
         } break;
         case Statement_While: {
             WhileStatement* sta = (WhileStatement*)statement;
-            sbAppend(sb, "while (");
-            transpileExpression(sta->condition);
-            sbAppend(sb, ") ");
+            sbAppend(sb, "while ");
+            transpileCondition(sta->condition);
+            sbAppend(sb, " ");
             transpileBlock(&sta->scope);
         } break;
 

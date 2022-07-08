@@ -467,6 +467,14 @@ static Expression* parseLeafExpression() {
             deref->derefOp = null;
             deref->name = identifier();
             res = (Expression*)deref;
+        } else if (tok(Tok_OpenSquare)) {
+            IndexingExpression* ind = malloc(sizeof(IndexingExpression));
+            ind->base.expressionType = ExprType_Indexing;
+            ind->base.nodebase.lineNumber = tokens[token_index - 1].line;
+            ind->indexed = res;
+            ind->index = expectExpression();
+            expect(Tok_CloseSquare);
+            res = (Expression*)ind;
         } else if (tok(Tok_OpenParen)) {
             FuncCall* call = malloc(sizeof(FuncCall));
             call->base.expressionType = ExprType_FuncCall;
@@ -521,7 +529,7 @@ static Expression* expectExpression() {
     return res;
 }
 
-static u32 operatorPriority(ExprType type) {
+u32 operatorPriority(ExprType type) {
     switch (type) {
 
         case ExprType_BooleanAnd:
@@ -548,10 +556,6 @@ static u32 operatorPriority(ExprType type) {
 }
 inline u32 binaryOperatorPriority(BinaryExpression* expr) {
     return operatorPriority(expr->base.expressionType);
-}
-
-inline bool isBinaryExpression(Expression* expr) {
-    return operatorPriority(expr->expressionType) != 0;
 }
 
 static Expression* expectLeafExpression() {
@@ -648,6 +652,41 @@ static IfStatement* expectIfStatement() {
     return res;
 }
 
+static bool isBasicType() {
+    if (tok(Tok_Word)) {
+        while (tok(Tok_Mul));
+
+        // funcptr
+        if (tok(Tok_OpenParen)) {
+            if (tok(Tok_CloseParen)) return true;
+            
+            do {
+                if (!isBasicType()) return false;
+            } while (tok(Tok_Comma));
+            
+            if (tok(Tok_CloseParen)) return true;
+            else return false;
+        }
+
+        return true;
+    }
+
+    return false;
+}
+
+static u32 peekType() {
+    u32 ti = token_index;
+
+    if (isBasicType()) {
+        u32 res = token_index;
+        token_index = ti;
+        return res;
+    } else {
+        token_index = ti;
+        return 0;
+    }
+}
+
 static VarDecl* expectVarDecl() {
     VarDecl* decl = malloc(sizeof(VarDecl));
     decl->base.statementType = Statement_Declaration;
@@ -724,24 +763,32 @@ static Statement* expectStatement() {
         default: {
 
             { // declaration
-                u32 i = token_index;
-                if (tokens[i++].type == Tok_Word) {
-                    while (tokens[i].type == Tok_Mul) i++;
-                    if (tokens[i++].type == Tok_Word) {
-                        // confirmed declaration
+                u32 postType = peekType();
+                if (postType && tokens[postType].type == Tok_Word) {
+                    // confirmed declaration
 
-                        VarDecl* decl = malloc(sizeof(VarDecl));
-                        decl->base.statementType = Statement_Declaration;
-                        decl->type = expectInferableType();
-                        decl->name = identifier();
+                    VarDecl* decl = malloc(sizeof(VarDecl));
+                    decl->base.statementType = Statement_Declaration;
+                    decl->type = expectInferableType();
+                    decl->name = identifier();
+
+                    // fixed sized arrays
+                    if (tok(Tok_OpenSquare)) {
+                        decl->base.statementType = Statement_FixedArray_Declaration;
+                        Expression* sizeExpr = expectExpression();
+                        expect(Tok_CloseSquare);
+                        decl->assignmentOrNull = sizeExpr;
+                        decl->type.numPointers++;
+                    } else {
                         decl->assignmentOrNull = tok(Tok_Assign) ? expectExpression() : null;
-
-                        semicolon();
-                        res = (Statement*)decl;
-                        break;
                     }
+
+                    semicolon();
+                    res = (Statement*)decl;
+                    break;
                 }
             }
+
 
             Expression* expr = parseExpression();
             if (expr) {
@@ -753,6 +800,7 @@ static Statement* expectStatement() {
                         staExpr->expr = expr;
                         res = (Statement*)staExpr;
                     } break;
+                    case ExprType_Indexing:
                     case ExprType_Unary_ValueOf:
                     case ExprType_Variable:
                     case ExprType_Deref: {
@@ -867,6 +915,7 @@ static void funcOrGlobal() {
     } else {
         // global variable
         VarDecl decl;
+        decl.base.statementType = Statement_Declaration;
         decl.assignmentOrNull = null;
         decl.name = name;
         decl.type = type;

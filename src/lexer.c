@@ -41,6 +41,8 @@ u32 lex(char* input) {
     while (true) {
         cursor++;
 
+
+
         // TODO: this should be a switch statement as it would be faster
         //       ĉi tio devus esti ŝaltilo deklaro ĉar ĝi estus pli rapida
 
@@ -138,7 +140,7 @@ u32 lex(char* input) {
             */
 
             TokenType tt = Tok_Integer;
-            
+
             switch (*cursor) {
                 case 'u': {
                     if (*(cursor + 1) == 'l') {
@@ -183,10 +185,16 @@ u32 lex(char* input) {
         // chars
         if (*cursor == '\'') {
             char* strStart = cursor++;
+
+            if (*cursor > 0x7E || *cursor < 0x20) {
+                printf("Error: Invalid character. At line %d\n", current_line);
+                numberOfErrors++;
+            }
+
             cursor++;
             if (*cursor != '\'') {
                 printf("Error: Missing closing single quote. At line %d\n", current_line);
-                numberOfErrors++;                
+                numberOfErrors++;
             }
             Token token = {
                 .type = Tok_Char,
@@ -197,7 +205,7 @@ u32 lex(char* input) {
                 }
             };
             darrayAdd(tokens, token);
-            continue;            
+            continue;
         }
 
         // string
@@ -244,7 +252,7 @@ u32 lex(char* input) {
 
             continue;
         }
-        
+
         // Multi-line comment
         if (*cursor == '/' && *(cursor + 1) == '*') {
             char* commentStart = cursor;
@@ -270,7 +278,7 @@ u32 lex(char* input) {
 
 
         #define test_char(c, t) if (*cursor == c) { appendToken(t);    continue; }
-        
+
         test_char(',', Tok_Comma);
         test_char('.', Tok_Period);
         test_char(';', Tok_Semicolon);
@@ -299,7 +307,7 @@ u32 lex(char* input) {
         test_op_eq('<', Tok_LessThan, Tok_LessThanOrEqual);
         test_op_eq('>', Tok_GreaterThan, Tok_GreaterThanOrEqual);
 
-        test_op_eq('=', Tok_Assign, Tok_Equals);        
+        test_op_eq('=', Tok_Assign, Tok_Equals);
         test_op_eq('!', Tok_ExclamationMark, Tok_NotEquals);
 
         test_op_eq('+', Tok_Plus, Tok_PlusAssign);
@@ -308,13 +316,11 @@ u32 lex(char* input) {
         test_op_eq('/', Tok_Div, Tok_DivAssign);
 
 
-        
-
 
         // Error: token not recognized
-        printf("Error: Token %c is not recognized. At line %d\n", *cursor, current_line);
+        printf("Error: Unknown byte value encountered %d. At line %d\n", *cursor, current_line);
         numberOfErrors++;
     }
-    
+
     return numberOfErrors;
 }

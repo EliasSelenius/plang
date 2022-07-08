@@ -41,6 +41,7 @@ typedef enum Typekind {
     Typekind_Enum,
     Typekind_Alias,
     Typekind_FuncPtr
+    // Typekind_FixedArray
 } Typekind;
 
 typedef struct Datatype {
@@ -113,7 +114,6 @@ Datatype ensureFuncPtrExistsFromFuncDeclaration(FuncDeclaration* decl);
 
 // ----Expressions---------------------------------------------
 
-
 typedef enum ExprType {
     ExprType_Plus = Tok_Plus,
     ExprType_Minus = Tok_Minus,
@@ -152,6 +152,7 @@ typedef enum ExprType {
     ExprType_FuncCall,
     ExprType_FuncPointerCall,
     ExprType_Deref,
+    ExprType_Indexing,
     ExprType_Cast
 
 } ExprType;
@@ -183,6 +184,12 @@ typedef struct BinaryExpression {
     Expression* left;
     Expression* right;
 } BinaryExpression;
+
+typedef struct IndexingExpression {
+    Expression base;
+    Expression* indexed;
+    Expression* index;
+} IndexingExpression;
 
 typedef struct AllocExpression {
     Expression base;
@@ -220,11 +227,19 @@ typedef struct TernaryExpression {
 } TernaryExpression;
 
 
+u32 operatorPriority(ExprType type);
+
+inline bool isBinaryExpression(Expression* expr) {
+    return operatorPriority(expr->expressionType) != 0;
+}
+
+
 // ----Statements----------------------------------------------
 
 
 typedef enum StatementType {
     Statement_Declaration,
+    Statement_FixedArray_Declaration,
     Statement_Assignment,
     Statement_Expression,
 

@@ -26,17 +26,21 @@
         - omit curl brackets in if/while etc. for single statement block
         - hash identifiers (Tok_Word tokens) for faster string equals and to free the file buffer
         - nested multi-line comments
-        - declare function pointer type in local scope
         - disallow void as variable type in declaration
-        *- char literal
+        *- pre/post increment/decrement
+        - nesting funcptr types inside funcptrs arguments. void(void*(char*), uint) seems to produce a bug
+        *- make assignments be expressions 
 
     InProgress:
         - line numbers in validation errors
         - localy defined functions
-        - function pointers
 
 
     DONE list:
+        *- a way to do stack allocation of arrays
+        - function pointers
+        - declare function pointer type in local scope
+        *- char literal
         *- hex literal
         *- type agnostic constants (const pi = 3.14)
         *- casting (my_var as uint)
@@ -83,14 +87,16 @@ char* fileread(const char* filename, u32* strLength) {
     }
 
     fseek(file, 0, SEEK_END);
-    *strLength = ftell(file);
+    int bufferLength = ftell(file) + 1; // CRLF gurantees there is enough space, but when the file is not in CRLF we add one to get space for null termination
     rewind(file);
 
-    char* res = calloc(*strLength + 1, sizeof(char));
-    fread(res, 1, *strLength, file);
+    char* res = calloc(bufferLength, 1);
+    u64 len = fread(res, 1, bufferLength, file);
+    res[len] = '\0';
+    *strLength = (u32)len;
 
     fclose(file);
-    
+
     return res;
 }
 

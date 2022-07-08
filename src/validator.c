@@ -367,6 +367,21 @@ static Datatype validateExpression(Expression* expr) {
 
         } break;
 
+        case ExprType_Indexing: {
+            IndexingExpression* ind = (IndexingExpression*)expr;
+            Datatype indexedType = validateExpression(ind->indexed);
+            if (indexedType.numPointers == 0) {
+                error("Attempted to dereference something that isnt a pointer.");
+                return type_null;
+            }
+            Datatype indexType = validateExpression(ind->index);
+            // TODO: is indexType a valid integer expression
+
+            Datatype resType = indexedType;
+            resType.numPointers--;
+            return resType;
+        } break;
+
         case ExprType_Unary_Not: {
             UnaryExpression* unary = (UnaryExpression*)expr;
             Datatype type = validateExpression(unary->expr);
@@ -492,6 +507,29 @@ static void validateScope(Codeblock* scope) {
         Statement* sta = scope->statements[i];
         currentStatement = sta;
         switch (sta->statementType) {
+            case Statement_FixedArray_Declaration: {
+                VarDecl* decl = (VarDecl*)sta;
+                
+                // Check wheter there already is a variable with this name
+                if (getDeclaredVariable(decl->name).typeId) {
+                    error("Variable \"%.*s\" is already declared.", 
+                        decl->name.length,
+                        decl->name.start);
+                }
+
+                if (typeExists(decl->type)) {
+                    validateType(decl->type);
+                }
+
+                Datatype asstype = validateExpression(decl->assignmentOrNull);
+                // TODO: is asstype a valid integer expression?
+
+                Variable var;
+                var.name = decl->name;
+                var.type = &decl->type;
+                
+                darrayAdd(variables, var);
+            } break;
             case Statement_Declaration: {
                 VarDecl* decl = (VarDecl*)sta;
 
