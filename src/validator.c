@@ -341,7 +341,7 @@ static Datatype validateExpression(Expression* expr) {
             DerefOperator* deref = (DerefOperator*)expr;
             Datatype type = validateExpression(deref->expr);
             if (!type.typeId) return type_null;
-            
+
             if (type.numPointers > 1) {
                 error("Attempted to dereference a %dth-degree pointer.", type.numPointers);
                 return type_null;
@@ -380,6 +380,16 @@ static Datatype validateExpression(Expression* expr) {
             Datatype resType = indexedType;
             resType.numPointers--;
             return resType;
+        } break;
+
+        case ExprType_Unary_PreIncrement:
+        case ExprType_Unary_PostIncrement:
+        case ExprType_Unary_PreDecrement:
+        case ExprType_Unary_PostDecrement: {
+            UnaryExpression* unary = (UnaryExpression*)expr;
+            Datatype type = validateExpression(unary->expr);
+            // TODO: can type be incremented/decremented?
+            return type;
         } break;
 
         case ExprType_Unary_Not: {
@@ -509,7 +519,7 @@ static void validateScope(Codeblock* scope) {
         switch (sta->statementType) {
             case Statement_FixedArray_Declaration: {
                 VarDecl* decl = (VarDecl*)sta;
-                
+
                 // Check wheter there already is a variable with this name
                 if (getDeclaredVariable(decl->name).typeId) {
                     error("Variable \"%.*s\" is already declared.", 
@@ -527,7 +537,7 @@ static void validateScope(Codeblock* scope) {
                 Variable var;
                 var.name = decl->name;
                 var.type = &decl->type;
-                
+
                 darrayAdd(variables, var);
             } break;
             case Statement_Declaration: {
@@ -539,14 +549,14 @@ static void validateScope(Codeblock* scope) {
                         decl->name.length,
                         decl->name.start);
                 }
-                
+
                 /*
                     assign
 
                     yes       o     o
                     no        x     o
 
-                    infer    yes    no      
+                    infer    yes    no
                 */
 
                 if (decl->assignmentOrNull) {
@@ -568,7 +578,7 @@ static void validateScope(Codeblock* scope) {
                 Variable var;
                 var.name = decl->name;
                 var.type = &decl->type;
-                
+
                 darrayAdd(variables, var);
 
             } break;

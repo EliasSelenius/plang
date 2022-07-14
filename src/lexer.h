@@ -71,6 +71,9 @@ typedef enum TokenType {
     Tok_Mul,
     Tok_Div,
 
+    Tok_PlusPlus,
+    Tok_MinusMinus,
+
     Tok_PlusAssign,
     Tok_MinusAssign,
     Tok_MulAssign,

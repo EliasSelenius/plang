@@ -57,7 +57,7 @@ static void transpileFuncCall(FuncCall* func) {
     sbAppend(sb, "(");
     if (func->args) {
         transpileExpression(func->args[0]);
-        
+
         u32 len = darrayLength(func->args);
         for (u32 i = 1; i < len; i++) {
             sbAppend(sb, ", ");
@@ -70,11 +70,25 @@ static void transpileFuncCall(FuncCall* func) {
 static void transpileExpression(Expression* expr) {
 
     switch (expr->expressionType) {
-        
+
         { // Binary & Unary Expressions
-        
+
+            case ExprType_Unary_PostIncrement: {
+                UnaryExpression* unary = (UnaryExpression*)expr;
+                transpileExpression(unary->expr);
+                sbAppend(sb, "++");
+            } break;
+            case ExprType_Unary_PostDecrement: {
+                UnaryExpression* unary = (UnaryExpression*)expr;
+                transpileExpression(unary->expr);
+                sbAppend(sb, "--");
+            } break;
+
+
             char* operator = null;
 
+            case ExprType_Unary_PreIncrement: operator = "++"; goto unary;
+            case ExprType_Unary_PreDecrement: operator = "--"; goto unary;
             case ExprType_Unary_Not:       operator = "!"; goto unary;
             case ExprType_Unary_AddressOf: operator = "&"; goto unary;
             case ExprType_Unary_ValueOf:   operator = "*"; goto unary;

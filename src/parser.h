@@ -129,6 +129,10 @@ typedef enum ExprType {
     ExprType_BooleanAnd = Tok_Keyword_And,
     ExprType_BooleanOr = Tok_Keyword_Or,
 
+    ExprType_Unary_PreIncrement,
+    ExprType_Unary_PostIncrement,
+    ExprType_Unary_PreDecrement,
+    ExprType_Unary_PostDecrement,
     ExprType_Unary_Not,
     ExprType_Unary_AddressOf,
     ExprType_Unary_ValueOf,

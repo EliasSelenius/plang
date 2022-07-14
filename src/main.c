@@ -27,9 +27,9 @@
         - hash identifiers (Tok_Word tokens) for faster string equals and to free the file buffer
         - nested multi-line comments
         - disallow void as variable type in declaration
-        *- pre/post increment/decrement
         - nesting funcptr types inside funcptrs arguments. void(void*(char*), uint) seems to produce a bug
         *- make assignments be expressions 
+        - "plang build" CLI. build all .pog files in directory. let output exe be named the name of the directory
 
     InProgress:
         - line numbers in validation errors
@@ -37,6 +37,7 @@
 
 
     DONE list:
+        *- pre/post increment/decrement
         *- a way to do stack allocation of arrays
         - function pointers
         - declare function pointer type in local scope

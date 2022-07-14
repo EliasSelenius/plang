@@ -405,6 +405,8 @@ static Expression* parseLeafExpression() {
         case Tok_Mul: unary = createUnaryExpr(ExprType_Unary_AddressOf); break;
         case Tok_At: unary = createUnaryExpr(ExprType_Unary_ValueOf); break;
         case Tok_ExclamationMark: unary = createUnaryExpr(ExprType_Unary_Not); break;
+        case Tok_PlusPlus: unary = createUnaryExpr(ExprType_Unary_PreIncrement); break;
+        case Tok_MinusMinus: unary = createUnaryExpr(ExprType_Unary_PreDecrement); break;
         default: break;
     }
 
@@ -457,7 +459,7 @@ static Expression* parseLeafExpression() {
 
         default: return null;
     }
-    
+
     while (true) {
         if (tok(Tok_Period)) {
             DerefOperator* deref = malloc(sizeof(DerefOperator));
@@ -486,6 +488,20 @@ static Expression* parseLeafExpression() {
     }
 
     if (unary) {
+        unary->expr = res;
+        res = (Expression*)unary;
+    }
+
+    if (tok(Tok_PlusPlus)) {
+        UnaryExpression* unary = malloc(sizeof(UnaryExpression));
+        unary->base.expressionType = ExprType_Unary_PostIncrement;
+        unary->base.nodebase.lineNumber = tokens[token_index-1].line;
+        unary->expr = res;
+        res = (Expression*)unary;
+    } else if (tok(Tok_MinusMinus)) {
+        UnaryExpression* unary = malloc(sizeof(UnaryExpression));
+        unary->base.expressionType = ExprType_Unary_PostDecrement;
+        unary->base.nodebase.lineNumber = tokens[token_index-1].line;
         unary->expr = res;
         res = (Expression*)unary;
     }
@@ -793,7 +809,11 @@ static Statement* expectStatement() {
             Expression* expr = parseExpression();
             if (expr) {
                 switch (expr->expressionType) {
-                    case ExprType_FuncCall: {                        
+                    case ExprType_Unary_PreIncrement:
+                    case ExprType_Unary_PostIncrement:
+                    case ExprType_Unary_PreDecrement:
+                    case ExprType_Unary_PostDecrement:
+                    case ExprType_FuncCall: {
                         StatementExpression* staExpr = malloc(sizeof(StatementExpression));
                         staExpr->base.statementType = Statement_Expression;
                         staExpr->base.nodebase.lineNumber = expr->nodebase.lineNumber;

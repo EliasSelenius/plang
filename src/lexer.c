@@ -310,8 +310,26 @@ u32 lex(char* input) {
         test_op_eq('=', Tok_Assign, Tok_Equals);
         test_op_eq('!', Tok_ExclamationMark, Tok_NotEquals);
 
-        test_op_eq('+', Tok_Plus, Tok_PlusAssign);
-        test_op_eq('-', Tok_Minus, Tok_MinusAssign);
+        if (*cursor == '+') {
+            switch (*(cursor + 1)) {
+                case '+': appendTokenLength(Tok_PlusPlus, 2); cursor++; break;
+                case '=': appendTokenLength(Tok_PlusAssign, 2); cursor++; break;
+                default: appendToken(Tok_Plus); break;
+            }
+            continue;
+        }
+
+        if (*cursor == '-') {
+            switch (*(cursor + 1)) {
+                case '-': appendTokenLength(Tok_MinusMinus, 2); cursor++; break;
+                case '=': appendTokenLength(Tok_MinusAssign, 2); cursor++; break;
+                default: appendToken(Tok_Minus); break;
+            }
+            continue;
+        }
+
+        // test_op_eq('+', Tok_Plus, Tok_PlusAssign);
+        // test_op_eq('-', Tok_Minus, Tok_MinusAssign);
         test_op_eq('*', Tok_Mul, Tok_MulAssign);
         test_op_eq('/', Tok_Div, Tok_DivAssign);
 
