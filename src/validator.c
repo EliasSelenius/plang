@@ -212,9 +212,9 @@ static bool typeAssignable(Datatype toType, Datatype fromType) {
     u32 fromPointers = numPointers(fromType);
 
     if (toPointers == fromPointers) {
-        
+
         if (to == from) return true;
-        
+
         // TODO: these checks must also consider the actual type
         if (toType.typeId == type_uint64.typeId) { // when converting to ulong
             if (fromType.typeId == type_uint32.typeId) return true; // uint to ulong
@@ -270,7 +270,7 @@ static Datatype validateFuncCall(FuncCall* call) {
 
                 return func->returnType;
             }
-            
+
             for (u32 i = 0; i < argLen; i++) {
                 Datatype passedArgType = validateExpression(call->args[i]);
                 if (passedArgType.typeId) {
@@ -293,7 +293,7 @@ static Datatype validateFuncCall(FuncCall* call) {
     }
 
 
-    // calling function pointer? 
+    // calling function pointer?
     Datatype calleeExprType = validateExpression(call->funcExpr);
     if (calleeExprType.typeId) {
         PlangType* type = getActualType(calleeExprType);
@@ -430,14 +430,14 @@ static Datatype validateExpression(Expression* expr) {
             BinaryExpression* bop = (BinaryExpression*)expr;
             Datatype leftType = validateExpression(bop->left);
             Datatype rightType = validateExpression(bop->right);
-            
+
             if (leftType.typeId && rightType.typeId) {
                 // TODO: is a valid operator operands pair?
             } else return type_null;
 
             return leftType;
         } break;
-        
+
         case ExprType_Alloc: {
             AllocExpression* alloc = (AllocExpression*)expr;
             validateType(alloc->type);
@@ -455,7 +455,13 @@ static Datatype validateExpression(Expression* expr) {
             type.numPointers++;
             return type;
         } break;
-        
+
+        case ExprType_Sizeof: {
+            SizeofExpression* sof = (SizeofExpression*)expr;
+            validateType(sof->type);
+            return type_uint32;
+        } break;
+
         case ExprType_Ternary: {
             TernaryExpression* ter = (TernaryExpression*)expr;
             Datatype conditionType = validateExpression(ter->condition);

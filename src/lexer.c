@@ -47,8 +47,8 @@ u32 lex(char* input) {
         //       ĉi tio devus esti ŝaltilo deklaro ĉar ĝi estus pli rapida
 
         if (*cursor == '\0') break;
-        
-        
+
+
         { // handle whitespace
             if (*cursor == ' ') continue;
 
@@ -90,6 +90,13 @@ u32 lex(char* input) {
             else if (spanEquals(word, "type")) tokType = Tok_Keyword_Type;
             else if (spanEquals(word, "as")) tokType = Tok_Keyword_As;
             else if (spanEquals(word, "const")) tokType = Tok_Keyword_Const;
+            else if (spanEquals(word, "for")) tokType = Tok_Keyword_For;
+            else if (spanEquals(word, "switch")) tokType = Tok_Keyword_Switch;
+            else if (spanEquals(word, "case")) tokType = Tok_Keyword_Case;
+            else if (spanEquals(word, "goto")) tokType = Tok_Keyword_Goto;
+            else if (spanEquals(word, "with")) tokType = Tok_Keyword_With;
+            else if (spanEquals(word, "namespace")) tokType = Tok_Keyword_Namespace;
+            else if (spanEquals(word, "sizeof")) tokType = Tok_Keyword_Sizeof;
 
             Token token;
             token.type = tokType;
@@ -121,7 +128,7 @@ u32 lex(char* input) {
         }
 
         // number
-        if ( isDigit(*cursor) ||
+        if ( isDigit(*cursor) ||            // TODO: dont tokenize minus as part of the number token. it fucks up things like (list[i-1]) the minus token needs to be sepperate from the number
                 (isDigit(*(cursor + 1)) && *cursor == '-')
            ) {
             // integer part

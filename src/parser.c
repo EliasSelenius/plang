@@ -435,6 +435,22 @@ static Expression* parseLeafExpression() {
             res = (Expression*)alloc;
         } break;
 
+        case Tok_Keyword_Sizeof: {
+            SizeofExpression* sof = malloc(sizeof(SizeofExpression*));
+            sof->base.expressionType = ExprType_Sizeof;
+            sof->base.nodebase.lineNumber = tokens[token_index].line;
+            token_index++;
+
+            bool mustClose = false;
+            if (tok(Tok_OpenParen)) mustClose = true;
+            sof->type = expectType();
+            if (mustClose) if (!tok(Tok_CloseParen)) {
+                error("Expected a closing parenthesis.");
+            }
+
+            res = (Expression*)sof;
+        } break;
+
         case Tok_OpenParen: {
             token_index++;
             Expression* expr = expectExpression();

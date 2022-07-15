@@ -157,7 +157,8 @@ typedef enum ExprType {
     ExprType_FuncPointerCall,
     ExprType_Deref,
     ExprType_Indexing,
-    ExprType_Cast
+    ExprType_Cast,
+    ExprType_Sizeof
 
 } ExprType;
 
@@ -222,6 +223,11 @@ typedef struct CastExpression {
     Expression* expr;
     Datatype castToType;
 } CastExpression;
+
+typedef struct SizeofExpression {
+    Expression base;
+    Datatype type;
+} SizeofExpression;
 
 typedef struct TernaryExpression {
     Expression base;

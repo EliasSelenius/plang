@@ -37,6 +37,7 @@
 
 
     DONE list:
+        *- sizeof()
         *- pre/post increment/decrement
         *- a way to do stack allocation of arrays
         - function pointers

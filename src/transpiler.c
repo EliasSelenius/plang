@@ -181,6 +181,13 @@ static void transpileExpression(Expression* expr) {
             sbAppend(sb, ")");
         } break;
 
+        case ExprType_Sizeof: {
+            SizeofExpression* sof = (SizeofExpression*)expr;
+            sbAppend(sb, "sizeof(");
+            transpileType(sof->type);
+            sbAppend(sb, ")");
+        } break;
+
         case ExprType_Cast: {
             CastExpression* cast = (CastExpression*)expr;
             sbAppend(sb, "(");
