@@ -11,7 +11,7 @@ void main() {
     v.x *= aspect;
 
     v -= cam_pos;
-    v *= zoom;
+    v /= zoom;
 
     gl_Position = vec4(v, 0.0, 1.0);
 }

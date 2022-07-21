@@ -941,10 +941,11 @@ static void funcOrGlobal() {
         // function
 
         PlangFunction func;
+        func.overload = 0;
         func.decl.returnType = type;
         func.decl.name = name;
         func.decl.arguments = expectFuncArgList();
-        
+
         expectBlock(&func.scope);
         darrayAdd(g_Unit->functions, func);
 
@@ -955,7 +956,7 @@ static void funcOrGlobal() {
         decl.assignmentOrNull = null;
         decl.name = name;
         decl.type = type;
-        
+
         if (tok(Tok_Assign)) {
             decl.assignmentOrNull = expectExpression();
         } else if (!typeExists(decl.type)) {
@@ -994,7 +995,7 @@ u32 parse() {
                         break;
                     }
                 }
-                
+
                 darrayAdd(g_Unit->structs, stru);
 
             } break;
@@ -1041,7 +1042,7 @@ u32 parse() {
 
                 darrayAdd(g_Unit->functionDeclarations, funcDecl);
             } break;
-            
+
             default: {
                 unexpectedToken();
             } break;

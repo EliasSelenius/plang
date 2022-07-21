@@ -134,12 +134,12 @@ static Datatype getDeclaredVariable(StrSpan name) {
         if (spanEqualsSpan(name, g_Unit->globalVariables[i].name)) return g_Unit->globalVariables[i].type;
     }
 
-    
+
     return type_null;
 }
 
 static Datatype validateVariable(VariableExpression* var) {
-    
+
     Datatype type = getDeclaredVariable(var->name);
     if (type.typeId) return type;
 
@@ -232,7 +232,7 @@ static bool typeAssignable(Datatype toType, Datatype fromType) {
             }
         }
     }
-    
+
     return false;
 }
 
@@ -252,79 +252,98 @@ static void assertAssignability(Datatype toType, Datatype fromType) {
 }
 
 static Datatype validateFuncCall(FuncCall* call) {
-    
-    // calling a declared function?
-    if (call->funcExpr->expressionType == ExprType_Variable) {
-        VariableExpression* var = (VariableExpression*)call->funcExpr;
-        FuncDeclaration* func = getFuncDecl(var->name);
-        if (func) {
-            u32 argLen = call->args ? darrayLength(call->args) : 0;
-            u32 expArgLen = func->arguments ? darrayLength(func->arguments) : 0;
+    call->overload = 0;
 
-            if (argLen != expArgLen) {
+    // validate passed arguments
+    u32 passedArgumentsLength = call->args ? darrayLength(call->args) : 0;
+    Datatype passedArguments[passedArgumentsLength];
+    for (u32 i = 0; i < passedArgumentsLength; i++) passedArguments[i] = validateExpression(call->args[i]);
+
+
+    if (call->funcExpr->expressionType != ExprType_Variable) goto funcptrPart;
+    StrSpan name = ((VariableExpression*)call->funcExpr)->name;
+
+
+    // look for function with possible overloads
+    u32 len = darrayLength(g_Unit->functions);
+    for (u32 i = 0; i < len; i++) {
+        PlangFunction* func = &g_Unit->functions[i];
+        if (!spanEqualsSpan(name, func->decl.name)) continue;
+
+        u32 expectedArgumentLength = func->decl.arguments ? darrayLength(func->decl.arguments) : 0;
+
+        if (func->overload) {
+            if (passedArgumentsLength != expectedArgumentLength) continue;
+
+            bool compat = true;
+            for (u32 i = 0; i < passedArgumentsLength; i++) {
+                if (!typeAssignable(func->decl.arguments[i].type, passedArguments[i])) {compat = false; break;}
+            }
+
+            if (compat) {
+                call->overload = func->overload;
+                return func->decl.returnType;
+            } else continue;
+
+        } else {
+            if (passedArgumentsLength != expectedArgumentLength) {
                 error("Unexpected number of arguments passed to \"%.*s\", expected %d, but got %d.", 
-                    func->name.length, func->name.start,
-                    expArgLen, argLen);
-
-                for (u32 i = 0; i < argLen; i++) validateExpression(call->args[i]);
-
-                return func->returnType;
+                    name.length, name.start,
+                    expectedArgumentLength, passedArgumentsLength);
+                return func->decl.returnType;
             }
 
-            for (u32 i = 0; i < argLen; i++) {
-                Datatype passedArgType = validateExpression(call->args[i]);
-                if (passedArgType.typeId) {
-                    Datatype expectedArg = func->arguments[i].type;
-
-                    // if (!typeAssignable(expectedArg, passedArgType)) {
-                    //     StrSpan passedName = getType(passedArgType)->name;
-                    //     StrSpan expectedName = getType(expectedArg)->name;
-                    //     // TODO: print proper type names
-                    //     error("Argument type missmatch, expression of type %.*s cannot be passed to argument of type %.*s",
-                    //         passedName.length, passedName.start,
-                    //         expectedName.length, expectedName.start);
-                    // }
-
-                    assertAssignability(expectedArg, passedArgType);
-                }
+            for (u32 i = 0; i < passedArgumentsLength; i++) {
+                if (passedArguments[i].typeId) assertAssignability(func->decl.arguments[i].type, passedArguments[i]);
             }
-            return func->returnType;
+
+            return func->decl.returnType;
         }
     }
 
+    // function declarations
+    len = darrayLength(g_Unit->functionDeclarations);
+    for (u32 i = 0; i < len; i++) {
+        FuncDeclaration* decl = &g_Unit->functionDeclarations[i];
+        if (!spanEqualsSpan(name, decl->name)) continue;
 
-    // calling function pointer?
-    Datatype calleeExprType = validateExpression(call->funcExpr);
-    if (calleeExprType.typeId) {
-        PlangType* type = getActualType(calleeExprType);
+        u32 expectedArgumentLength = decl->arguments ? darrayLength(decl->arguments) : 0;
+
+        if (passedArgumentsLength != expectedArgumentLength) continue;
+
+        bool compat = true;
+        for (u32 i = 0; i < passedArgumentsLength; i++) {
+            if (!passedArguments[i].typeId) continue;
+            if (!typeAssignable(decl->arguments[i].type, passedArguments[i])) {compat = false; break;}
+        }
+
+        if (compat) return decl->returnType;
+    }
+
+    funcptrPart:
+    Datatype calleeType = validateExpression(call->funcExpr);
+    if (calleeType.typeId) {
+        PlangType* type = getActualType(calleeType);
         if (type->kind == Typekind_FuncPtr) {
             call->base.expressionType = ExprType_FuncPointerCall;
-            FuncPtr* funcPtr = getFuncPtr(type->type_funcPtr);
+            FuncPtr* funcptr = getFuncPtr(type->type_funcPtr);
 
-            u32 argLen = call->args ? darrayLength(call->args) : 0;
-
-            if (argLen != funcPtr->argCount) {
-                error("Unexpected number of arguments passed to function pointer, expected %d, but got %d.", funcPtr->argCount, argLen);
-
-                for (u32 i = 0; i < argLen; i++) validateExpression(call->args[i]);
-
-                return funcPtr->returnType;
+            if (passedArgumentsLength != funcptr->argCount) {
+                error("Unexpected number of arguments passed to function pointer, expected %d, but got %d.",
+                    funcptr->argCount, passedArgumentsLength);
+                return funcptr->returnType;
             }
 
-            for (u32 i = 0; i < argLen; i++) {
-                Datatype t = validateExpression(call->args[i]);
-                // if (!typeAssignable(funcPtr->argTypes[i], t)) {
-                //     error("Argument type missmatch");
-                // }
-
-                assertAssignability(funcPtr->argTypes[i], t);
+            for (u32 i = 0; i < passedArgumentsLength; i++) {
+                if (passedArguments[i].typeId) assertAssignability(funcptr->argTypes[i], passedArguments[i]);
             }
 
-            return funcPtr->returnType;
+            return funcptr->returnType;
         }
     }
 
-    error("Function does not exist.");
+
+    error("Function \"%.*s\" was not found.", name.length, name.start);
     return type_null;
 }
 
@@ -352,7 +371,7 @@ static Datatype validateExpression(Expression* expr) {
             StrSpan name = getType(type)->name;
             PlangStruct* stru = getStructByName(name);
             if (stru) {
-                Field* field = getField(stru, deref->name);                
+                Field* field = getField(stru, deref->name);
                 if (!field) {
                     error("Field \"%.*s\" does not exist on type \"%.*s\".",
                             field->name.length, field->name.start,
@@ -681,7 +700,7 @@ static void validateScope(Codeblock* scope) {
 }
 
 static void validateFunctionDeclaration(FuncDeclaration* decl) {
-    
+
     validateType(decl->returnType);
 
     if (decl->arguments) {
@@ -824,13 +843,38 @@ u32 validate() {
         validateFunctionDeclaration(&g_Unit->functionDeclarations[i]);
     }
 
+    // check for function overloads
+    u32 funcLen = darrayLength(g_Unit->functions);
+    for (u32 i = 0; i < funcLen; i++) {
+        PlangFunction* f1 = &g_Unit->functions[i];
+        if (f1->overload) continue;
+
+        u32 overloadCount = 1;
+
+        // for each subsequent function
+        for (u32 j = i + 1; j < funcLen; j++) {
+            PlangFunction* f2 = &g_Unit->functions[j];
+
+            if (!spanEqualsSpan(f1->decl.name, f2->decl.name)) continue;
+
+            f2->overload = ++overloadCount;
+
+            printf("Function overload detected \"%.*s\"\n", f1->decl.name.length, f1->decl.name.start);
+
+            // TODO: check if it is a valid overload pair
+            // if (darrayLength(f1->arguments) == darrayLength(f2->arguments)) { }
+        }
+
+        if (overloadCount != 1) f1->overload = 1;
+    }
+
     // validate functions
     variables = darrayCreate(Variable);
-    u32 funcLen = darrayLength(g_Unit->functions);
     for (u32 i = 0; i < funcLen; i++) {
         validateFunction(&g_Unit->functions[i]);
     }
     darrayDelete(variables);
+
 
     return numberOfErrors;
 }

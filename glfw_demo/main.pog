@@ -11,6 +11,67 @@ uint vao;
 vec2 cam_pos;
 float cam_zoom = 1f;
 
+Mesh* meshes;
+
+declare double sin(double t);
+declare double cos(double t);
+declare float sinf(float t);
+declare float cosf(float t);
+
+const PI = 3.141599;
+const TAU = PI * 2;
+
+let clamp(float t, float min, float max) {
+    return t < min ? min : t > max ? max : t;
+}
+
+struct Mesh {
+    uint vao;
+    uint vbo;
+    uint ebo;
+
+    int elementsCount;
+}
+
+void drawMesh(uint vao, int elementsCount) {
+    glBindVertexArray(vao);
+    glDrawElements(GL_TRIANGLES, elementsCount, GL_UNSIGNED_INT, null);
+    glBindVertexArray(0u);
+}
+
+void drawMesh(Mesh mesh) {
+    drawMesh(mesh.vao, mesh.elementsCount);
+}
+
+void drawMeshVertices(Mesh mesh, int vertsCount) {
+    glBindVertexArray(mesh.vao);
+    glDrawArrays(GL_POINTS, 0, vertsCount);
+    glBindVertexArray(0u);
+}
+
+Mesh createMesh(vec2* verts, uint vertsCount, uint* inds, uint indsCount) {
+    Mesh mesh;
+    mesh.elementsCount = indsCount as int;
+
+    glGenVertexArrays(1, *mesh.vao);
+    glBindVertexArray(mesh.vao);
+
+    glGenBuffers(1, *mesh.vbo);
+    glBindBuffer(GL_ARRAY_BUFFER , mesh.vbo);
+    glBufferData(GL_ARRAY_BUFFER, (sizeof(vec2) * vertsCount) as long, verts, GL_STATIC_DRAW);
+
+    glGenBuffers(1, *mesh.ebo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh.ebo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, (sizeof(uint) * indsCount) as long, inds, GL_STATIC_DRAW);
+
+    glEnableVertexAttribArray(0u);
+    glVertexAttribPointer(0u, 2, GL_FLOAT, false as byte, 8, null);
+
+    glBindVertexArray(0u);
+
+    return mesh;
+}
+
 void loadGL() {
 
     load_opengl(glfwGetProcAddress);
@@ -23,40 +84,38 @@ void loadGL() {
     shader = createShader();
     glUseProgram(shader);
 
-    glPointSize(100.0);
+    glPointSize(30.0);
 
+    meshes = malloc(6u * sizeof Mesh);
+}
 
-    {
-        glGenVertexArrays(1, *vao);
-        glBindVertexArray(vao);
+Mesh genPlanet() {
+    let res = 36;
+    uint vertsCount = res as uint + 1u;
+    vec2 verts[vertsCount];
 
-        glGenBuffers(1, *vbo);
-        glBindBuffer(GL_ARRAY_BUFFER , vbo);
-
-        vec2 verts[3];
-        verts[0].x = 0.5;
-        verts[0].y = 0.5;
-        verts[1].x = -0.5;
-        verts[1].y = 0.7;
-        verts[2].x = 0.1;
-        verts[2].y = -0.3;
-        glBufferData(GL_ARRAY_BUFFER, (8 * 3) as long, verts, GL_STATIC_DRAW);
-
-        glGenBuffers(1, *ebo);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-
-        uint inds[3];
-        inds[0] = 0u;
-        inds[1] = 1u;
-        inds[2] = 2u;
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, (4 * 3) as long, inds, GL_STATIC_DRAW);
-
-
-        glEnableVertexAttribArray(0u);
-        glVertexAttribPointer(0u, 2, GL_FLOAT, false as byte, 8, null);
-
-        glBindVertexArray(0u);
+    int i = 1;
+    while i < res + 1 {
+        float angle = (i as float) * TAU / res;
+        verts[i].x = cosf(angle);
+        verts[i].y = sinf(angle);
+        ++i;
     }
+
+    uint indsCount = (res as uint) * 3u;
+    uint inds[indsCount];
+    i = 0;
+    uint v = 1u;
+    while i < indsCount {
+        inds[i] = 0u;
+        inds[i+1] = v++;
+        inds[i+2] = v;
+        i += 3;
+    }
+
+    inds[i - 1] = 1u;
+
+    return createMesh(verts, vertsCount, inds, indsCount);
 }
 
 void GLFWframebuffersizefunCallback(GLFWwindow* window, int w, int h) {
@@ -66,7 +125,8 @@ void GLFWframebuffersizefunCallback(GLFWwindow* window, int w, int h) {
 }
 
 void GLFWscrollfunCallback(GLFWwindow* window, double x, double y) {
-    cam_zoom += (y as float) * 0.1;
+    cam_zoom -= cam_zoom * (y as float) * 0.1;
+    cam_zoom = clamp(cam_zoom, 1.0, 100.0);
 }
 
 uint makeShader(uint program, uint _type, char* code) {
@@ -145,6 +205,8 @@ let main() {
     }
 
 
+    let planet = genPlanet();
+
     while !glfwWindowShouldClose(window) {
 
         vec2 wasd;
@@ -158,8 +220,8 @@ let main() {
         //     vec2Normalize(&wasd);
         // }
 
-        cam_pos.x += wasd.x * 0.1;
-        cam_pos.y += wasd.y * 0.1;
+        cam_pos.x += wasd.x * 0.05 * cam_zoom;
+        cam_pos.y += wasd.y * 0.05 * cam_zoom;
 
         glUniform2f(glGetUniformLocation(shader, "cam_pos"), cam_pos.x, cam_pos.y);
         glUniform1f(glGetUniformLocation(shader, "zoom"), cam_zoom);
@@ -171,8 +233,7 @@ let main() {
 
         glClear(GL_COLOR_BUFFER_BIT);
 
-        glBindVertexArray(vao);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
+        drawMesh(planet);
 
         glfwSwapBuffers(window);
         glfwPollEvents();

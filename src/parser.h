@@ -329,6 +329,13 @@ typedef struct FuncDeclaration {
 
 typedef struct PlangFunction {
     FuncDeclaration decl;
+
+    /* overload
+        value of zero means this function is not overloaded.
+        a value of N means this function is the N'th function in the set of all its siblings. Where N > 0
+    */
+    u32 overload;
+
     Codeblock scope;
 } PlangFunction;
 
@@ -336,6 +343,7 @@ typedef struct FuncCall {
     Expression base;
     Expression* funcExpr;
     Expression** args; // darray of Expression pointers
+    u32 overload;
 } FuncCall;
 
 // ----Struct----------------------------------------------

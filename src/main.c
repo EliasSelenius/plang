@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdlib.h>
 
+
 #include "types.h"
 #include "parser.h"
 #include "lexer.h"
@@ -10,11 +11,9 @@
 #include "essh-string.h"
 
 
-
 /*
 
     TODO list:
-        - function overloads
         - localy defined structs
         *- clasic for loop: for (int i = 0; i < 10; i++)
         - for in range loop: for (i in 0..10)
@@ -34,6 +33,7 @@
     InProgress:
         - line numbers in validation errors
         - localy defined functions
+        - function overloads
 
 
     DONE list:
@@ -149,8 +149,15 @@ void addPrimitiveType(char* name) {
     darrayAdd(g_Unit->types, newType);
 }
 
+
 // plang glfw.txt cflags -g -lglfw3dll.lib
 int main(int argc, char* argv[]) {
+
+
+    // printAllPogFiles();
+    // printf("\n\n\n\n");
+    // printDir();
+    // return 0;
 
     if (argc == 1) {
         printf("Insufficent arguments.\n");

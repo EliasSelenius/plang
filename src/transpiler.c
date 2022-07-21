@@ -52,16 +52,22 @@ static void transpileType(Datatype type) {
     }
 }
 
-static void transpileFuncCall(FuncCall* func) {
-    transpileExpression(func->funcExpr);
-    sbAppend(sb, "(");
-    if (func->args) {
-        transpileExpression(func->args[0]);
+static char getCharFromU32(u32 num) {
+    // TODO: do better than this...
+    return '0' + num;
+}
 
-        u32 len = darrayLength(func->args);
+static void transpileFuncCall(FuncCall* call) {
+    transpileExpression(call->funcExpr);
+    if (call->overload) sbAppendChar(sb, getCharFromU32(call->overload));
+    sbAppend(sb, "(");
+    if (call->args) {
+        transpileExpression(call->args[0]);
+
+        u32 len = darrayLength(call->args);
         for (u32 i = 1; i < len; i++) {
             sbAppend(sb, ", ");
-            transpileExpression(func->args[i]);
+            transpileExpression(call->args[i]);
         }
     }
     sbAppend(sb, ")");
@@ -341,10 +347,11 @@ static void transpileBlock(Codeblock* scope) {
     sbAppend(sb, "}");
 }
 
-static void transpileFunctionSignature(FuncDeclaration* func) {
+static void transpileFunctionSignature(FuncDeclaration* func, u32 overload) {
     transpileType(func->returnType);
     sbAppend(sb, " ");
     sbAppendSpan(sb, func->name);
+    if (overload) sbAppendChar(sb, getCharFromU32(overload));
     sbAppend(sb, "(");
     if (func->arguments) {
 
@@ -367,7 +374,7 @@ static void transpileFunctionSignature(FuncDeclaration* func) {
 }
 
 static void transpileFunction(PlangFunction* func) {
-    transpileFunctionSignature(&func->decl);
+    transpileFunctionSignature(&func->decl, func->overload);
     sbAppend(sb, " ");
     transpileBlock(&func->scope);
     newline();
@@ -377,7 +384,7 @@ static void transpileStruct(PlangStruct* stru) {
     sbAppend(sb, "typedef struct ");
     sbAppendSpan(sb, stru->name);
     sbAppend(sb, " {");
-    
+
     tabing++;
 
     u32 len = darrayLength(stru->fields);
@@ -475,17 +482,17 @@ void transpile() {
     for (u32 i = 0; i < functionsLen; i++) {
         PlangFunction* func = &g_Unit->functions[i];
 
-        transpileFunctionSignature(&func->decl);
+        transpileFunctionSignature(&func->decl, func->overload);
         sbAppend(sb, ";\n");
     }
 
     u32 declsLength = darrayLength(g_Unit->functionDeclarations);
     for (u32 i = 0; i < declsLength; i++) {
-        transpileFunctionSignature(&g_Unit->functionDeclarations[i]);
+        transpileFunctionSignature(&g_Unit->functionDeclarations[i], 0);
         sbAppend(sb, ";\n");
     }
 
-    
+
     sbAppend(sb, "\n// Globals\n");
     u32 globLen = darrayLength(g_Unit->globalVariables);
     for (u32 i = 0; i < globLen; i++) {
@@ -495,7 +502,7 @@ void transpile() {
 
     sbAppend(sb, "\n// Implementations\n");
 
-    for (u32 i = 0; i < functionsLen; i++) {     
+    for (u32 i = 0; i < functionsLen; i++) {
         PlangFunction* func = &g_Unit->functions[i];
         transpileFunction(func);
     }
