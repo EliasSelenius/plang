@@ -27,7 +27,7 @@ type GLFWdropfun = void(GLFWwindow*, int, /*const*/ char**);
 type GLFWmonitorfun = void(GLFWmonitor*, int);
 type GLFWjoystickfun = void(int, int);
 
-struct GLFWvidmode { 
+struct GLFWvidmode {
     // The width, in screen coordinates, of the video mode.
     int width;
     // The height, in screen coordinates, of the video mode.
@@ -42,7 +42,7 @@ struct GLFWvidmode {
     int refreshRate;
 }
 
-struct GLFWgammaramp { 
+struct GLFWgammaramp {
     // An array of value describing the response of the red channel.
     ushort* red;
     // An array of value describing the response of the green channel.
@@ -53,7 +53,7 @@ struct GLFWgammaramp {
     uint size;
 }
 
-struct GLFWimage { 
+struct GLFWimage {
     // The width, in pixels, of this image.
     int width;
     // The height, in pixels, of this image.
@@ -62,7 +62,7 @@ struct GLFWimage {
     byte* pixels;
 }
 
-struct GLFWgamepadstate { 
+struct GLFWgamepadstate {
     // The states of each [gamepad button](@ref gamepad_buttons), `GLFW_PRESS` or `GLFW_RELEASE`.
     // byte buttons[15];
     // The states of each [gamepad axis](@ref gamepad_axes), in the range -1.0 to 1.0 inclusive.

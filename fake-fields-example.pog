@@ -1,0 +1,32 @@
+
+
+struct rect {
+    float w, h;
+    float area -> w * h;
+}
+
+struct Rigidbody {
+    vec2 vel;
+    float mass;
+}
+
+Rigidbody[] rbs;
+
+struct Entity {
+    uint id;
+    with Rigidbody rb -> rbs[id];
+    vec2 pos;
+}
+
+void update(with Entity* e) {
+    e.pos += e.vel;
+}
+
+int* ptr;
+
+struct Test {
+    int i -> @ptr;
+}
+
+Test t;
+t.i = 0;

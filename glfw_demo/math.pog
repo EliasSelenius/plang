@@ -1,0 +1,69 @@
+
+
+declare double sin(double t);
+declare double cos(double t);
+declare float sinf(float t);
+declare float cosf(float t);
+
+const Pi = 3.14159265359;
+const Tau = Pi * 2.0;
+
+float random(float seed) {
+    return sinf(seed * 9999999.0);
+}
+
+// float random(int seed) {
+//     seed = (seed << 13) ^ seed;
+//     return (1.0f - ((seed * (seed * seed * 15731 + 789221) + 1376312589) & 0x7fffffff) / 1073741824.0f);
+// }
+
+// // TODO: the 'quality' of randomnes is not tested here
+// float random(int seed_x, int seed_y) {
+//     return random(seed_x + seed_y * 57);
+// }
+
+let clamp(float t, float min, float max) {
+    return t < min ? min : t > max ? max : t;
+}
+
+
+struct vec2 {
+    float x;
+    float y;
+}
+
+vec2 sub(vec2 a, vec2 b) {
+    vec2 r;
+    r.x = a.x - b.x;
+    r.y = a.y - b.y;
+    return r;
+}
+
+vec2 add(vec2 a, vec2 b) {
+    vec2 r;
+    r.x = a.x + b.x;
+    r.y = a.y + b.y;
+    return r;
+}
+
+vec2 mul(vec2 a, vec2 b) {
+    vec2 r;
+    r.x = a.x * b.x;
+    r.y = a.y * b.y;
+    return r;
+}
+
+vec2 mul(vec2 a, float s) {
+    vec2 r = a;
+    r.x *= s;
+    r.y *= s;
+    return r;
+}
+
+float dot(vec2 a, vec2 b) {
+    return a.x * b.x + a.y * b.y;
+}
+
+float sqlength(vec2 a) {
+    return dot(a, a);
+}
