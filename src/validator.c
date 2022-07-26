@@ -374,7 +374,7 @@ static Datatype validateExpression(Expression* expr) {
                 Field* field = getField(stru, deref->name);
                 if (!field) {
                     error("Field \"%.*s\" does not exist on type \"%.*s\".",
-                            field->name.length, field->name.start,
+                            deref->name.length, deref->name.start,
                             stru->name.length, stru->name.start);
                     return type_null;
                 }

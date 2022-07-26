@@ -29,6 +29,8 @@
         - nesting funcptr types inside funcptrs arguments. void(void*(char*), uint) seems to produce a bug
         *- make assignments be expressions 
         - "plang build" CLI. build all .pog files in directory. let output exe be named the name of the directory
+        - contextual inclusion (the with keyword on struct fields)
+        - member-like functions (the with keyword on function arguments)
 
     InProgress:
         - line numbers in validation errors

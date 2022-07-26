@@ -144,7 +144,7 @@ static StrSpan constructNameForFuncPtr(FuncPtr* funcPtr) {
 }
 
 Datatype ensureFuncPtrExistsFromFuncDeclaration(FuncDeclaration* decl) {
-    
+
     u32 oldLength = g_Unit->funcPtrTypes->length; // remember the old length in case we have a duplicate
     u32 fpRef = dyReserve(&g_Unit->funcPtrTypes, sizeof(FuncPtr));
 
@@ -196,7 +196,7 @@ static Datatype parseFuncPtrArgs(Datatype retType) {
         u32 fpRef = dyReserve(&g_Unit->funcPtrTypes, sizeof(FuncPtr));
 
         // arguments
-        u32 argCount = 0;        
+        u32 argCount = 0;
         Datatype argType;
         if (parseType(&argType)) {
             argCount++;
@@ -210,16 +210,16 @@ static Datatype parseFuncPtrArgs(Datatype retType) {
                 *(Datatype*)(&g_Unit->funcPtrTypes->bytes[argRef]) = argType;
             }
         }
-        
+
         FuncPtr* funcPtr = getFuncPtr(fpRef);
         funcPtr->returnType = retType;
         funcPtr->argCount = argCount;
 
         expect(Tok_CloseParen);
-        
+
         Datatype funcType;
         funcType.numPointers = 1;
-        
+
         { // look if the function pointer is a duplicate
             u32 i = 0;
             while (i < oldLength) {
@@ -263,7 +263,7 @@ static bool parseInferableType(Datatype* type) {
         type->numPointers = 0;
         while (tok(Tok_Mul)) type->numPointers++;
 
-        *type = parseFuncPtrArgs(*type);        
+        *type = parseFuncPtrArgs(*type);
 
         return true;
     }
@@ -604,7 +604,7 @@ inline bool isOperator(TokenType type) {
         || (type >= Tok_LessThan && type <= Tok_Equals)
         || (type == Tok_Keyword_And)
         || (type == Tok_Keyword_Or)
-        || (type == ExprType_NotEquals);
+        || (type == Tok_NotEquals);
 }
 
 static BinaryExpression* appendBinaryExpression(BinaryExpression* target, BinaryExpression* addition) {
@@ -691,11 +691,11 @@ static bool isBasicType() {
         // funcptr
         if (tok(Tok_OpenParen)) {
             if (tok(Tok_CloseParen)) return true;
-            
+
             do {
                 if (!isBasicType()) return false;
             } while (tok(Tok_Comma));
-            
+
             if (tok(Tok_CloseParen)) return true;
             else return false;
         }
@@ -786,7 +786,7 @@ static Statement* expectStatement() {
             ((ReturnStatement*)res)->returnExpr = parseExpression();
             semicolon();
         } break;
-        
+
         case Tok_Keyword_Let: {
             res = (Statement*)expectVarDecl();
             semicolon();
