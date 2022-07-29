@@ -31,6 +31,7 @@
         - "plang build" CLI. build all .pog files in directory. let output exe be named the name of the directory
         - contextual inclusion (the with keyword on struct fields)
         - member-like functions (the with keyword on function arguments)
+        *- unary minus operation
 
     InProgress:
         - line numbers in validation errors
@@ -117,7 +118,9 @@ void filewrite(const char* filename, char* content) {
 }
 
 
-void addFile(char* filename) {
+void addFile(char* filename, char* extension) {
+    printf("Adding %s\n", filename);
+
     u32 filesize = 0;
     char* fileContent = fileread(filename, &filesize);
     if (!fileContent) return;
@@ -143,6 +146,7 @@ void addFile(char* filename) {
 
 void startPerf();
 i64 endPerf();
+void foreachFile(char* ext, void (*func)(char* filename, char* extension));
 
 void addPrimitiveType(char* name) {
     PlangType newType;
@@ -152,21 +156,19 @@ void addPrimitiveType(char* name) {
 }
 
 
+static void printFileName(char* filename,  char* extension) {
+    printf("%s (%s)\n", filename, extension);
+}
+
 // plang glfw.txt cflags -g -lglfw3dll.lib
 int main(int argc, char* argv[]) {
 
+    // if (argc == 1) {
+    //     printf("Insufficent arguments.\n");
+    //     return 0;
+    // }
 
-    // printAllPogFiles();
-    // printf("\n\n\n\n");
-    // printDir();
-    // return 0;
-
-    if (argc == 1) {
-        printf("Insufficent arguments.\n");
-        return 0;
-    }
-
-    // TODO: use higher default capacity here, to minimize the amount of reallocs 
+    // TODO: use higher default capacity here, to minimize the amount of reallocs
     tokens = darrayCreate(Token);
 
     static char* TypekindNames[] = {
@@ -207,15 +209,17 @@ int main(int argc, char* argv[]) {
 
     startPerf();
 
+    foreachFile(".pog", addFile);
+
     u32 i = 1;
     while (i < argc) {
         char* arg = argv[i++];
         if (spanEquals(spFrom("cflags"), arg)) break;
         printf("    %d. %s\n", i, arg);
-        addFile(arg);
+        addFile(arg, null);
     }
 
-    
+
     StringBuilder sb = sbCreate();
     sbAppend(&sb, "clang output.g.c -o output.exe ");
 

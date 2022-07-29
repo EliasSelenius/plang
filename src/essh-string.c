@@ -82,6 +82,15 @@ bool spanEqualsSpan(StrSpan span1, StrSpan span2) {
     return true;
 }
 
+bool cstrEquals(char* a, char* b) {
+    u32 i = 0;
+    while (true) {
+        if (a[i] != b[i]) return false;
+        if (a[i] == '\0') return true;
+        i++;
+    }
+}
+
 // ----------StringBuilder----------------
 
 StringBuilder sbCreateWithCapacity(u32 initialCapacity) {

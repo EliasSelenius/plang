@@ -1,9 +1,11 @@
 
 
 declare double sin(double t);
-declare double cos(double t);
 declare float sinf(float t);
+declare double cos(double t);
 declare float cosf(float t);
+declare double sqrt(double x);
+declare float sqrtf(float x);
 
 const Pi = 3.14159265359;
 const Tau = Pi * 2.0;
@@ -60,10 +62,23 @@ vec2 mul(vec2 a, float s) {
     return r;
 }
 
+
 float dot(vec2 a, vec2 b) {
     return a.x * b.x + a.y * b.y;
 }
 
 float sqlength(vec2 a) {
     return dot(a, a);
+}
+
+float length(vec2 a) {
+    return sqrtf(dot(a, a));
+}
+
+vec2 normalize(vec2 a) {
+    return mul(a, 1.0 / length(a));
+}
+
+vec2 reflect(vec2 a, vec2 normal) {
+    return add(a, mul(normal, dot(a, normal) * -2.0));
 }

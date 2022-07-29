@@ -100,16 +100,30 @@ void updateEntity(Entity* entity) {
 
     uint i = 0u;
     while i < planetsCount {
-        Planet* p = *planets[i++];
-        vec2 a = sub(entity.pos, p.pos);
-        float sqdist = sqlength(a);
-        if (sqdist <= p.radius * p.radius) { // NOTE: we can neglect the entitys radius because its always 1.0
-            println("Intersection");
-            entity.pos = add(entity.pos, a);
-            entity.vel.x = 0f;
-            entity.vel.y = 0f;
+        Planet* planet = *planets[i++];
+
+        vec2 diff = sub(entity.pos, planet.pos);
+        vec2 normal = normalize(diff);
+
+        float intersection = length(diff) - planet.radius; // NOTE: we can neglect the entitys radius because its always 1.0
+
+        float planetArea = Pi * planet.radius * planet.radius;
+        float planetMass = planetArea; // assuming the same uniform mass-density on all planets.
+        vec2 gravity = mul(normal, planetMass / sqlength(diff) * -0.003);
+        entity.vel = add(entity.vel, gravity);
+
+        if (intersection <= 0.0) {
+
+            vec2 correction = mul(normal, intersection * -1.0);
+            entity.pos = add(entity.pos, correction);
+
+            // entity.vel = reflect(entity.vel, normal); // bounce
+            entity.vel = add(entity.vel, mul(normal, dot(entity.vel, normal) * -1.0)); // cancel velocity in direction of surface
         }
     }
+
+    cam_pos = player.pos;
+    glUniform2f(glGetUniformLocation(shader, "cam_pos"), cam_pos.x, cam_pos.y);
 }
 
 void load() {
@@ -170,13 +184,13 @@ let main() {
         //     vec2Normalize(&wasd);
         // }
 
+        if key('F') { player.vel.x = 0.0; player.vel.y = 0.0; }
+
         player.vel = add(player.vel, mul(wasd, 0.01));
-        cam_pos = player.pos;
 
         // cam_pos.x += wasd.x * 0.05 * cam_zoom;
         // cam_pos.y += wasd.y * 0.05 * cam_zoom;
 
-        glUniform2f(glGetUniformLocation(shader, "cam_pos"), cam_pos.x, cam_pos.y);
         glUniform1f(glGetUniformLocation(shader, "zoom"), cam_zoom);
 
         int w;
@@ -187,6 +201,7 @@ let main() {
         glClear(GL_COLOR_BUFFER_BIT);
 
         float time = glfwGetTime() as float;
+        // time = 0.0;
         int i = 0;
         while i < planetsCount {
             Planet* planet = *planets[i++];
@@ -196,6 +211,7 @@ let main() {
             drawPlanet(planet);
         }
 
+
         i = 0;
         while i < entitiesLength {
             let e = *entities[i];
@@ -204,6 +220,7 @@ let main() {
             drawMesh(e.mesh);
             i++;
         }
+
 
         glfwSwapBuffers(window);
         glfwPollEvents();

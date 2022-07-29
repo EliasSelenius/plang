@@ -12,15 +12,10 @@ void transpileExpression(Expression* expr);
 
 static StringBuilder* sb;
 static u32 tabing = 0;
-static char* tabs[] = {
-    "",
-    "    ",
-    "        ",
-    "            "
-};
 inline void newline() {
     sbAppend(sb, "\n");
-    sbAppend(sb, tabs[tabing]);
+    u32 t = tabing;
+    while (t--) sbAppend(sb, "    ");
 }
 
 StrSpan getTypeCname(Datatype type) {
@@ -404,7 +399,6 @@ static void transpileStruct(PlangStruct* stru) {
     sbAppend(sb, ";\n");
 }
 
-
 void transpile() {
     // TODO: use a higer initial capacity for the string builder
     StringBuilder builder = sbCreate();
@@ -474,7 +468,8 @@ void transpile() {
     sbAppend(sb, "\n// Structs\n");
     u32 structsLen = darrayLength(g_Unit->structs);
     for (u32 i = 0; i < structsLen; i++) {
-        transpileStruct(&g_Unit->structs[i]);
+        PlangStruct* stru = &g_Unit->structs[i];
+        transpileStruct(stru);
     }
 
     sbAppend(sb, "\n// Forward declarations\n");

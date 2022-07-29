@@ -30,7 +30,7 @@ char* fileread(char* filename) {
     fseek(stream, 0, 2); // 2 = SEEK_END
     ulong len = ftell(stream);
     rewind(stream);
-    
+
     char* res = calloc(len + 1, 1ul);
     fread(res, 1ul, len, stream);
 

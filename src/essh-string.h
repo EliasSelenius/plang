@@ -35,7 +35,7 @@ inline bool isHexDigit(char c) { return isDigit(c) || (c >= 'a' && c <= 'f') || 
 bool spanEquals(StrSpan span, char* str);
 bool spanEqualsSpan(StrSpan span1, StrSpan span2);
 
-
+bool cstrEquals(char* a, char* b);
 
 // --------StringBuilder------------------
 
