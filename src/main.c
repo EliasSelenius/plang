@@ -31,7 +31,7 @@
         - "plang build" CLI. build all .pog files in directory. let output exe be named the name of the directory
         - contextual inclusion (the with keyword on struct fields)
         - member-like functions (the with keyword on function arguments)
-        *- unary minus operation
+        *- goto statement and labels
 
     InProgress:
         - line numbers in validation errors
@@ -40,6 +40,9 @@
 
 
     DONE list:
+        *- unary minus operation
+        *- modulus operator
+        *- bitwise operators
         *- sizeof()
         *- pre/post increment/decrement
         *- a way to do stack allocation of arrays

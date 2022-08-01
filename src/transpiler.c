@@ -5,6 +5,7 @@
 
 #include <stdio.h>
 #include <assert.h>
+#include <stdlib.h> // malloc
 
 void transpileBlock(Codeblock* scope);
 void filewrite(const char* filename, char* content);
@@ -90,14 +91,23 @@ static void transpileExpression(Expression* expr) {
 
             case ExprType_Unary_PreIncrement: operator = "++"; goto unary;
             case ExprType_Unary_PreDecrement: operator = "--"; goto unary;
-            case ExprType_Unary_Not:       operator = "!"; goto unary;
-            case ExprType_Unary_AddressOf: operator = "&"; goto unary;
-            case ExprType_Unary_ValueOf:   operator = "*"; goto unary;
+            case ExprType_Unary_Not:          operator = "!"; goto unary;
+            case ExprType_Unary_AddressOf:    operator = "&"; goto unary;
+            case ExprType_Unary_ValueOf:      operator = "*"; goto unary;
+            case ExprType_Unary_Negate:       operator = "-"; goto unary;
+            case ExprType_Unary_BitwiseNot:   operator = "~"; goto unary;
+
+            case ExprType_Bitwise_And: operator = " & "; goto binary;
+            case ExprType_Bitwise_Or: operator = " | "; goto binary;
+            case ExprType_Bitwise_Xor: operator = " ^ "; goto binary;
+            case ExprType_Bitwise_Lshift: operator = " << "; goto binary;
+            case ExprType_Bitwise_Rshift: operator = " >> "; goto binary;
 
             case ExprType_Plus:  operator = " + "; goto binary;
             case ExprType_Minus: operator = " - "; goto binary;
             case ExprType_Mul:   operator = " * "; goto binary;
             case ExprType_Div:   operator = " / "; goto binary;
+            case ExprType_Mod:   operator = " % "; goto binary;
 
             case ExprType_Less:          operator = " < ";  goto binary;
             case ExprType_Greater:       operator = " > ";  goto binary;
@@ -210,6 +220,17 @@ static void transpileExpression(Expression* expr) {
         case ExprType_FuncCall: {
             FuncCall* fc = (FuncCall*)expr;
             transpileFuncCall(fc);
+        } break;
+
+        case ExprType_Parenthesized: {
+            ParenthesizedExpression* p = (ParenthesizedExpression*)expr;
+            if (isBinaryExpression(p->innerExpr)) {
+                transpileExpression(p->innerExpr);
+            } else {
+                sbAppend(sb, "(");
+                transpileExpression(p->innerExpr);
+                sbAppend(sb, ")");
+            }
         } break;
     }
 
@@ -399,6 +420,22 @@ static void transpileStruct(PlangStruct* stru) {
     sbAppend(sb, ";\n");
 }
 
+static u32 countStructDependencies(PlangStruct* stru) {
+    u32 deps = 0;
+    u32 fieldsLen = darrayLength(stru->fields);
+    for (u32 f = 0; f < fieldsLen; f++) {
+        Datatype datatype = stru->fields[f].type;
+        if (datatype.numPointers) continue;
+        PlangType* type = getActualType(datatype);
+        if (type->kind != Typekind_Struct) continue;
+
+        deps++;
+        deps += countStructDependencies(type->type_struct);
+    }
+
+    return deps;
+}
+
 void transpile() {
     // TODO: use a higer initial capacity for the string builder
     StringBuilder builder = sbCreate();
@@ -465,11 +502,34 @@ void transpile() {
         }
     }
 
-    sbAppend(sb, "\n// Structs\n");
-    u32 structsLen = darrayLength(g_Unit->structs);
-    for (u32 i = 0; i < structsLen; i++) {
-        PlangStruct* stru = &g_Unit->structs[i];
-        transpileStruct(stru);
+    { // structs
+        sbAppend(sb, "\n// Structs\n");
+        u32 structsLen = darrayLength(g_Unit->structs);
+        u32* deps = malloc(sizeof(u32) * structsLen);
+
+        for (u32 i = 0; i < structsLen; i++) {
+            PlangStruct* stru = &g_Unit->structs[i];
+
+            deps[i] = countStructDependencies(stru);
+        }
+
+        u32 dep = 0;
+        u32 transpiled = 0;
+        while (transpiled < structsLen) {
+            for (u32 i = 0; i < structsLen; i++) {
+                if (deps[i] == dep) {
+                    PlangStruct* stru = &g_Unit->structs[i];
+                    char buffer[16];
+                    sprintf_s(buffer, 16, "// deps: %d\n", deps[i]);
+                    sbAppend(sb, buffer);
+                    transpileStruct(stru);
+                    transpiled++;
+                }
+            }
+            dep++;
+        }
+
+        free(deps);
     }
 
     sbAppend(sb, "\n// Forward declarations\n");

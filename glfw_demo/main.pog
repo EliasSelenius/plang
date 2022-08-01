@@ -24,7 +24,7 @@ Entity* appendEntity(Entity e) {
 
 void GLFWscrollfunCallback(GLFWwindow* window, double x, double y) {
     cam_zoom -= cam_zoom * (y as float) * 0.1;
-    cam_zoom = clamp(cam_zoom, 1.0, 100.0);
+    cam_zoom = clamp(cam_zoom, 1.0, 10000.0);
 }
 
 Mesh genCircle(int res, float radius) {
@@ -64,7 +64,7 @@ Planet genPlanet(float radius, float dist, float year) {
     p.yearDuration = year;
     p.mesh = genCircle(36 * radius, radius);
     p.rot = 0.0;
-    p.orbitOffset = Pi * random(dist);
+    p.orbitOffset = Pi * random(dist as int);
 
     return p;
 }
@@ -109,8 +109,8 @@ void updateEntity(Entity* entity) {
 
         float planetArea = Pi * planet.radius * planet.radius;
         float planetMass = planetArea; // assuming the same uniform mass-density on all planets.
-        vec2 gravity = mul(normal, planetMass / sqlength(diff) * -0.003);
-        entity.vel = add(entity.vel, gravity);
+        vec2 gravity = mul(normal, planetMass / sqlength(diff) * -0.000003);
+        // entity.vel = add(entity.vel, gravity);
 
         if (intersection <= 0.0) {
 
@@ -132,7 +132,10 @@ void load() {
 
     uint i = 0u;
     while i < planetsCount {
-        Planet p = genPlanet(2.0 + random(i as float), 14.0 + 6.0 * i, 100.0 + 20.0 * random(2.0 * i as float + 100.0));
+        float r = 20.0 + random(i as int);
+        Planet p = genPlanet(r,
+                            70.0 + r * 30.0 * i,
+                            100.0 + 20.0 * random(2 * i + 100));
         planets[i++] = p;
     }
 
@@ -157,6 +160,7 @@ let main() {
         glfwTerminate();
         return -1;
     }
+
 
     glfwMakeContextCurrent(window);
 

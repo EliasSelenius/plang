@@ -57,10 +57,13 @@ typedef enum TokenType {
     Tok_QuestionMark,
     Tok_ExclamationMark,
     Tok_At,
-    Tok_Tilda,
+    Tok_Tilde,
     Tok_Ampersand,
     Tok_Pipe,
     Tok_Caret,
+
+    Tok_LeftShift,
+    Tok_RightShift,
 
     Tok_OpenCurl,
     Tok_CloseCurl,
@@ -81,6 +84,7 @@ typedef enum TokenType {
     Tok_Minus,
     Tok_Mul,
     Tok_Div,
+    Tok_Mod,
 
     Tok_PlusPlus,
     Tok_MinusMinus,
@@ -88,7 +92,8 @@ typedef enum TokenType {
     Tok_PlusAssign,
     Tok_MinusAssign,
     Tok_MulAssign,
-    Tok_DivAssign
+    Tok_DivAssign,
+    Tok_ModAssign
 
 } TokenType;
 

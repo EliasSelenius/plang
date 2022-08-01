@@ -10,14 +10,14 @@ declare float sqrtf(float x);
 const Pi = 3.14159265359;
 const Tau = Pi * 2.0;
 
-float random(float seed) {
-    return sinf(seed * 9999999.0);
-}
-
-// float random(int seed) {
-//     seed = (seed << 13) ^ seed;
-//     return (1.0f - ((seed * (seed * seed * 15731 + 789221) + 1376312589) & 0x7fffffff) / 1073741824.0f);
+// float random(float seed) {
+    // return sinf(seed * 9999999.0);
 // }
+
+float random(int seed) {
+    seed = (seed << 13) ^ seed;
+    return (1.0f - ((seed * (seed * seed * 15731 + 789221) + 1376312589) & 0x7fffffff) / 1073741824.0f);
+}
 
 // // TODO: the 'quality' of randomnes is not tested here
 // float random(int seed_x, int seed_y) {

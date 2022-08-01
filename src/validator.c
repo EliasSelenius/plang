@@ -401,6 +401,20 @@ static Datatype validateExpression(Expression* expr) {
             return resType;
         } break;
 
+        case ExprType_Unary_Negate: {
+            UnaryExpression* unary = (UnaryExpression*)expr;
+            Datatype type = validateExpression(unary->expr);
+            // TODO: can type be negated?
+            return type;
+        } break;
+
+        case ExprType_Unary_BitwiseNot: {
+            UnaryExpression* unary = (UnaryExpression*)expr;
+            Datatype type = validateExpression(unary->expr);
+            // TODO: can everything be bit flipped like this?
+            return type;
+        } break;
+
         case ExprType_Unary_PreIncrement:
         case ExprType_Unary_PostIncrement:
         case ExprType_Unary_PreDecrement:
@@ -434,6 +448,11 @@ static Datatype validateExpression(Expression* expr) {
             return type;
         } break;
 
+        case ExprType_Bitwise_And:
+        case ExprType_Bitwise_Or:
+        case ExprType_Bitwise_Xor:
+        case ExprType_Bitwise_Lshift:
+        case ExprType_Bitwise_Rshift:
         case ExprType_Less:
         case ExprType_Greater:
         case ExprType_LessEquals:
@@ -445,7 +464,8 @@ static Datatype validateExpression(Expression* expr) {
         case ExprType_Plus:
         case ExprType_Minus:
         case ExprType_Mul:
-        case ExprType_Div: {
+        case ExprType_Div:
+        case ExprType_Mod: {
             BinaryExpression* bop = (BinaryExpression*)expr;
             Datatype leftType = validateExpression(bop->left);
             Datatype rightType = validateExpression(bop->right);
@@ -523,6 +543,11 @@ static Datatype validateExpression(Expression* expr) {
             case ExprType_Literal_Bool:    return type_int32;
             case ExprType_Literal_Null:    return type_voidPointer;
         }
+
+        case ExprType_Parenthesized: {
+            ParenthesizedExpression* p = (ParenthesizedExpression*)expr;
+            return validateExpression(p->innerExpr);
+        } break;
 
     }
 

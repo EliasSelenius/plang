@@ -115,24 +115,25 @@ Datatype ensureFuncPtrExistsFromFuncDeclaration(FuncDeclaration* decl);
 // ----Expressions---------------------------------------------
 
 typedef enum ExprType {
-    ExprType_Plus = Tok_Plus,
-    ExprType_Minus = Tok_Minus,
-    ExprType_Mul = Tok_Mul,
-    ExprType_Div = Tok_Div,
 
-    ExprType_Less = Tok_LessThan,
-    ExprType_Greater = Tok_GreaterThan,
-    ExprType_LessEquals = Tok_LessThanOrEqual,
-    ExprType_GreaterEquals = Tok_GreaterThanOrEqual,
-    ExprType_Equals = Tok_Equals,
-    ExprType_NotEquals = Tok_NotEquals,
-    ExprType_BooleanAnd = Tok_Keyword_And,
-    ExprType_BooleanOr = Tok_Keyword_Or,
+    ExprType_Plus = 1,
+    ExprType_Minus,
+    ExprType_Mul,
+    ExprType_Div,
+    ExprType_Mod,
+
+    ExprType_Less,
+    ExprType_Greater,
+    ExprType_LessEquals,
+    ExprType_GreaterEquals,
+    ExprType_Equals,
+    ExprType_NotEquals,
+    ExprType_BooleanAnd,
+    ExprType_BooleanOr,
 
     ExprType_Bitwise_And,
     ExprType_Bitwise_Or,
     ExprType_Bitwise_Xor,
-    ExprType_Bitwise_Not,
     ExprType_Bitwise_Lshift,
     ExprType_Bitwise_Rshift,
 
@@ -141,8 +142,10 @@ typedef enum ExprType {
     ExprType_Unary_PreDecrement,
     ExprType_Unary_PostDecrement,
     ExprType_Unary_Not,
+    ExprType_Unary_BitwiseNot,
     ExprType_Unary_AddressOf,
     ExprType_Unary_ValueOf,
+    ExprType_Unary_Negate,
 
     ExprType_Literal_Integer,
     ExprType_Literal_Uint,
@@ -165,7 +168,9 @@ typedef enum ExprType {
     ExprType_Deref,
     ExprType_Indexing,
     ExprType_Cast,
-    ExprType_Sizeof
+    ExprType_Sizeof,
+
+    ExprType_Parenthesized
 
 } ExprType;
 
@@ -196,6 +201,11 @@ typedef struct BinaryExpression {
     Expression* left;
     Expression* right;
 } BinaryExpression;
+
+typedef struct ParenthesizedExpression {
+    Expression base;
+    Expression* innerExpr;
+} ParenthesizedExpression;
 
 typedef struct IndexingExpression {
     Expression base;

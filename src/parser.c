@@ -407,6 +407,8 @@ static Expression* parseLeafExpression() {
         case Tok_ExclamationMark: unary = createUnaryExpr(ExprType_Unary_Not); break;
         case Tok_PlusPlus: unary = createUnaryExpr(ExprType_Unary_PreIncrement); break;
         case Tok_MinusMinus: unary = createUnaryExpr(ExprType_Unary_PreDecrement); break;
+        case Tok_Minus: unary = createUnaryExpr(ExprType_Unary_Negate); break;
+        case Tok_Tilde: unary = createUnaryExpr(ExprType_Unary_BitwiseNot); break;
         default: break;
     }
 
@@ -452,10 +454,13 @@ static Expression* parseLeafExpression() {
         } break;
 
         case Tok_OpenParen: {
-            token_index++;
-            Expression* expr = expectExpression();
+            ParenthesizedExpression* p = malloc(sizeof(ParenthesizedExpression));
+            p->base.expressionType = ExprType_Parenthesized;
+            p->base.nodebase.lineNumber = tokens[token_index++].line;
+            p->innerExpr = expectExpression();
             expect(Tok_CloseParen);
-            res = expr;
+
+            res = (Expression*)p;
         } break;
 
 
@@ -564,9 +569,16 @@ static Expression* expectExpression() {
 u32 operatorPriority(ExprType type) {
     switch (type) {
 
+        case ExprType_Bitwise_Lshift:
+        case ExprType_Bitwise_Rshift:
+        case ExprType_Bitwise_And:
+        case ExprType_Bitwise_Or:
+        case ExprType_Bitwise_Xor:
+            return 1;
+
         case ExprType_BooleanAnd:
         case ExprType_BooleanOr:
-            return 1;
+            return 2;
 
         case ExprType_Less:
         case ExprType_Greater:
@@ -574,14 +586,15 @@ u32 operatorPriority(ExprType type) {
         case ExprType_GreaterEquals:
         case ExprType_Equals:
         case ExprType_NotEquals:
-            return 2;
+            return 3;
 
         case ExprType_Plus:
         case ExprType_Minus:
-            return 3;
+            return 4;
         case ExprType_Mul:
         case ExprType_Div:
-            return 4;
+        case ExprType_Mod:
+            return 5;
 
         default: return 0; // not an operator
     }
@@ -599,13 +612,33 @@ static Expression* expectLeafExpression() {
     return res;
 }
 
-inline bool isOperator(TokenType type) {
-    return (type >= Tok_Plus && type <= Tok_Div)
-        || (type >= Tok_LessThan && type <= Tok_Equals)
-        || (type == Tok_Keyword_And)
-        || (type == Tok_Keyword_Or)
-        || (type == Tok_NotEquals);
+ExprType getExprTypeForBinaryOperator(TokenType type) {
+    switch (type) {
+        case Tok_Plus: return ExprType_Plus;
+        case Tok_Minus: return ExprType_Minus;
+        case Tok_Mul: return ExprType_Mul;
+        case Tok_Div: return ExprType_Div;
+        case Tok_Mod: return ExprType_Mod;
+
+        case Tok_LessThan: return ExprType_Less;
+        case Tok_GreaterThan: return ExprType_Greater;
+        case Tok_LessThanOrEqual: return ExprType_LessEquals;
+        case Tok_GreaterThanOrEqual: return ExprType_GreaterEquals;
+        case Tok_Equals: return ExprType_Equals;
+        case Tok_NotEquals: return ExprType_NotEquals;
+        case Tok_Keyword_And: return ExprType_BooleanAnd;
+        case Tok_Keyword_Or: return ExprType_BooleanOr;
+
+        case Tok_Ampersand: return ExprType_Bitwise_And;
+        case Tok_Pipe: return ExprType_Bitwise_Or;
+        case Tok_Caret: return ExprType_Bitwise_Xor;
+        case Tok_LeftShift: return ExprType_Bitwise_Lshift;
+        case Tok_RightShift: return ExprType_Bitwise_Rshift;
+
+        default: return 0; // not an operator
+    }
 }
+
 
 static BinaryExpression* appendBinaryExpression(BinaryExpression* target, BinaryExpression* addition) {
     u32 targetPriority = binaryOperatorPriority(target);
@@ -633,20 +666,21 @@ static Expression* parseExpression() {
     if (!a) return null;
 
     TokenType tokentype = tokens[token_index].type;
-    if (!isOperator(tokentype)) return testForTernary(a);
+    ExprType exprType = getExprTypeForBinaryOperator(tokentype);
+    if (!exprType) return testForTernary(a);
     token_index++;
 
     BinaryExpression* root = malloc(sizeof(BinaryExpression));
-    root->base.expressionType = (ExprType)tokentype; // safe to make cast since isOperator ensures only correct values for tokentype
+    root->base.expressionType = exprType;//(ExprType)tokentype; // safe to make cast since isOperator ensures only correct values for tokentype
     root->left = a;
     root->right = expectLeafExpression();
 
     tokentype = tokens[token_index].type;
-    while (isOperator(tokentype)) {
+    while ( (exprType = getExprTypeForBinaryOperator(tokentype)) ) {
         token_index++;
 
         BinaryExpression* op = malloc(sizeof(BinaryExpression));
-        op->base.expressionType = (ExprType)tokentype; // safe to make cast since isOperator ensures only correct values for tokentype
+        op->base.expressionType = exprType; //(ExprType)tokentype; // safe to make cast since isOperator ensures only correct values for tokentype
         op->right = expectLeafExpression();
 
         root = appendBinaryExpression(root, op);
@@ -654,7 +688,6 @@ static Expression* parseExpression() {
         tokentype = tokens[token_index].type;
     }
 
-    // return (Expression*)root;
     return testForTernary((Expression*)root);
 }
 

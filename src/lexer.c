@@ -13,7 +13,7 @@ inline void appendTokenLength(TokenType type, u32 len) {
     token.type = type;
     token.line = current_line;
     token.value.start = cursor;
-    token.value.length = len;    
+    token.value.length = len;
     darrayAdd(tokens, token);
 }
 
@@ -286,20 +286,38 @@ u32 lex(char* input) {
 
         #define test_char(c, t) if (*cursor == c) { appendToken(t);    continue; }
 
-        test_char(',', Tok_Comma);
-        test_char('.', Tok_Period);
-        test_char(';', Tok_Semicolon);
-        test_char(':', Tok_Colon);
-        test_char('?', Tok_QuestionMark);
-        test_char('@', Tok_At);
+        switch (*cursor) {
 
-        test_char('{', Tok_OpenCurl);
-        test_char('}', Tok_CloseCurl);
-        test_char('(', Tok_OpenParen);
-        test_char(')', Tok_CloseParen);
-        test_char('[', Tok_OpenSquare);
-        test_char(']', Tok_CloseSquare);
+            case ',': appendToken(Tok_Comma); continue;
+            case '.': appendToken(Tok_Period); continue;
+            case ';': appendToken(Tok_Semicolon); continue;
+            case ':': appendToken(Tok_Colon); continue;
+            case '?': appendToken(Tok_QuestionMark); continue;
+            case '@': appendToken(Tok_At); continue;
+            case '~': appendToken(Tok_Tilde); continue;
+            case '&': appendToken(Tok_Ampersand); continue;
+            case '|': appendToken(Tok_Pipe); continue;
+            case '^': appendToken(Tok_Caret); continue;
+            case '{': appendToken(Tok_OpenCurl); continue;
+            case '}': appendToken(Tok_CloseCurl); continue;
+            case '(': appendToken(Tok_OpenParen); continue;
+            case ')': appendToken(Tok_CloseParen); continue;
+            case '[': appendToken(Tok_OpenSquare); continue;
+            case ']': appendToken(Tok_CloseSquare); continue;
 
+            case '<': switch (*(cursor + 1)) {
+                case '=': appendTokenLength(Tok_LessThanOrEqual, 2); cursor++; continue;
+                case '<': appendTokenLength(Tok_LeftShift, 2); cursor++; continue;
+                default: appendToken(Tok_LessThan); continue;
+            }
+
+            case '>': switch (*(cursor + 1)) {
+                case '=': appendTokenLength(Tok_GreaterThanOrEqual, 2); cursor++; continue;
+                case '>': appendTokenLength(Tok_RightShift, 2); cursor++; continue;
+                default: appendToken(Tok_GreaterThan); continue;
+            }
+
+        }
 
         #define test_op_eq(c, token, tokenEqual) \
             if (*cursor == c) { \
@@ -310,9 +328,6 @@ u32 lex(char* input) {
                 continue; \
             } \
 
-
-        test_op_eq('<', Tok_LessThan, Tok_LessThanOrEqual);
-        test_op_eq('>', Tok_GreaterThan, Tok_GreaterThanOrEqual);
 
         test_op_eq('=', Tok_Assign, Tok_Equals);
         test_op_eq('!', Tok_ExclamationMark, Tok_NotEquals);
@@ -339,7 +354,7 @@ u32 lex(char* input) {
         // test_op_eq('-', Tok_Minus, Tok_MinusAssign);
         test_op_eq('*', Tok_Mul, Tok_MulAssign);
         test_op_eq('/', Tok_Div, Tok_DivAssign);
-
+        test_op_eq('%', Tok_Mod, Tok_ModAssign);
 
 
         // Error: token not recognized
