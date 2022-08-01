@@ -820,12 +820,30 @@ static Statement* expectStatement() {
             semicolon();
         } break;
 
+        case Tok_Keyword_Goto: {
+            GotoStatement* go = malloc(sizeof(GotoStatement));
+            go->base.statementType = Statement_Goto;
+            token_index++;
+            go->label = identifier();
+            res = (Statement*)go;
+            semicolon();
+        } break;
+
         case Tok_Keyword_Let: {
             res = (Statement*)expectVarDecl();
             semicolon();
         } break;
 
         default: {
+
+            if (tokens[token_index].type == Tok_Word && tokens[token_index + 1].type == Tok_Colon) {
+                LabelStatement* label = malloc(sizeof(LabelStatement));
+                label->base.statementType = Statement_Label;
+                label->label = tokens[token_index++].value;
+                token_index++;
+                res = (Statement*)label;
+                break;
+            }
 
             { // declaration
                 u32 postType = peekType();

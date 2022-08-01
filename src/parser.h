@@ -276,7 +276,9 @@ typedef enum StatementType {
 
     Statement_Continue,
     Statement_Break,
-    Statement_Return
+    Statement_Return,
+    Statement_Goto,
+    Statement_Label
 } StatementType;
 
 typedef struct Statement {
@@ -330,6 +332,16 @@ typedef struct ReturnStatement {
     Statement base;
     Expression* returnExpr;
 } ReturnStatement;
+
+typedef struct GotoStatement {
+    Statement base;
+    StrSpan label;
+} GotoStatement;
+
+typedef struct LabelStatement {
+    Statement base;
+    StrSpan label;
+} LabelStatement;
 
 // ----Functions----------------------------------------------
 

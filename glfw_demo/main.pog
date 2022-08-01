@@ -114,11 +114,11 @@ void updateEntity(Entity* entity) {
 
         if (intersection <= 0.0) {
 
-            vec2 correction = mul(normal, intersection * -1.0);
+            vec2 correction = mul(normal, -intersection);
             entity.pos = add(entity.pos, correction);
 
             // entity.vel = reflect(entity.vel, normal); // bounce
-            entity.vel = add(entity.vel, mul(normal, dot(entity.vel, normal) * -1.0)); // cancel velocity in direction of surface
+            entity.vel = add(entity.vel, mul(normal, -dot(entity.vel, normal))); // cancel velocity in direction of surface
         }
     }
 

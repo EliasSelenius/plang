@@ -336,7 +336,19 @@ static void transpileStatement(Statement* statement) {
             } else {
                 sbAppend(sb, "return;");
             }
-            
+
+        } break;
+
+        case Statement_Goto: {
+            GotoStatement* go = (GotoStatement*)statement;
+            sbAppend(sb, "goto ");
+            sbAppendSpan(sb, go->label);
+            sbAppend(sb, ";");
+        } break;
+        case Statement_Label: {
+            LabelStatement* l = (LabelStatement*)statement;
+            sbAppendSpan(sb, l->label);
+            sbAppend(sb, ":");
         } break;
 
         case Statement_Expression: {

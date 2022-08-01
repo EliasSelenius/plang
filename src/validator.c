@@ -710,6 +710,13 @@ static void validateScope(Codeblock* scope) {
 
             } break;
 
+            case Statement_Goto: {
+                // TODO: does label exist?
+            } break;
+            case Statement_Label: {
+                // TODO: is label already declared?
+            } break;
+
             case Statement_Expression: {
                 StatementExpression* staExpr = (StatementExpression*)sta;
                 validateExpression(staExpr->expr);
@@ -884,7 +891,7 @@ u32 validate() {
 
             f2->overload = ++overloadCount;
 
-            printf("Function overload detected \"%.*s\"\n", f1->decl.name.length, f1->decl.name.start);
+            // printf("Function overload detected \"%.*s\"\n", f1->decl.name.length, f1->decl.name.start);
 
             // TODO: check if it is a valid overload pair
             // if (darrayLength(f1->arguments) == darrayLength(f2->arguments)) { }

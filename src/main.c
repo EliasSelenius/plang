@@ -31,15 +31,15 @@
         - "plang build" CLI. build all .pog files in directory. let output exe be named the name of the directory
         - contextual inclusion (the with keyword on struct fields)
         - member-like functions (the with keyword on function arguments)
-        *- goto statement and labels
 
     InProgress:
         - line numbers in validation errors
         - localy defined functions
-        - function overloads
 
 
     DONE list:
+        - function overloads
+        *- goto statement and labels
         *- unary minus operation
         *- modulus operator
         *- bitwise operators
@@ -84,42 +84,13 @@
 */
 
 void transpile();
+void startPerf();
+i64 endPerf();
+void foreachFile(char* ext, void (*func)(char* filename, char* extension));
+char* fileread(const char* filename, u32* strLength);
+void filewrite(const char* filename, char* content);
 
 TranslationUnit* g_Unit;
-
-char* fileread(const char* filename, u32* strLength) {
-    FILE* file;
-    if ( fopen_s(&file, filename, "r") ) {
-        printf("Could not read file: %s\n", filename);
-        return null;
-    }
-
-    fseek(file, 0, SEEK_END);
-    int bufferLength = ftell(file) + 1; // CRLF gurantees there is enough space, but when the file is not in CRLF we add one to get space for null termination
-    rewind(file);
-
-    char* res = calloc(bufferLength, 1);
-    u64 len = fread(res, 1, bufferLength, file);
-    res[len] = '\0';
-    *strLength = (u32)len;
-
-    fclose(file);
-
-    return res;
-}
-
-void filewrite(const char* filename, char* content) {
-    FILE* file;
-    if ( fopen_s(&file, filename, "w") ) {
-        printf("Could not write to file: %s\n", filename);
-        return;
-    }
-
-    fprintf(file, "%s", content);
-
-    fclose(file);
-}
-
 
 void addFile(char* filename, char* extension) {
     printf("Adding %s\n", filename);
@@ -147,10 +118,6 @@ void addFile(char* filename, char* extension) {
 
 }
 
-void startPerf();
-i64 endPerf();
-void foreachFile(char* ext, void (*func)(char* filename, char* extension));
-
 void addPrimitiveType(char* name) {
     PlangType newType;
     newType.kind = Typekind_Primitive;
@@ -159,17 +126,12 @@ void addPrimitiveType(char* name) {
 }
 
 
-static void printFileName(char* filename,  char* extension) {
-    printf("%s (%s)\n", filename, extension);
-}
-
-// plang glfw.txt cflags -g -lglfw3dll.lib
 int main(int argc, char* argv[]) {
 
-    // if (argc == 1) {
-    //     printf("Insufficent arguments.\n");
-    //     return 0;
-    // }
+    if (argc == 1) {
+        printf("Insufficent arguments.\n");
+        return 0;
+    }
 
     // TODO: use higher default capacity here, to minimize the amount of reallocs
     tokens = darrayCreate(Token);
@@ -212,9 +174,16 @@ int main(int argc, char* argv[]) {
 
     startPerf();
 
-    foreachFile(".pog", addFile);
-
     u32 i = 1;
+
+    if (argc >= 2) {
+        if (cstrEquals(argv[1], "build")) {
+            foreachFile(".pog", addFile);
+            i = 2;
+            goto skipfiles;
+        }
+    }
+
     while (i < argc) {
         char* arg = argv[i++];
         if (spanEquals(spFrom("cflags"), arg)) break;
@@ -222,6 +191,7 @@ int main(int argc, char* argv[]) {
         addFile(arg, null);
     }
 
+    skipfiles:
 
     StringBuilder sb = sbCreate();
     sbAppend(&sb, "clang output.g.c -o output.exe ");
