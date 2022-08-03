@@ -1,15 +1,13 @@
-#include "validator.h"
-
 #include "types.h"
 #include "parser.h"
 #include "darray.h"
 
 #include <stdio.h>
 #include <stdarg.h>
-#include <stdlib.h> // included for malloc
+// #include <stdlib.h> // included for malloc
 
 typedef struct Variable {
-    StrSpan name;
+    Identifier name;
     Datatype* type;
 } Variable;
 
@@ -32,7 +30,7 @@ static Datatype type_float32;
 static Datatype type_float64;
 
 Datatype validateExpression(Expression* expr);
-Datatype getDeclaredVariable(StrSpan name);
+Datatype getDeclaredVariable(Identifier name);
 bool typeAssignable(Datatype toType, Datatype fromType);
 
 inline void error(char* format, ...) {
@@ -45,7 +43,7 @@ inline void error(char* format, ...) {
     va_start(args, format);
     vprintf(format, args);
     va_end(args);
-    
+
     printf("\n");
 
     numberOfErrors++;
@@ -58,58 +56,58 @@ inline void errorLine(u32 line, char* format, ...) {
     va_start(args, format);
     vprintf(format, args);
     va_end(args);
-    
+
     printf("\n");
 
     numberOfErrors++;
-} 
+}
 
-static Field* getField(PlangStruct* stru, StrSpan name) {
+static Field* getField(PlangStruct* stru, Identifier name) {
     for (u32 i = 0; i < darrayLength(stru->fields); i++) {
-        if (spanEqualsSpan(stru->fields[i].name, name)) return &stru->fields[i];
+        if (stru->fields[i].name == name) return &stru->fields[i];
     }
 
     return null;
 }
 
-static PlangStruct* getStructByName(StrSpan name) {
+static PlangStruct* getStructByName(Identifier name) {
     u32 structsLen = darrayLength(g_Unit->structs);
 
     for (u32 i = 0; i < structsLen; i++) {
-        if (spanEqualsSpan(g_Unit->structs[i].name, name)) return &g_Unit->structs[i];
+        if (g_Unit->structs[i].name == name) return &g_Unit->structs[i];
     }
 
     return null;
 }
 
-static PlangFunction* getFunctionByName(StrSpan name) {
+static PlangFunction* getFunctionByName(Identifier name) {
     u32 len = darrayLength(g_Unit->functions);
     for (u32 i = 0; i < len; i++) {
-        if (spanEqualsSpan(name, g_Unit->functions[i].decl.name)) return &g_Unit->functions[i];
+        if (name == g_Unit->functions[i].decl.name) return &g_Unit->functions[i];
     }
 
     return null;
 }
 
-static FuncDeclaration* getFuncDecl(StrSpan name) {
+static FuncDeclaration* getFuncDecl(Identifier name) {
     PlangFunction* func = getFunctionByName(name);
     if (func) return &func->decl;
 
     u32 len = darrayLength(g_Unit->functionDeclarations);
     for (u32 i = 0; i < len; i++) {
-        if (spanEqualsSpan(name, g_Unit->functionDeclarations[i].name)) return &g_Unit->functionDeclarations[i];
+        if (name == g_Unit->functionDeclarations[i].name) return &g_Unit->functionDeclarations[i];
     }
 
     return null;
 }
 
-static Datatype getDeclaredVariable(StrSpan name) {
+static Datatype getDeclaredVariable(Identifier name) {
 
     // look for local var
     if (variables) {
         u32 len = darrayLength(variables);
         for (u32 i = 0; i < len; i++) {
-            if (spanEqualsSpan(name, variables[i].name)) {
+            if (name == variables[i].name) {
                 return *variables[i].type;
             }
         }
@@ -121,7 +119,7 @@ static Datatype getDeclaredVariable(StrSpan name) {
             u32 len = darrayLength(function->decl.arguments);
             for (u32 i = 0; i < len; i++) {
                 FuncArg* arg = &function->decl.arguments[i];
-                if (spanEqualsSpan(name, arg->name)) {
+                if (name == arg->name) {
                     return arg->type;
                 }
             }
@@ -131,7 +129,7 @@ static Datatype getDeclaredVariable(StrSpan name) {
     // look for global var
     u32 len = darrayLength(g_Unit->globalVariables);
     for (u32 i = 0; i < len; i++) {
-        if (spanEqualsSpan(name, g_Unit->globalVariables[i].name)) return g_Unit->globalVariables[i].type;
+        if (name == g_Unit->globalVariables[i].name) return g_Unit->globalVariables[i].type;
     }
 
 
@@ -149,23 +147,21 @@ static Datatype validateVariable(VariableExpression* var) {
     // look for constants
     u32 len = darrayLength(g_Unit->constants);
     for (u32 i = 0; i < len; i++) {
-        if (spanEqualsSpan(var->name, g_Unit->constants[i].name)) {
+        if (var->name == g_Unit->constants[i].name) {
             var->base.expressionType = ExprType_Constant;
             var->constExpr = g_Unit->constants[i].expr;
             return validateExpression(var->constExpr);
         }
     }
 
-    error("Variable \"%.*s\" is not declared.",
-        var->name.length,
-        var->name.start);
+    error("Variable \"%s\" is not declared.", getIdentifierStringValue(var->name));
     return type_null;
 }
 
 inline void validateType(Datatype type) {
     PlangType* pt = getType(type);
     if (pt->kind == Typekind_Invalid) {
-        error("Type \"%.*s\" does not exist.", pt->name.length, pt->name.start);
+        error("Type \"%s\" does not exist.", getIdentifierStringValue(pt->name));
         return;
     }
 
@@ -243,11 +239,12 @@ static void assertAssignability(Datatype toType, Datatype fromType) {
         PlangType* from = getType(fromType);
 
         // TODO: print correct type names. (include pointers and the proper name of function pointers) 
-        error("Type missmatch. \"%.*s\" is not compatible with \"%.*s\".",
-            from->name.length,
-            from->name.start,
-            to->name.length,
-            to->name.start);
+        // error("Type missmatch. \"%.*s\" is not compatible with \"%.*s\".",
+            // from->name.length,
+            // from->name.start,
+            // to->name.length,
+            // to->name.start);
+        error("Type missmatch.");
     }
 }
 
@@ -261,14 +258,14 @@ static Datatype validateFuncCall(FuncCall* call) {
 
 
     if (call->funcExpr->expressionType != ExprType_Variable) goto funcptrPart;
-    StrSpan name = ((VariableExpression*)call->funcExpr)->name;
+    Identifier name = ((VariableExpression*)call->funcExpr)->name;
 
 
     // look for function with possible overloads
     u32 len = darrayLength(g_Unit->functions);
     for (u32 i = 0; i < len; i++) {
         PlangFunction* func = &g_Unit->functions[i];
-        if (!spanEqualsSpan(name, func->decl.name)) continue;
+        if (name != func->decl.name) continue;
 
         u32 expectedArgumentLength = func->decl.arguments ? darrayLength(func->decl.arguments) : 0;
 
@@ -287,8 +284,8 @@ static Datatype validateFuncCall(FuncCall* call) {
 
         } else {
             if (passedArgumentsLength != expectedArgumentLength) {
-                error("Unexpected number of arguments passed to \"%.*s\", expected %d, but got %d.", 
-                    name.length, name.start,
+                error("Unexpected number of arguments passed to \"%s\", expected %d, but got %d.", 
+                    getIdentifierStringValue(name),
                     expectedArgumentLength, passedArgumentsLength);
                 return func->decl.returnType;
             }
@@ -305,7 +302,7 @@ static Datatype validateFuncCall(FuncCall* call) {
     len = darrayLength(g_Unit->functionDeclarations);
     for (u32 i = 0; i < len; i++) {
         FuncDeclaration* decl = &g_Unit->functionDeclarations[i];
-        if (!spanEqualsSpan(name, decl->name)) continue;
+        if (name != decl->name) continue;
 
         u32 expectedArgumentLength = decl->arguments ? darrayLength(decl->arguments) : 0;
 
@@ -343,7 +340,7 @@ static Datatype validateFuncCall(FuncCall* call) {
     }
 
 
-    error("Function \"%.*s\" was not found.", name.length, name.start);
+    error("Function \"%s\" was not found.", getIdentifierStringValue(name));
     return type_null;
 }
 
@@ -358,32 +355,31 @@ static Datatype validateExpression(Expression* expr) {
 
         case ExprType_Deref: {
             DerefOperator* deref = (DerefOperator*)expr;
-            Datatype type = validateExpression(deref->expr);
-            if (!type.typeId) return type_null;
+            Datatype datatype = validateExpression(deref->expr);
+            if (!datatype.typeId) return type_null;
 
-            if (type.numPointers > 1) {
-                error("Attempted to dereference a %dth-degree pointer.", type.numPointers);
+            if (datatype.numPointers > 1) {
+                error("Attempted to dereference a %dth-degree pointer.", datatype.numPointers);
                 return type_null;
             }
 
-            deref->derefOp = type.numPointers ? "->" : ".";
+            deref->derefOp = datatype.numPointers ? "->" : ".";
 
-            StrSpan name = getType(type)->name;
-            PlangStruct* stru = getStructByName(name);
-            if (stru) {
-                Field* field = getField(stru, deref->name);
-                if (!field) {
-                    error("Field \"%.*s\" does not exist on type \"%.*s\".",
-                            deref->name.length, deref->name.start,
-                            stru->name.length, stru->name.start);
-                    return type_null;
-                }
-                return field->type;
-            } else {
-                error("%.*s cannot be dereferenced.", name.length, name.start);
+            PlangType* type = getType(datatype);
+            if (type->kind != Typekind_Struct) {
+                error("Invalid dereferencing.");
                 return type_null;
             }
 
+            PlangStruct* stru = getStructByName(type->name);
+            Field* field = getField(stru, deref->name);
+            if (!field) {
+                error("Field \"%s\" does not exist on type \"%s\".",
+                        getIdentifierStringValue(deref->name),
+                        getIdentifierStringValue(stru->name));
+                return type_null;
+            }
+            return field->type;
         } break;
 
         case ExprType_Indexing: {
@@ -572,9 +568,7 @@ static void validateScope(Codeblock* scope) {
 
                 // Check wheter there already is a variable with this name
                 if (getDeclaredVariable(decl->name).typeId) {
-                    error("Variable \"%.*s\" is already declared.", 
-                        decl->name.length,
-                        decl->name.start);
+                    error("Variable \"%s\" is already declared.", getIdentifierStringValue(decl->name));
                 }
 
                 if (typeExists(decl->type)) {
@@ -595,19 +589,8 @@ static void validateScope(Codeblock* scope) {
 
                 // Check wheter there already is a variable with this name
                 if (getDeclaredVariable(decl->name).typeId) {
-                    error("Variable \"%.*s\" is already declared.", 
-                        decl->name.length,
-                        decl->name.start);
+                    error("Variable \"%s\" is already declared.", getIdentifierStringValue(decl->name));
                 }
-
-                /*
-                    assign
-
-                    yes       o     o
-                    no        x     o
-
-                    infer    yes    no
-                */
 
                 if (decl->assignmentOrNull) {
                     Datatype assType = validateExpression(decl->assignmentOrNull);
@@ -684,7 +667,7 @@ static void validateScope(Codeblock* scope) {
 
                 if (typeExists(function->decl.returnType)) {
                     if (!typeAssignable(function->decl.returnType, type)) {
-                        error("Return type missmatch in function \"%.*s\".", function->decl.name.length, function->decl.name.start);
+                        error("Return type missmatch in function \"%s\".", getIdentifierStringValue(function->decl.name));
                     }
                 } else {
                     function->decl.returnType = type;
@@ -770,12 +753,11 @@ static void validateStruct(PlangStruct* stru) {
     for (u32 i = 0; i < fieldLen; i++) {
         Field* field = &stru->fields[i];
         validateType(field->type);
-        StrSpan fieldTypeName = getType(field->type)->name;
+        Identifier fieldTypeName = getType(field->type)->name;
 
         // TODO: PlangStruct may contain its typeid so we dont have to do the spanEqualsSpan() call
-        if (field->type.numPointers == 0 && spanEqualsSpan(fieldTypeName, stru->name)) {
-            errorLine(field->nodebase.lineNumber, "Struct \"%.*s\" self reference by value.",
-                stru->name.length, stru->name.start);
+        if (field->type.numPointers == 0 && fieldTypeName == stru->name) {
+            errorLine(field->nodebase.lineNumber, "Struct \"%s\" self reference by value.", getIdentifierStringValue(stru->name));
         }
     }
 }
@@ -799,18 +781,16 @@ static void validateGlobalVar(VarDecl* decl) {
 
 u32 validate() {
 
-    type_void           = (Datatype) { .typeId = ensureTypeExistence(spFrom("void")), .numPointers = 0 };
-    type_voidPointer    = (Datatype) { .typeId = ensureTypeExistence(spFrom("void")), .numPointers = 1 };
-    type_charPointer    = (Datatype) { .typeId = ensureTypeExistence(spFrom("char")), .numPointers = 1 };
-    type_char           = (Datatype) { .typeId = ensureTypeExistence(spFrom("char")), .numPointers = 0 };
-
-    type_int32          = (Datatype) { .typeId = ensureTypeExistence(spFrom("int")),  .numPointers = 0 };
-    type_uint32         = (Datatype) { .typeId = ensureTypeExistence(spFrom("uint")),  .numPointers = 0 };
-    type_int64          = (Datatype) { .typeId = ensureTypeExistence(spFrom("long")),  .numPointers = 0 };
-    type_uint64         = (Datatype) { .typeId = ensureTypeExistence(spFrom("ulong")),  .numPointers = 0 };
-
-    type_float32        = (Datatype) { .typeId = ensureTypeExistence(spFrom("float")), .numPointers = 0 };
-    type_float64        = (Datatype) { .typeId = ensureTypeExistence(spFrom("double")), .numPointers = 0 };
+    type_void           = (Datatype) { .typeId = ensureTypeExistence(appendStringToTypetable(spFrom("void"))), .numPointers = 0 };
+    type_voidPointer    = (Datatype) { .typeId = ensureTypeExistence(appendStringToTypetable(spFrom("void"))), .numPointers = 1 };
+    type_charPointer    = (Datatype) { .typeId = ensureTypeExistence(appendStringToTypetable(spFrom("char"))), .numPointers = 1 };
+    type_char           = (Datatype) { .typeId = ensureTypeExistence(appendStringToTypetable(spFrom("char"))), .numPointers = 0 };
+    type_int32          = (Datatype) { .typeId = ensureTypeExistence(appendStringToTypetable(spFrom("int"))),  .numPointers = 0 };
+    type_uint32         = (Datatype) { .typeId = ensureTypeExistence(appendStringToTypetable(spFrom("uint"))),  .numPointers = 0 };
+    type_int64          = (Datatype) { .typeId = ensureTypeExistence(appendStringToTypetable(spFrom("long"))),  .numPointers = 0 };
+    type_uint64         = (Datatype) { .typeId = ensureTypeExistence(appendStringToTypetable(spFrom("ulong"))),  .numPointers = 0 };
+    type_float32        = (Datatype) { .typeId = ensureTypeExistence(appendStringToTypetable(spFrom("float"))), .numPointers = 0 };
+    type_float64        = (Datatype) { .typeId = ensureTypeExistence(appendStringToTypetable(spFrom("double"))), .numPointers = 0 };
 
     // validate types
     u32 typeLen = darrayLength(g_Unit->types);
@@ -862,9 +842,8 @@ u32 validate() {
         validateGlobalVar(&g_Unit->globalVariables[i]);
 
         for (u32 j = i+1; j < globLen; j++) {
-            if (spanEqualsSpan(g_Unit->globalVariables[j].name, decl->name)) {
-                error("Global variable \"%.*s\" name conflict.",
-                    decl->name.length, decl->name.start);
+            if (g_Unit->globalVariables[j].name == decl->name) {
+                error("Global variable \"%s\" name conflict.", getIdentifierStringValue(decl->name));
             }
         }
     }
@@ -887,11 +866,11 @@ u32 validate() {
         for (u32 j = i + 1; j < funcLen; j++) {
             PlangFunction* f2 = &g_Unit->functions[j];
 
-            if (!spanEqualsSpan(f1->decl.name, f2->decl.name)) continue;
+            if (f1->decl.name != f2->decl.name) continue;
+            // function overload detected
 
             f2->overload = ++overloadCount;
 
-            // printf("Function overload detected \"%.*s\"\n", f1->decl.name.length, f1->decl.name.start);
 
             // TODO: check if it is a valid overload pair
             // if (darrayLength(f1->arguments) == darrayLength(f2->arguments)) { }

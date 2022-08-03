@@ -43,32 +43,38 @@ static void errorLine(u32 lineNum, char* format, ...) {
 // asserts the existence of a semicolon
 inline void semicolon() {
     if (tokens[token_index].type != Tok_Semicolon) {     
-        error("Expected semicolon, but got \"%.*s\" instead.",
-            tokens[token_index].value.length,
-            tokens[token_index].value.start);
+        // error("Expected semicolon, but got \"%.*s\" instead.",
+            // tokens[token_index].value.length,
+            // tokens[token_index].value.start);
+
+        error("Expected semicolon.");
         return;
     }
     token_index++;
 }
 
-static StrSpan identifier() {
+static Identifier identifier() {
     Token* token = &tokens[token_index];
     if (token->type != Tok_Word) {
-        error("\"%.*s\" is not a valid identifier.",
-            token->value.length,
-            token->value.start); 
+        // error("\"%.*s\" is not a valid identifier.",
+            // token->value.length,
+            // token->value.start);
+        error("Invalid identifier.");
+        return -1;
     }
     token_index++;
-    return token->value;
+    return token->stringTableByteOffset;
 }
 
 static void expect(TokenType type) {
     if (tokens[token_index].type != type) {
         // TODO: get TokenType as string
-        error("Expected token type %d, but got \"%.*s\" instead.",
-            type,
-            tokens[token_index].value.length,
-            tokens[token_index].value.start);
+        // error("Expected token type %d, but got \"%.*s\" instead.",
+            // type,
+            // tokens[token_index].value.length,
+            // tokens[token_index].value.start);
+
+        error("Unexpected token type %d.", tokens[token_index].type);
 
         return;
     }
@@ -77,9 +83,11 @@ static void expect(TokenType type) {
 
 static void unexpectedToken() {
 
-    error("Unexpected token \"%.*s\".",
-        tokens[token_index].value.length,
-        tokens[token_index].value.start);
+    // error("Unexpected token \"%.*s\".",
+        // tokens[token_index].value.length,
+        // tokens[token_index].value.start);
+
+    error("Unexpected token.");
 
     token_index++;
 }
@@ -105,7 +113,7 @@ static u32 queryFuncPtrTypeId(u32 funcPtrRef) {
     return 0;
 }
 
-inline bool funcPtrEquivalence(FuncPtr* a, FuncPtr* b) {    
+inline bool funcPtrEquivalence(FuncPtr* a, FuncPtr* b) {
     if (a->argCount != b->argCount) return false;
     if (!typeEquals(a->returnType, b->returnType)) return false;
     for (u32 i = 0; i < a->argCount; i++) {
@@ -115,16 +123,18 @@ inline bool funcPtrEquivalence(FuncPtr* a, FuncPtr* b) {
     return true;
 }
 
+
 static StringBuilder sb_funcPtrName = {0};
 
 static void funcPtrName_append(Datatype type) {
     sbAppendChar(&sb_funcPtrName, '_');
-    sbAppendSpan(&sb_funcPtrName, getType(type)->name);
+    PlangType* pt = getType(type);
+    char* name = getIdentifierStringValue(pt->name);
+    sbAppend(&sb_funcPtrName, name);
     for (u32 i = 0; i < type.numPointers; i++) sbAppendChar(&sb_funcPtrName, 'p');
 }
 
-static StrSpan constructNameForFuncPtr(FuncPtr* funcPtr) {
-
+static Identifier constructNameForFuncPtr(FuncPtr* funcPtr) {
     sbClear(&sb_funcPtrName);
 
     sbAppendChar(&sb_funcPtrName, 'f');
@@ -133,15 +143,14 @@ static StrSpan constructNameForFuncPtr(FuncPtr* funcPtr) {
         funcPtrName_append(funcPtr->argTypes[i]);
     }
 
-    u32 len = sb_funcPtrName.length;
-    char* buf = malloc(len);
-    sbCopyIntoBuffer(&sb_funcPtrName, buf, len);
+    StrSpan span;
+    span.length = sb_funcPtrName.length;
+    span.start = sb_funcPtrName.content;
 
-    StrSpan res;
-    res.length = len;
-    res.start = buf;
-    return res;
+    Identifier id = appendStringToTypetable(span);
+    return id;
 }
+
 
 Datatype ensureFuncPtrExistsFromFuncDeclaration(FuncDeclaration* decl) {
 
@@ -258,7 +267,8 @@ static bool parseInferableType(Datatype* type) {
     }
 
     if (tokens[token_index].type == Tok_Word) {
-        type->typeId = ensureTypeExistence(tokens[token_index].value);
+        Identifier id = tokens[token_index].stringTableByteOffset;
+        type->typeId = ensureTypeExistence(id);
         token_index++;
         type->numPointers = 0;
         while (tok(Tok_Mul)) type->numPointers++;
@@ -286,9 +296,10 @@ inline bool parseType(Datatype* type) {
 inline Datatype expectInferableType() {
     Datatype res = {0};
     if (!parseInferableType(&res)) {
-        error("Expected type, but got \"%.*s\" instead.",
-            tokens[token_index].value.length,
-            tokens[token_index].value.start);
+        // error("Expected type, but got \"%.*s\" instead.",
+            // tokens[token_index].value.length,
+            // tokens[token_index].value.start);
+        error("Expected type.");
     }
     return res;
 }
@@ -385,7 +396,13 @@ static Expression* createLiteral(ExprType type) {
     LiteralExpression* lit = malloc(sizeof(LiteralExpression));
     lit->base.expressionType = type;
     lit->base.nodebase.lineNumber = tokens[token_index].line;
-    lit->value = tokens[token_index].value;
+
+    if (type == ExprType_Literal_String) {
+        lit->string = tokens[token_index].stringTableByteOffset;
+    } else {
+        lit->value = tokens[token_index].value;
+    }
+
     token_index++;
     return (Expression*)lit;
 }
@@ -558,9 +575,11 @@ static Expression* testForTernary(Expression* expr) {
 static Expression* expectExpression() {
     Expression* res = parseExpression();
     if (res == null) {
-        error("Expected expression, but got \"%.*s\" instead.",
-            tokens[token_index].value.length,
-            tokens[token_index].value.start);
+        // error("Expected expression, but got \"%.*s\" instead.",
+            // tokens[token_index].value.length,
+            // tokens[token_index].value.start);
+
+        error("Expected expression.");
         token_index++;
     }
     return res;
@@ -606,9 +625,10 @@ inline u32 binaryOperatorPriority(BinaryExpression* expr) {
 static Expression* expectLeafExpression() {
     Expression* res = parseLeafExpression();
     if (!res)
-        error("Expected expression, but got \"%.*s\" instead.",
-            tokens[token_index].value.length,
-            tokens[token_index].value.start);
+        // error("Expected expression, but got \"%.*s\" instead.",
+            // tokens[token_index].value.length,
+            // tokens[token_index].value.start);
+        error("Expected expression.");
     return res;
 }
 
@@ -671,7 +691,7 @@ static Expression* parseExpression() {
     token_index++;
 
     BinaryExpression* root = malloc(sizeof(BinaryExpression));
-    root->base.expressionType = exprType;//(ExprType)tokentype; // safe to make cast since isOperator ensures only correct values for tokentype
+    root->base.expressionType = exprType;
     root->left = a;
     root->right = expectLeafExpression();
 
@@ -680,7 +700,7 @@ static Expression* parseExpression() {
         token_index++;
 
         BinaryExpression* op = malloc(sizeof(BinaryExpression));
-        op->base.expressionType = exprType; //(ExprType)tokentype; // safe to make cast since isOperator ensures only correct values for tokentype
+        op->base.expressionType = exprType;
         op->right = expectLeafExpression();
 
         root = appendBinaryExpression(root, op);
@@ -762,7 +782,7 @@ static VarDecl* expectVarDecl() {
     if (tok(Tok_Assign)) {
         decl->assignmentOrNull = expectExpression();
     } else if (!typeExists(decl->type)) {
-        error("Variable \"%.*s\" must be assigned to, to be type inferred.", decl->name.length, decl->name.start);
+        error("Variable \"%s\" must be assigned to, to be type inferred.", getIdentifierStringValue(decl->name));
     }
 
     return decl;
@@ -839,7 +859,7 @@ static Statement* expectStatement() {
             if (tokens[token_index].type == Tok_Word && tokens[token_index + 1].type == Tok_Colon) {
                 LabelStatement* label = malloc(sizeof(LabelStatement));
                 label->base.statementType = Statement_Label;
-                label->label = tokens[token_index++].value;
+                label->label = tokens[token_index++].stringTableByteOffset;
                 token_index++;
                 res = (Statement*)label;
                 break;
@@ -986,7 +1006,7 @@ static FuncArg* expectFuncArgList() {
 
 static void funcOrGlobal() {
     Datatype type = expectInferableType();
-    StrSpan name = identifier();
+    Identifier name = identifier();
 
     if (tok(Tok_OpenParen)) {
         // function
@@ -1011,7 +1031,7 @@ static void funcOrGlobal() {
         if (tok(Tok_Assign)) {
             decl.assignmentOrNull = expectExpression();
         } else if (!typeExists(decl.type)) {
-            error("Global variable \"%.*s\" must be assigned to, to be type inferred.", decl.name.length, decl.name.start);
+            error("Global variable \"%s\" must be assigned to, to be type inferred.", getIdentifierStringValue(decl.name));
         }
 
         darrayAdd(g_Unit->globalVariables, decl);
@@ -1041,8 +1061,8 @@ u32 parse() {
                 stru.nodebase.lineNumber = lineNum;
                 u32 struLen = darrayLength(g_Unit->structs);
                 for (u32 i = 0; i < struLen; i++) {
-                    if (spanEqualsSpan(g_Unit->structs[i].name, stru.name)) {
-                        errorLine(stru.nodebase.lineNumber, "Struct \"%.*s\" is already defined.", stru.name.length, stru.name.start);
+                    if (g_Unit->structs[i].name == stru.name) { // spanEqualsSpan(g_Unit->structs[i].name, stru.name)
+                        errorLine(stru.nodebase.lineNumber, "Struct \"%s\" is already defined.", getIdentifierStringValue(stru.name));
                         break;
                     }
                 }
@@ -1054,7 +1074,7 @@ u32 parse() {
             case Tok_Keyword_Type: {
                 u32 lineNum = tokens[token_index].line;
                 token_index++;
-                StrSpan name = identifier();
+                Identifier name = identifier();
                 Datatype type = type_null;
                 if (tok(Tok_Assign)) type = expectType();
                 semicolon();

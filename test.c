@@ -1,5 +1,8 @@
 
 #include <stdio.h>
+#include <math.h>
+#include <stdlib.h>
+#include <string.h>
 
 typedef struct String {
     unsigned int length;
@@ -13,18 +16,16 @@ typedef struct Test {
     int i, j;
 } Test;
 
+int size = 0;
+
+
 int main() {
 
-    Test t;
+    char* str = "";
 
-    if (t.i) {
-        printf("Yes\n");
-    }
+    int len = strlen(str);
 
-    Test tests[2];
-
-    printf("size: %llu\n", sizeof(Test));
-    printf("size: %llu\n", sizeof(tests));
+    printf("%d\n", len);
 
     return 0;
 }

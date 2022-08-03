@@ -105,9 +105,14 @@ char* TokenTypeNames[] = {
 
 typedef struct Token {
     TokenType type;
-    StrSpan value;
     u32 line;
+
+    union {
+        StrSpan value; // TODO: remove this
+        u32 stringTableByteOffset;
+    };
 } Token;
+
 
 extern Token* tokens;
 

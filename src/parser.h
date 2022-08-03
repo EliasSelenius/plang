@@ -26,9 +26,19 @@ typedef struct TranslationUnit {
     PlangType* types;
     DynamicBuffer* funcPtrTypes;
 
+    u32* stringTableByteOffsets; // darray
+    DynamicBuffer* stringTable;
+
 } TranslationUnit;
 
 extern TranslationUnit* g_Unit;
+
+u32 appendStringToTypetable(StrSpan word);
+
+typedef u32 Identifier;
+inline char* getIdentifierStringValue(Identifier id) {
+    return (char*)(&g_Unit->stringTable->bytes[id]);
+}
 
 typedef struct Node {
     u32 lineNumber;
@@ -51,7 +61,8 @@ typedef struct Datatype {
 
 typedef struct PlangType {
     Typekind kind;
-    StrSpan name;
+    Identifier name;
+
     union {
         Datatype     type_aliasedType;
         PlangStruct* type_struct;
@@ -85,14 +96,14 @@ inline bool typeEquals(Datatype a, Datatype b) {
 }
 
 
-inline u32 ensureTypeExistence(StrSpan name) {
+inline u32 ensureTypeExistence(Identifier name) {
     u32 len = darrayLength(g_Unit->types);
     for (u32 i = 0; i < len; i++) {
         switch (g_Unit->types[i].kind) {
             case Typekind_Invalid:
             case Typekind_Alias:
             case Typekind_Primitive: {
-                if (spanEqualsSpan(g_Unit->types[i].name, name)) {
+                if (g_Unit->types[i].name == name) {
                     return i + 1;
                 }
             } break;
@@ -184,7 +195,7 @@ typedef struct LiteralExpression {
 
     union {
         StrSpan value; // TODO: remove this
-        char* string;
+        Identifier string;
         u64 integer;
         f64 decimal;
     };
@@ -224,13 +235,13 @@ typedef struct DerefOperator {
     Expression* expr;
     // I feel this is a little bit of a hack. We may have to remove this
     char* derefOp;
-    StrSpan name;
+    Identifier name;
 } DerefOperator;
 
 typedef struct VariableExpression {
     Expression base;
     union {
-        StrSpan name;
+        Identifier name;
         Expression* constExpr;
     };
 } VariableExpression;
@@ -294,7 +305,7 @@ typedef struct StatementExpression {
 typedef struct VarDecl {
     Statement base;
     Datatype type;
-    StrSpan name;
+    Identifier name;
     Expression* assignmentOrNull;
 } VarDecl;
 
@@ -335,23 +346,23 @@ typedef struct ReturnStatement {
 
 typedef struct GotoStatement {
     Statement base;
-    StrSpan label;
+    Identifier label;
 } GotoStatement;
 
 typedef struct LabelStatement {
     Statement base;
-    StrSpan label;
+    Identifier label;
 } LabelStatement;
 
 // ----Functions----------------------------------------------
 
 typedef struct FuncArg {
     Datatype type;
-    StrSpan name;
+    Identifier name;
 } FuncArg;
 
 typedef struct FuncDeclaration {
-    StrSpan name;
+    Identifier name;
     Datatype returnType;
     FuncArg* arguments; // darray
 } FuncDeclaration;
@@ -380,17 +391,17 @@ typedef struct FuncCall {
 typedef struct Field {
     Node nodebase;
     Datatype type;
-    StrSpan name;
+    Identifier name;
 } Field;
 
 typedef struct PlangStruct {
     Node nodebase;
-    StrSpan name;
+    Identifier name;
     Field* fields; // darray
 } PlangStruct;
 
 
 typedef struct Constant {
-    StrSpan name;
+    Identifier name;
     Expression* expr;
 } Constant;

@@ -1,5 +1,6 @@
 #include "lexer.h"
 #include "darray.h"
+#include "parser.h"
 
 #include <stdio.h>
 
@@ -102,6 +103,11 @@ u32 lex(char* input) {
             token.type = tokType;
             token.line = current_line;
             token.value = word;
+
+            if (token.type == Tok_Word) {
+                token.stringTableByteOffset = appendStringToTypetable(word);
+            }
+
             darrayAdd(tokens, token);
 
             continue;
@@ -227,14 +233,17 @@ u32 lex(char* input) {
                 }
             }
 
+            StrSpan str = {
+                .start = strStart,
+                .length = cursor - (strStart - 1)
+            };
+
             Token token = {
                 .type = Tok_String,
                 .line = current_line,
-                .value = {
-                    .start = strStart,
-                    .length = cursor - (strStart - 1)
-                }
+                .stringTableByteOffset = appendStringToTypetable(str)
             };
+
             darrayAdd(tokens, token);
             continue;
         }
@@ -244,19 +253,6 @@ u32 lex(char* input) {
             char* commentStart = cursor;
             while (*++cursor != '\n');
             cursor--;
-
-            /*
-            tokens[tokens_length++] = (Token) {
-                .type = Tok_Comment,
-                .line = current_line,
-                .value = (StrSpan) {
-                    .start = commentStart,
-                    .length = cursor - (commentStart - 1)
-                }
-            };
-            */
-
-
             continue;
         }
 
@@ -268,23 +264,9 @@ u32 lex(char* input) {
                 if (*cursor == '\n') current_line++;
             }
             cursor++;
-
-            /*
-            tokens[tokens_length++] = (Token) {
-                .type = Tok_MultiComment,
-                .line = current_line,
-                .value = (StrSpan) {
-                    .start = commentStart,
-                    .length = cursor - (commentStart - 1)
-                }
-            };
-            */
-
             continue;
         }
 
-
-        #define test_char(c, t) if (*cursor == c) { appendToken(t);    continue; }
 
         switch (*cursor) {
 

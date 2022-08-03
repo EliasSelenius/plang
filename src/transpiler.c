@@ -19,7 +19,7 @@ inline void newline() {
     while (t--) sbAppend(sb, "    ");
 }
 
-StrSpan getTypeCname(Datatype type) {
+char* getTypeCname(Datatype type) {
     PlangType* ptype = getType(type);
 
     switch (ptype->kind) {
@@ -27,8 +27,8 @@ StrSpan getTypeCname(Datatype type) {
         case Typekind_Primitive: {
 
             // TODO: this is obviously temporarly hard coded
-            if (type.typeId == 9) return spFrom("signed long long");
-            if (type.typeId == 10) return spFrom("unsigned long long");
+            if (type.typeId == 9) return "signed long long";
+            if (type.typeId == 10) return "unsigned long long";
 
         } break;
         case Typekind_Struct: break;
@@ -37,11 +37,11 @@ StrSpan getTypeCname(Datatype type) {
         case Typekind_FuncPtr: break;
     }
 
-    return ptype->name;
+    return getIdentifierStringValue(ptype->name);
 }
 
 static void transpileType(Datatype type) {
-    sbAppendSpan(sb, getTypeCname(type));
+    sbAppend(sb, getTypeCname(type));
     u32 np = type.numPointers;
     while (np-- > 0) {
         sbAppend(sb, "*");
@@ -138,7 +138,7 @@ static void transpileExpression(Expression* expr) {
             DerefOperator* deref = (DerefOperator*)expr;
             transpileExpression(deref->expr);
             sbAppend(sb, deref->derefOp);
-            sbAppendSpan(sb, deref->name);
+            sbAppend(sb, getIdentifierStringValue(deref->name));
         } break;
 
         case ExprType_Indexing: {
@@ -153,9 +153,12 @@ static void transpileExpression(Expression* expr) {
             sbAppend(sb, "0");
         } break;
 
+        case ExprType_Literal_String: {
+            LiteralExpression* lit = (LiteralExpression*)expr;
+            sbAppend(sb, getIdentifierStringValue(lit->string));
+        } break;
 
         case ExprType_Literal_Bool:
-        case ExprType_Literal_String:
         case ExprType_Literal_Char:
 
         case ExprType_Literal_Integer:
@@ -172,7 +175,7 @@ static void transpileExpression(Expression* expr) {
 
         case ExprType_Variable: {
             VariableExpression* var = (VariableExpression*)expr;
-            sbAppendSpan(sb, var->name);
+            sbAppend(sb, getIdentifierStringValue(var->name));
         } break;
 
         case ExprType_Constant: {
@@ -267,7 +270,7 @@ static void transpileVarDecl(VarDecl* decl) {
         transpileType(decl->type);
         decl->type.numPointers++;
         sbAppend(sb, " ");
-        sbAppendSpan(sb, decl->name);
+        sbAppend(sb, getIdentifierStringValue(decl->name));
 
         sbAppend(sb, "[");
         transpileExpression(decl->assignmentOrNull);
@@ -275,7 +278,7 @@ static void transpileVarDecl(VarDecl* decl) {
     } else {
         transpileType(decl->type);
         sbAppend(sb, " ");
-        sbAppendSpan(sb, decl->name);
+        sbAppend(sb, getIdentifierStringValue(decl->name));
 
         if (decl->assignmentOrNull) {
             sbAppend(sb, " = ");
@@ -342,12 +345,12 @@ static void transpileStatement(Statement* statement) {
         case Statement_Goto: {
             GotoStatement* go = (GotoStatement*)statement;
             sbAppend(sb, "goto ");
-            sbAppendSpan(sb, go->label);
+            sbAppend(sb, getIdentifierStringValue(go->label));
             sbAppend(sb, ";");
         } break;
         case Statement_Label: {
             LabelStatement* l = (LabelStatement*)statement;
-            sbAppendSpan(sb, l->label);
+            sbAppend(sb, getIdentifierStringValue(l->label));
             sbAppend(sb, ":");
         } break;
 
@@ -378,7 +381,7 @@ static void transpileBlock(Codeblock* scope) {
 static void transpileFunctionSignature(FuncDeclaration* func, u32 overload) {
     transpileType(func->returnType);
     sbAppend(sb, " ");
-    sbAppendSpan(sb, func->name);
+    sbAppend(sb, getIdentifierStringValue(func->name));
     if (overload) sbAppendChar(sb, getCharFromU32(overload));
     sbAppend(sb, "(");
     if (func->arguments) {
@@ -386,7 +389,7 @@ static void transpileFunctionSignature(FuncDeclaration* func, u32 overload) {
         FuncArg arg = func->arguments[0];
         transpileType(arg.type);
         sbAppend(sb, " ");
-        sbAppendSpan(sb, arg.name);
+        sbAppend(sb, getIdentifierStringValue(arg.name));
 
         u32 len = darrayLength(func->arguments);
         for (u32 i = 1; i < len; i++) {
@@ -395,7 +398,7 @@ static void transpileFunctionSignature(FuncDeclaration* func, u32 overload) {
             arg = func->arguments[i];
             transpileType(arg.type);
             sbAppend(sb, " ");
-            sbAppendSpan(sb, arg.name);
+            sbAppend(sb, getIdentifierStringValue(arg.name));
         }
     }
     sbAppend(sb, ")");
@@ -410,7 +413,7 @@ static void transpileFunction(PlangFunction* func) {
 
 static void transpileStruct(PlangStruct* stru) {
     sbAppend(sb, "typedef struct ");
-    sbAppendSpan(sb, stru->name);
+    sbAppend(sb, getIdentifierStringValue(stru->name));
     sbAppend(sb, " {");
 
     tabing++;
@@ -420,7 +423,7 @@ static void transpileStruct(PlangStruct* stru) {
         newline();
         transpileType(stru->fields[i].type);
         sbAppend(sb, " ");
-        sbAppendSpan(sb, stru->fields[i].name);
+        sbAppend(sb, getIdentifierStringValue(stru->fields[i].name));
         sbAppend(sb, ";");
     }
 
@@ -428,7 +431,7 @@ static void transpileStruct(PlangStruct* stru) {
     newline();
 
     sbAppend(sb, "} ");
-    sbAppendSpan(sb, stru->name);
+    sbAppend(sb, getIdentifierStringValue(stru->name));
     sbAppend(sb, ";\n");
 }
 
@@ -466,6 +469,7 @@ void transpile() {
     u32 typesLen = darrayLength(g_Unit->types);
     for (u32 i = 0; i < typesLen; i++) {
         PlangType* type = &g_Unit->types[i];
+        char* name = getIdentifierStringValue(type->name);
         switch (type->kind) {
 
             case Typekind_Invalid: break;
@@ -473,9 +477,10 @@ void transpile() {
 
             case Typekind_Struct: {
                 sbAppend(sb, "typedef struct ");
-                sbAppendSpan(sb, type->type_struct->name);
+                // char* name = getIdentifierStringValue(type->type_struct->name);
+                sbAppend(sb, name);
                 sbAppend(sb, " ");
-                sbAppendSpan(sb, type->type_struct->name);
+                sbAppend(sb, name);
                 sbAppend(sb, ";\n");
             } break;
 
@@ -487,10 +492,10 @@ void transpile() {
                     transpileType(type->type_aliasedType);
                 } else {
                     sbAppend(sb, "struct ");
-                    sbAppendSpan(sb, type->name);
+                    sbAppend(sb, name);
                 }
                 sbAppend(sb, " ");
-                sbAppendSpan(sb, type->name);
+                sbAppend(sb, name);
                 sbAppend(sb, ";\n");
             } break;
 
@@ -499,7 +504,7 @@ void transpile() {
                 sbAppend(sb, "typedef ");
                 transpileType(funcPtr->returnType);
                 sbAppend(sb, " ");
-                sbAppendSpan(sb, type->name);
+                sbAppend(sb, name);
                 sbAppend(sb, "(");
                 if (funcPtr->argCount) {
                     transpileType(funcPtr->argTypes[0]);

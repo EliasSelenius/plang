@@ -23,7 +23,6 @@
         - allow underscores in number literals
         *- switch statements
         - omit curl brackets in if/while etc. for single statement block
-        - hash identifiers (Tok_Word tokens) for faster string equals and to free the file buffer
         - nested multi-line comments
         - disallow void as variable type in declaration
         - nesting funcptr types inside funcptrs arguments. void(void*(char*), uint) seems to produce a bug
@@ -35,6 +34,7 @@
     InProgress:
         - line numbers in validation errors
         - localy defined functions
+        - construct list of all string identifiers during tokenizing, to allow for faster string equals and to free the file buffer, and to clear the tokens list after parsing for less memory usage
 
 
     DONE list:
@@ -118,13 +118,31 @@ void addFile(char* filename, char* extension) {
 
 }
 
+
+
+u32 appendStringToTypetable(StrSpan word) {
+    u32 len = darrayLength(g_Unit->stringTableByteOffsets);
+    for (u32 i = 0; i < len; i++) {
+        u32 byteOffset = g_Unit->stringTableByteOffsets[i];
+        char* s = (char*)(&g_Unit->stringTable->bytes[byteOffset]);
+        if (spanEquals(word, s)) return byteOffset;
+    }
+
+    u32 byteOffset = dyReserve(&g_Unit->stringTable, word.length + 1);
+    u8* p = (&g_Unit->stringTable->bytes[byteOffset]);
+    for (u32 i = 0; i < word.length; i++) p[i] = word.start[i];
+    p[word.length] = '\0';
+
+    darrayAdd(g_Unit->stringTableByteOffsets, byteOffset);
+    return byteOffset;
+}
+
 void addPrimitiveType(char* name) {
     PlangType newType;
     newType.kind = Typekind_Primitive;
-    newType.name = spFrom(name);
+    newType.name = appendStringToTypetable(spFrom(name));
     darrayAdd(g_Unit->types, newType);
 }
-
 
 int main(int argc, char* argv[]) {
 
@@ -153,6 +171,8 @@ int main(int argc, char* argv[]) {
     unit.constants = darrayCreate(Constant);
     unit.types = darrayCreate(PlangType);
     unit.funcPtrTypes = dyCreate();
+    unit.stringTable = dyCreate();
+    unit.stringTableByteOffsets = darrayCreate(u32);
     g_Unit = &unit;
 
     { // add default types to typetable
@@ -170,6 +190,11 @@ int main(int argc, char* argv[]) {
 
         addPrimitiveType("float");
         addPrimitiveType("double");
+
+        u32 len = darrayLength(g_Unit->types);
+        for (u32 i = 0; i < len; i++) {
+            printf("    %d. %s : %s\n", i, TypekindNames[g_Unit->types[i].kind], getIdentifierStringValue(g_Unit->types[i].name));
+        }
     }
 
     startPerf();
@@ -200,6 +225,20 @@ int main(int argc, char* argv[]) {
         sbAppend(&sb, argv[i++]);
         sbAppendChar(&sb, ' ');
     }
+
+
+    { // print string table
+        // printf("%.*s\n", g_Unit->stringTable->length, g_Unit->stringTable->bytes);
+
+        u32 len = darrayLength(g_Unit->stringTableByteOffsets);
+        for (u32 i = 0; i < len; i++) {
+            u8* s = &g_Unit->stringTable->bytes[g_Unit->stringTableByteOffsets[i]];
+            printf("%s\n", s);
+        }
+
+        printf("Printed %d strings\n", len);
+    }
+
 
     printf("Validate...\n");
     u32 numErrors = validate();

@@ -205,7 +205,7 @@ let main() {
         glClear(GL_COLOR_BUFFER_BIT);
 
         float time = glfwGetTime() as float;
-        // time = 0.0;
+        time = 0.0;
         int i = 0;
         while i < planetsCount {
             Planet* planet = *planets[i++];
