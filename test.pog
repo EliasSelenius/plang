@@ -1,0 +1,9 @@
+
+
+int main() {
+
+    let i = 0;
+    let f = 12.123;
+
+    return 0;
+}

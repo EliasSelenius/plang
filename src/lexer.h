@@ -38,12 +38,12 @@ typedef enum TokenType {
     Tok_Keyword_Const,
 
     Tok_Integer,
-    Tok_Integer_Uint,
-    Tok_Integer_Long,
-    Tok_Integer_Ulong,
+    // Tok_Integer_Uint,
+    // Tok_Integer_Long,
+    // Tok_Integer_Ulong,
     Tok_Decimal,
-    Tok_Decimal_Float,
-    Tok_Decimal_Double,
+    // Tok_Decimal_Float,
+    // Tok_Decimal_Double,
     Tok_String,
     Tok_Char,
 
@@ -108,11 +108,20 @@ typedef struct Token {
     u32 line;
 
     union {
-        StrSpan value; // TODO: remove this
         u32 stringTableByteOffset;
+        u64 integer;
+        f64 decimal;
+        char character;
     };
 } Token;
 
+typedef enum TypeSuffix {
+    Suffix_f,
+    Suffix_d,
+    Suffix_u,
+    Suffix_l,
+    Suffix_ul
+} TypeSuffix;
 
 extern Token* tokens;
 

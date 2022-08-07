@@ -22,6 +22,7 @@ static Datatype type_voidPointer;
 static Datatype type_charPointer;
 static Datatype type_char;
 
+static Datatype type_ambiguousNumber = { .typeId = 0, .numPointers = 1 };
 static Datatype type_int32;
 static Datatype type_uint32;
 static Datatype type_int64;
@@ -29,6 +30,7 @@ static Datatype type_uint64;
 static Datatype type_float32;
 static Datatype type_float64;
 
+Datatype validateExpressionWithAmbiguousTypes(Expression* expr);
 Datatype validateExpression(Expression* expr);
 Datatype getDeclaredVariable(Identifier name);
 bool typeAssignable(Datatype toType, Datatype fromType);
@@ -139,7 +141,7 @@ static Datatype getDeclaredVariable(Identifier name) {
 static Datatype validateVariable(VariableExpression* var) {
 
     Datatype type = getDeclaredVariable(var->name);
-    if (type.typeId) return type;
+    if (typeExists(type)) return type;
 
     FuncDeclaration* decl = getFuncDecl(var->name);
     if (decl) return ensureFuncPtrExistsFromFuncDeclaration(decl);
@@ -202,9 +204,21 @@ static bool typeAssignable(Datatype toType, Datatype fromType) {
     if (typeEquals(toType, fromType)) return true;
 
     PlangType* to = getActualType(toType);
-    PlangType* from = getActualType(fromType);
-
     u32 toPointers = numPointers(toType);
+
+    if (isAmbiguousNumber(fromType) && toPointers == 0) {
+        u32 typeId = getTypeIdOfType(to);
+
+        if (typeId == type_int32.typeId) return true;
+        else if (typeId == type_uint32.typeId) return true;
+        else if (typeId == type_int64.typeId) return true;
+        else if (typeId == type_uint64.typeId) return true;
+        else if (typeId == type_float32.typeId) return true;
+        else if (typeId == type_float64.typeId) return true;
+        else return false;
+    }
+
+    PlangType* from = getActualType(fromType);
     u32 fromPointers = numPointers(fromType);
 
     if (toPointers == fromPointers) {
@@ -254,7 +268,7 @@ static Datatype validateFuncCall(FuncCall* call) {
     // validate passed arguments
     u32 passedArgumentsLength = call->args ? darrayLength(call->args) : 0;
     Datatype passedArguments[passedArgumentsLength];
-    for (u32 i = 0; i < passedArgumentsLength; i++) passedArguments[i] = validateExpression(call->args[i]);
+    for (u32 i = 0; i < passedArgumentsLength; i++) passedArguments[i] = validateExpressionWithAmbiguousTypes(call->args[i]);
 
 
     if (call->funcExpr->expressionType != ExprType_Variable) goto funcptrPart;
@@ -291,7 +305,7 @@ static Datatype validateFuncCall(FuncCall* call) {
             }
 
             for (u32 i = 0; i < passedArgumentsLength; i++) {
-                if (passedArguments[i].typeId) assertAssignability(func->decl.arguments[i].type, passedArguments[i]);
+                if (typeExists(passedArguments[i])) assertAssignability(func->decl.arguments[i].type, passedArguments[i]);
             }
 
             return func->decl.returnType;
@@ -310,7 +324,7 @@ static Datatype validateFuncCall(FuncCall* call) {
 
         bool compat = true;
         for (u32 i = 0; i < passedArgumentsLength; i++) {
-            if (!passedArguments[i].typeId) continue;
+            if (!typeExists(passedArguments[i])) continue;
             if (!typeAssignable(decl->arguments[i].type, passedArguments[i])) {compat = false; break;}
         }
 
@@ -332,7 +346,7 @@ static Datatype validateFuncCall(FuncCall* call) {
             }
 
             for (u32 i = 0; i < passedArgumentsLength; i++) {
-                if (passedArguments[i].typeId) assertAssignability(funcptr->argTypes[i], passedArguments[i]);
+                if (typeExists(passedArguments[i])) assertAssignability(funcptr->argTypes[i], passedArguments[i]);
             }
 
             return funcptr->returnType;
@@ -345,7 +359,7 @@ static Datatype validateFuncCall(FuncCall* call) {
 }
 
 
-static Datatype validateExpression(Expression* expr) {
+static Datatype validateExpressionWithAmbiguousTypes(Expression* expr) {
     switch (expr->expressionType) {
         case ExprType_Constant:
         case ExprType_Variable: {
@@ -526,17 +540,12 @@ static Datatype validateExpression(Expression* expr) {
         } break;
 
         { // literals
-            case ExprType_Literal_Integer:  return type_int32;
-            case ExprType_Literal_Uint:     return type_uint32;
-            case ExprType_Literal_Long:     return type_int64;
-            case ExprType_Literal_ULong:    return type_uint64;
-            case ExprType_Literal_Decimal:  return type_float32;
-            case ExprType_Literal_Float:    return type_float32;
-            case ExprType_Literal_Double:   return type_float64;
-
+            case ExprType_Literal_Integer:  return type_ambiguousNumber;
+            case ExprType_Literal_Decimal:  return type_ambiguousNumber;
             case ExprType_Literal_Char:    return type_char;
             case ExprType_Literal_String:  return type_charPointer;
-            case ExprType_Literal_Bool:    return type_int32;
+            case ExprType_Literal_True:    return type_int32; // TODO: int32? maybe use another type?
+            case ExprType_Literal_False:   return type_int32;
             case ExprType_Literal_Null:    return type_voidPointer;
         }
 
@@ -551,6 +560,11 @@ static Datatype validateExpression(Expression* expr) {
     return type_null;
 }
 
+inline Datatype validateExpression(Expression* expr) {
+    Datatype type = validateExpressionWithAmbiguousTypes(expr);
+    if (isAmbiguousNumber(type)) return type_int32; // int32 is default number type
+    return type;
+}
 
 static void validateScope(Codeblock* scope) {
     Codeblock* parentScope = currentScope;
@@ -593,17 +607,17 @@ static void validateScope(Codeblock* scope) {
                 }
 
                 if (decl->assignmentOrNull) {
-                    Datatype assType = validateExpression(decl->assignmentOrNull);
-                    if (!assType.typeId) break; // if type could not be determined then we should not continue, act as if this statement does not exist 
+                    Datatype assType = validateExpressionWithAmbiguousTypes(decl->assignmentOrNull);
+
+                    if (!typeExists(assType)) break; // if type could not be determined then we should not continue, act as if this statement does not exist 
 
                     if (typeExists(decl->type)) {
                         validateType(decl->type);
                         assertAssignability(decl->type, assType);
                     } else {
                         // type infer
-                        decl->type = assType;
+                        decl->type = isAmbiguousNumber(assType) ? type_int32 : assType;
                     }
-
                 } else {
                     validateType(decl->type);
                 }
@@ -621,7 +635,7 @@ static void validateScope(Codeblock* scope) {
                 Datatype toType = validateExpression(ass->assigneeExpr);
                 Datatype fromType = validateExpression(ass->expr);
 
-                if (toType.typeId && fromType.typeId) {
+                if (typeExists(toType) && typeExists(fromType)) {
                     assertAssignability(toType, fromType);
                 }
             } break;
@@ -661,16 +675,16 @@ static void validateScope(Codeblock* scope) {
                 ReturnStatement* retSta = (ReturnStatement*)sta;
 
                 Datatype type = type_void;
-                if (retSta->returnExpr) type = validateExpression(retSta->returnExpr);
+                if (retSta->returnExpr) type = validateExpressionWithAmbiguousTypes(retSta->returnExpr);
 
-                if (!type.typeId) break;
+                if (!typeExists(type)) break;
 
                 if (typeExists(function->decl.returnType)) {
                     if (!typeAssignable(function->decl.returnType, type)) {
                         error("Return type missmatch in function \"%s\".", getIdentifierStringValue(function->decl.name));
                     }
                 } else {
-                    function->decl.returnType = type;
+                    function->decl.returnType = isAmbiguousNumber(type) ? type_int32 : type;
                 }
 
 
@@ -765,13 +779,13 @@ static void validateStruct(PlangStruct* stru) {
 static void validateGlobalVar(VarDecl* decl) {
     if (decl->assignmentOrNull) {
         Datatype assType = validateExpression(decl->assignmentOrNull);
-        if (!assType.typeId) return; // if type could not be determined then we should not continue.
+        if (!typeExists(assType)) return; // if type could not be determined then we should not continue.
 
         if (typeExists(decl->type)) {
             validateType(decl->type);
             assertAssignability(decl->type, assType);
         } else {
-            decl->type = assType;
+            decl->type = isAmbiguousNumber(assType) ? type_int32 : assType;
         }
 
     } else {
@@ -781,16 +795,16 @@ static void validateGlobalVar(VarDecl* decl) {
 
 u32 validate() {
 
-    type_void           = (Datatype) { .typeId = ensureTypeExistence(appendStringToTypetable(spFrom("void"))), .numPointers = 0 };
-    type_voidPointer    = (Datatype) { .typeId = ensureTypeExistence(appendStringToTypetable(spFrom("void"))), .numPointers = 1 };
-    type_charPointer    = (Datatype) { .typeId = ensureTypeExistence(appendStringToTypetable(spFrom("char"))), .numPointers = 1 };
-    type_char           = (Datatype) { .typeId = ensureTypeExistence(appendStringToTypetable(spFrom("char"))), .numPointers = 0 };
-    type_int32          = (Datatype) { .typeId = ensureTypeExistence(appendStringToTypetable(spFrom("int"))),  .numPointers = 0 };
-    type_uint32         = (Datatype) { .typeId = ensureTypeExistence(appendStringToTypetable(spFrom("uint"))),  .numPointers = 0 };
-    type_int64          = (Datatype) { .typeId = ensureTypeExistence(appendStringToTypetable(spFrom("long"))),  .numPointers = 0 };
-    type_uint64         = (Datatype) { .typeId = ensureTypeExistence(appendStringToTypetable(spFrom("ulong"))),  .numPointers = 0 };
-    type_float32        = (Datatype) { .typeId = ensureTypeExistence(appendStringToTypetable(spFrom("float"))), .numPointers = 0 };
-    type_float64        = (Datatype) { .typeId = ensureTypeExistence(appendStringToTypetable(spFrom("double"))), .numPointers = 0 };
+    type_void           = (Datatype) { .typeId = ensureTypeExistence(appendStringToStringtable(spFrom("void"))), .numPointers = 0 };
+    type_voidPointer    = (Datatype) { .typeId = ensureTypeExistence(appendStringToStringtable(spFrom("void"))), .numPointers = 1 };
+    type_charPointer    = (Datatype) { .typeId = ensureTypeExistence(appendStringToStringtable(spFrom("char"))), .numPointers = 1 };
+    type_char           = (Datatype) { .typeId = ensureTypeExistence(appendStringToStringtable(spFrom("char"))), .numPointers = 0 };
+    type_int32          = (Datatype) { .typeId = ensureTypeExistence(appendStringToStringtable(spFrom("int"))),  .numPointers = 0 };
+    type_uint32         = (Datatype) { .typeId = ensureTypeExistence(appendStringToStringtable(spFrom("uint"))),  .numPointers = 0 };
+    type_int64          = (Datatype) { .typeId = ensureTypeExistence(appendStringToStringtable(spFrom("long"))),  .numPointers = 0 };
+    type_uint64         = (Datatype) { .typeId = ensureTypeExistence(appendStringToStringtable(spFrom("ulong"))),  .numPointers = 0 };
+    type_float32        = (Datatype) { .typeId = ensureTypeExistence(appendStringToStringtable(spFrom("float"))), .numPointers = 0 };
+    type_float64        = (Datatype) { .typeId = ensureTypeExistence(appendStringToStringtable(spFrom("double"))), .numPointers = 0 };
 
     // validate types
     u32 typeLen = darrayLength(g_Unit->types);

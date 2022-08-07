@@ -147,7 +147,7 @@ static Identifier constructNameForFuncPtr(FuncPtr* funcPtr) {
     span.length = sb_funcPtrName.length;
     span.start = sb_funcPtrName.content;
 
-    Identifier id = appendStringToTypetable(span);
+    Identifier id = appendStringToStringtable(span);
     return id;
 }
 
@@ -392,19 +392,19 @@ static void expectFuncCallArgs(FuncCall* func, Expression* funcExpr) {
 }
 
 
-static Expression* createLiteral(ExprType type) {
+
+static Expression* basicLiteral(ExprType type) {
+    LiteralExpression* lit = malloc(sizeof(LiteralExpression));
+    lit->base.expressionType = type;
+    lit->base.nodebase.lineNumber = tokens[token_index++].line;
+    return (Expression*)lit;
+}
+
+static LiteralExpression* createLiteral(ExprType type) {
     LiteralExpression* lit = malloc(sizeof(LiteralExpression));
     lit->base.expressionType = type;
     lit->base.nodebase.lineNumber = tokens[token_index].line;
-
-    if (type == ExprType_Literal_String) {
-        lit->string = tokens[token_index].stringTableByteOffset;
-    } else {
-        lit->value = tokens[token_index].value;
-    }
-
-    token_index++;
-    return (Expression*)lit;
+    return lit;
 }
 
 static UnaryExpression* createUnaryExpr(ExprType type) {
@@ -481,19 +481,26 @@ static Expression* parseLeafExpression() {
         } break;
 
 
-        case Tok_Integer:        res = createLiteral(ExprType_Literal_Integer); break;
-        case Tok_Integer_Uint:   res = createLiteral(ExprType_Literal_Uint); break;
-        case Tok_Integer_Long:   res = createLiteral(ExprType_Literal_Long); break;
-        case Tok_Integer_Ulong:  res = createLiteral(ExprType_Literal_ULong); break;
-        case Tok_Decimal:        res = createLiteral(ExprType_Literal_Decimal); break;
-        case Tok_Decimal_Float:  res = createLiteral(ExprType_Literal_Float); break;
-        case Tok_Decimal_Double: res = createLiteral(ExprType_Literal_Double); break;
+        case Tok_Integer: {
+            LiteralExpression* lit = createLiteral(ExprType_Literal_Integer);
+            lit->integer = tokens[token_index++].integer;
+            res = (Expression*)lit;
+        } break;
+        case Tok_Decimal: {
+            LiteralExpression* lit = createLiteral(ExprType_Literal_Decimal);
+            lit->decimal = tokens[token_index++].decimal;
+            res = (Expression*)lit;
+        } break;
+        case Tok_String: {
+            LiteralExpression* lit = createLiteral(ExprType_Literal_String);
+            lit->string = tokens[token_index++].stringTableByteOffset;
+            res = (Expression*)lit;
+        } break;
 
-        case Tok_Char:          res = createLiteral(ExprType_Literal_Char); break;
-        case Tok_String:        res = createLiteral(ExprType_Literal_String); break;
-        case Tok_Keyword_True:  res = createLiteral(ExprType_Literal_Bool); break;
-        case Tok_Keyword_False: res = createLiteral(ExprType_Literal_Bool); break;
-        case Tok_Keyword_Null:  res = createLiteral(ExprType_Literal_Null); break;
+        case Tok_Char:          res = basicLiteral(ExprType_Literal_Char); break;
+        case Tok_Keyword_True:  res = basicLiteral(ExprType_Literal_True); break;
+        case Tok_Keyword_False: res = basicLiteral(ExprType_Literal_False); break;
+        case Tok_Keyword_Null:  res = basicLiteral(ExprType_Literal_Null); break;
 
         default: return null;
     }

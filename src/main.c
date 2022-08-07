@@ -120,7 +120,7 @@ void addFile(char* filename, char* extension) {
 
 
 
-u32 appendStringToTypetable(StrSpan word) {
+u32 appendStringToStringtable(StrSpan word) {
     u32 len = darrayLength(g_Unit->stringTableByteOffsets);
     for (u32 i = 0; i < len; i++) {
         u32 byteOffset = g_Unit->stringTableByteOffsets[i];
@@ -140,11 +140,19 @@ u32 appendStringToTypetable(StrSpan word) {
 void addPrimitiveType(char* name) {
     PlangType newType;
     newType.kind = Typekind_Primitive;
-    newType.name = appendStringToTypetable(spFrom(name));
+    newType.name = appendStringToStringtable(spFrom(name));
     darrayAdd(g_Unit->types, newType);
 }
 
+
+void test(u64 number) {
+
+
+}
+
+
 int main(int argc, char* argv[]) {
+
 
     if (argc == 1) {
         printf("Insufficent arguments.\n");
@@ -227,8 +235,7 @@ int main(int argc, char* argv[]) {
     }
 
 
-    { // print string table
-        // printf("%.*s\n", g_Unit->stringTable->length, g_Unit->stringTable->bytes);
+    if (false) { // print string table
 
         u32 len = darrayLength(g_Unit->stringTableByteOffsets);
         for (u32 i = 0; i < len; i++) {

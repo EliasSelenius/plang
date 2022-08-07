@@ -53,6 +53,19 @@ static char getCharFromU32(u32 num) {
     return '0' + num;
 }
 
+static char number_string[20]; // 20 is max char size for 64 bit integer
+static StrSpan numberToString(u64 num) {
+    if (num == 0) return (StrSpan) { "0", 1 };
+    u32 strIndex = 20;
+
+    while (num != 0) {
+        u64 r = num % 10; num /= 10;
+        number_string[--strIndex] = r + '0';
+    }
+
+    return (StrSpan) { &number_string[strIndex], 20 - strIndex };
+}
+
 static void transpileFuncCall(FuncCall* call) {
     transpileExpression(call->funcExpr);
     if (call->overload) sbAppendChar(sb, getCharFromU32(call->overload));
@@ -158,19 +171,25 @@ static void transpileExpression(Expression* expr) {
             sbAppend(sb, getIdentifierStringValue(lit->string));
         } break;
 
-        case ExprType_Literal_Bool:
-        case ExprType_Literal_Char:
-
-        case ExprType_Literal_Integer:
-        case ExprType_Literal_Uint:
-        case ExprType_Literal_Long:
-        case ExprType_Literal_ULong:
-        case ExprType_Literal_Decimal:
-        case ExprType_Literal_Float:
-        case ExprType_Literal_Double:
-        {
+        case ExprType_Literal_Char: {
             LiteralExpression* lit = (LiteralExpression*)expr;
-            sbAppendSpan(sb, lit->value);
+            sbAppendChar(sb, '\'');
+            sbAppendChar(sb, lit->character);
+            sbAppendChar(sb, '\'');
+        } break;
+
+        case ExprType_Literal_True: sbAppend(sb, "1"); break;
+        case ExprType_Literal_False: sbAppend(sb, "0"); break;
+
+        case ExprType_Literal_Integer: {
+            LiteralExpression* lit = (LiteralExpression*)expr;
+            sbAppendSpan(sb, numberToString(lit->integer));
+        } break;
+
+        case ExprType_Literal_Decimal: {
+            LiteralExpression* lit = (LiteralExpression*)expr;
+            // sbAppendSpan(sb, lit->value);
+            sbAppend(sb, "0.0");
         } break;
 
         case ExprType_Variable: {
@@ -458,7 +477,7 @@ void transpile() {
 
     // sbAppend(sb, "#include <stdlib.h>\n"); // malloc
     // sbAppend(sb, "#include <stdio.h>\n"); // printf
-    sbAppend(sb, "#define true 1\n#define false 0\n");
+    // sbAppend(sb, "#define true 1\n#define false 0\n");
 
     sbAppend(sb, "\n// types\n");
     sbAppend(sb, "typedef unsigned int uint;\n");

@@ -33,7 +33,7 @@ typedef struct TranslationUnit {
 
 extern TranslationUnit* g_Unit;
 
-u32 appendStringToTypetable(StrSpan word);
+u32 appendStringToStringtable(StrSpan word);
 
 typedef u32 Identifier;
 inline char* getIdentifierStringValue(Identifier id) {
@@ -79,9 +79,18 @@ typedef struct FuncPtr {
 
 #define type_null ((Datatype){0})
 
+inline u32 getTypeIdOfType(PlangType* type) { return (u32)(((u64)type) - ((u64)g_Unit->types)) + 1; }
 inline PlangType* getTypeById(u32 id) { return &g_Unit->types[id - 1]; }
 inline PlangType* getType(Datatype dt) { return getTypeById(dt.typeId); }
-inline bool typeExists(Datatype dt) { return dt.typeId != 0; }
+inline bool typeExists(Datatype dt) { return !(dt.typeId == 0 && dt.numPointers == 0); }
+
+inline bool isAmbiguousNumber(Datatype type) {
+    if (type.typeId == 0) {
+        if (type.numPointers == 1) return true;
+    }
+
+    return false;
+}
 
 inline PlangType* getActualType(Datatype dt) {
     PlangType* type = getType(dt);
@@ -159,16 +168,12 @@ typedef enum ExprType {
     ExprType_Unary_Negate,
 
     ExprType_Literal_Integer,
-    ExprType_Literal_Uint,
-    ExprType_Literal_Long,
-    ExprType_Literal_ULong,
     ExprType_Literal_Decimal,
-    ExprType_Literal_Float,
-    ExprType_Literal_Double,
 
     ExprType_Literal_Char,
     ExprType_Literal_String,
-    ExprType_Literal_Bool,
+    ExprType_Literal_True,
+    ExprType_Literal_False,
     ExprType_Literal_Null,
     ExprType_Variable,
     ExprType_Constant,
@@ -192,14 +197,12 @@ typedef struct Expression {
 
 typedef struct LiteralExpression {
     Expression base;
-
     union {
-        StrSpan value; // TODO: remove this
         Identifier string;
         u64 integer;
         f64 decimal;
+        char character;
     };
-
 } LiteralExpression;
 
 typedef struct UnaryExpression {

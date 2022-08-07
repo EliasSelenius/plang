@@ -3,23 +3,35 @@
 #include "parser.h"
 
 #include <stdio.h>
+#include <math.h>
 
 Token* tokens; // darray
 
 static u32 current_line;
 static char* cursor;
 
-inline void appendTokenLength(TokenType type, u32 len) {
+inline void appendToken(TokenType type) {
     Token token;
     token.type = type;
     token.line = current_line;
-    token.value.start = cursor;
-    token.value.length = len;
     darrayAdd(tokens, token);
 }
 
-inline void appendToken(TokenType type) {
-    appendTokenLength(type, 1);
+static u64 number(u32* numDigits) {
+    char* start = cursor;
+    while (isDigit(*++cursor));
+    u32 len = cursor - start;
+
+    u64 acc = 0;
+    u64 place = 1;
+    for (i32 i = len - 1; i >= 0; i--) {
+        u64 d = start[i] - '0';
+        acc += place * d;
+        place *= 10;
+    }
+
+    *numDigits = len;
+    return acc;
 }
 
 // u32 lex2(char* input) {
@@ -102,10 +114,9 @@ u32 lex(char* input) {
             Token token;
             token.type = tokType;
             token.line = current_line;
-            token.value = word;
 
             if (token.type == Tok_Word) {
-                token.stringTableByteOffset = appendStringToTypetable(word);
+                token.stringTableByteOffset = appendStringToStringtable(word);
             }
 
             darrayAdd(tokens, token);
@@ -121,20 +132,58 @@ u32 lex(char* input) {
             cursor--;
 
             Token token = {
-                .type = Tok_Integer_Uint,
+                .type = Tok_Integer, // Tok_Integer_Uint,
                 .line = current_line,
-                .value = {
-                    .start = digitStart,
-                    .length = cursor - digitStart + 1
-                }
+                // .value = {
+                    // .start = digitStart,
+                    // .length = cursor - digitStart + 1
+                // }
+                .integer = 0
             };
             darrayAdd(tokens, token);
 
             continue;
         }
 
+        // new number
+        if (isDigit(*cursor)) {
+            Token token = {0};
+            token.line = current_line;
+            token.type = Tok_Integer;
+
+            u32 numDigits;
+            u64 num = number(&numDigits);
+            token.integer = num;
+
+            if (*cursor == '.') {
+                cursor++;
+                f64 fraction = (f64)number(&numDigits);
+
+                f64 denom = 1.0;
+                for (u32 i = 0; i < numDigits; i++) denom *= 10.0;
+
+                f64 value = (f64)num + (fraction / denom);
+
+                token.type = Tok_Decimal;
+                token.decimal = value;
+            }
+
+            switch (*cursor) {
+                case 'f': break;
+                case 'd': break;
+                case 'u': {
+                    if (*(cursor + 1) == 'l') cursor++;
+                } break;
+                case 'l': break;
+                default: cursor--; break;
+            }
+
+            darrayAdd(tokens, token);
+            continue;
+        }
+
         // number
-        if ( isDigit(*cursor) ||            // TODO: dont tokenize minus as part of the number token. it fucks up things like (list[i-1]) the minus token needs to be sepperate from the number
+        /* if ( isDigit(*cursor) ||            // TODO: dont tokenize minus as part of the number token. it fucks up things like (list[i-1]) the minus token needs to be sepperate from the number
                 (isDigit(*(cursor + 1)) && *cursor == '-')
            ) {
             // integer part
@@ -143,14 +192,6 @@ u32 lex(char* input) {
 
             // 123.123
             u32 length = cursor - digitStart;
-
-            /*
-                f - float
-                d - double
-                u - uint
-                l - long
-                ul - ulong
-            */
 
             TokenType tt = Tok_Integer;
 
@@ -193,29 +234,30 @@ u32 lex(char* input) {
             darrayAdd(tokens, token);
 
             continue;
-        }
+        } */
 
         // chars
         if (*cursor == '\'') {
             char* strStart = cursor++;
+
 
             if (*cursor > 0x7E || *cursor < 0x20) {
                 printf("Error: Invalid character. At line %d\n", current_line);
                 numberOfErrors++;
             }
 
+            char c = *cursor;
+
             cursor++;
             if (*cursor != '\'') {
                 printf("Error: Missing closing single quote. At line %d\n", current_line);
                 numberOfErrors++;
             }
+
             Token token = {
                 .type = Tok_Char,
                 .line = current_line,
-                .value = {
-                    .start = strStart,
-                    .length = cursor - (strStart - 1)
-                }
+                .character = c
             };
             darrayAdd(tokens, token);
             continue;
@@ -241,7 +283,7 @@ u32 lex(char* input) {
             Token token = {
                 .type = Tok_String,
                 .line = current_line,
-                .stringTableByteOffset = appendStringToTypetable(str)
+                .stringTableByteOffset = appendStringToStringtable(str)
             };
 
             darrayAdd(tokens, token);
@@ -288,14 +330,14 @@ u32 lex(char* input) {
             case ']': appendToken(Tok_CloseSquare); continue;
 
             case '<': switch (*(cursor + 1)) {
-                case '=': appendTokenLength(Tok_LessThanOrEqual, 2); cursor++; continue;
-                case '<': appendTokenLength(Tok_LeftShift, 2); cursor++; continue;
+                case '=': appendToken(Tok_LessThanOrEqual); cursor++; continue;
+                case '<': appendToken(Tok_LeftShift); cursor++; continue;
                 default: appendToken(Tok_LessThan); continue;
             }
 
             case '>': switch (*(cursor + 1)) {
-                case '=': appendTokenLength(Tok_GreaterThanOrEqual, 2); cursor++; continue;
-                case '>': appendTokenLength(Tok_RightShift, 2); cursor++; continue;
+                case '=': appendToken(Tok_GreaterThanOrEqual); cursor++; continue;
+                case '>': appendToken(Tok_RightShift); cursor++; continue;
                 default: appendToken(Tok_GreaterThan); continue;
             }
 
@@ -304,7 +346,7 @@ u32 lex(char* input) {
         #define test_op_eq(c, token, tokenEqual) \
             if (*cursor == c) { \
                 if (*(cursor + 1) == '=') { \
-                    appendTokenLength(tokenEqual, 2); \
+                    appendToken(tokenEqual); \
                     cursor++; \
                 } else appendToken(token); \
                 continue; \
@@ -316,8 +358,8 @@ u32 lex(char* input) {
 
         if (*cursor == '+') {
             switch (*(cursor + 1)) {
-                case '+': appendTokenLength(Tok_PlusPlus, 2); cursor++; break;
-                case '=': appendTokenLength(Tok_PlusAssign, 2); cursor++; break;
+                case '+': appendToken(Tok_PlusPlus); cursor++; break;
+                case '=': appendToken(Tok_PlusAssign); cursor++; break;
                 default: appendToken(Tok_Plus); break;
             }
             continue;
@@ -325,8 +367,8 @@ u32 lex(char* input) {
 
         if (*cursor == '-') {
             switch (*(cursor + 1)) {
-                case '-': appendTokenLength(Tok_MinusMinus, 2); cursor++; break;
-                case '=': appendTokenLength(Tok_MinusAssign, 2); cursor++; break;
+                case '-': appendToken(Tok_MinusMinus); cursor++; break;
+                case '=': appendToken(Tok_MinusAssign); cursor++; break;
                 default: appendToken(Tok_Minus); break;
             }
             continue;

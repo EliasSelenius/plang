@@ -6,10 +6,17 @@
             "type": "lldb",
             "request": "launch",
             "program": "${workspaceFolder}/output.exe",
-            //"args": ["deref.txt"],
             "cwd": "${workspaceFolder}",
-            // "preLaunchTask": "c_project_build"
         },
+        {
+            "name": "compile test.pog",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/bin/plang.exe",
+            "args": ["test.pog"],
+            "cwd": "${workspaceFolder}",
+        },
+
 
         {
             "name": "compile glfw_demo",
