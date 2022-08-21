@@ -42,6 +42,7 @@ inline char* getIdentifierStringValue(Identifier id) {
 
 typedef struct Node {
     u32 lineNumber;
+    char* filepath;
 } Node;
 
 typedef enum Typekind {
@@ -79,7 +80,7 @@ typedef struct FuncPtr {
 
 #define type_null ((Datatype){0})
 
-inline u32 getTypeIdOfType(PlangType* type) { return (u32)(((u64)type) - ((u64)g_Unit->types)) + 1; }
+inline u32 getTypeIdOfType(PlangType* type) { return (u32)(((u64)type) - ((u64)g_Unit->types)) / sizeof(PlangType) + 1; }
 inline PlangType* getTypeById(u32 id) { return &g_Unit->types[id - 1]; }
 inline PlangType* getType(Datatype dt) { return getTypeById(dt.typeId); }
 inline bool typeExists(Datatype dt) { return !(dt.typeId == 0 && dt.numPointers == 0); }

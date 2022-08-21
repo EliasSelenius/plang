@@ -38,8 +38,12 @@ bool typeAssignable(Datatype toType, Datatype fromType);
 inline void error(char* format, ...) {
     // TODO: better line of not only statements
     u32 lineNum = 0;
-    if (currentStatement) lineNum = currentStatement->nodebase.lineNumber;  
-    printf("Error Ln%d: ", lineNum);
+    char* file = "unknown_file";
+    if (currentStatement) {
+        lineNum = currentStatement->nodebase.lineNumber;
+        // file = currentStatement->nodebase.filepath;
+    }
+    printf("%s:%d: error: ", file, lineNum);
 
     va_list args;
     va_start(args, format);
@@ -152,7 +156,7 @@ static Datatype validateVariable(VariableExpression* var) {
         if (var->name == g_Unit->constants[i].name) {
             var->base.expressionType = ExprType_Constant;
             var->constExpr = g_Unit->constants[i].expr;
-            return validateExpression(var->constExpr);
+            return validateExpressionWithAmbiguousTypes(var->constExpr);
         }
     }
 
@@ -477,10 +481,10 @@ static Datatype validateExpressionWithAmbiguousTypes(Expression* expr) {
         case ExprType_Div:
         case ExprType_Mod: {
             BinaryExpression* bop = (BinaryExpression*)expr;
-            Datatype leftType = validateExpression(bop->left);
-            Datatype rightType = validateExpression(bop->right);
+            Datatype leftType = validateExpressionWithAmbiguousTypes(bop->left);
+            Datatype rightType = validateExpressionWithAmbiguousTypes(bop->right);
 
-            if (leftType.typeId && rightType.typeId) {
+            if (typeExists(leftType) && typeExists(rightType)) {
                 // TODO: is a valid operator operands pair?
             } else return type_null;
 
@@ -540,8 +544,8 @@ static Datatype validateExpressionWithAmbiguousTypes(Expression* expr) {
         } break;
 
         { // literals
-            case ExprType_Literal_Integer:  return type_ambiguousNumber;
-            case ExprType_Literal_Decimal:  return type_ambiguousNumber;
+            case ExprType_Literal_Integer: return type_ambiguousNumber;
+            case ExprType_Literal_Decimal: return type_ambiguousNumber;
             case ExprType_Literal_Char:    return type_char;
             case ExprType_Literal_String:  return type_charPointer;
             case ExprType_Literal_True:    return type_int32; // TODO: int32? maybe use another type?
@@ -633,7 +637,7 @@ static void validateScope(Codeblock* scope) {
                 Assignement* ass = (Assignement*)sta;
 
                 Datatype toType = validateExpression(ass->assigneeExpr);
-                Datatype fromType = validateExpression(ass->expr);
+                Datatype fromType = validateExpressionWithAmbiguousTypes(ass->expr);
 
                 if (typeExists(toType) && typeExists(fromType)) {
                     assertAssignability(toType, fromType);
