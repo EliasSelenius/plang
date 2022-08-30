@@ -5,6 +5,7 @@
 #include "lexer.h"
 #include "darray.h"
 #include "dynamic_buffer.h"
+#include "typesystem.h"
 
 u32 parse();
 
@@ -13,7 +14,8 @@ typedef struct FuncDeclaration FuncDeclaration;
 typedef struct PlangStruct PlangStruct;
 typedef struct VarDecl VarDecl;
 typedef struct Constant Constant;
-typedef struct PlangType PlangType;
+
+typedef u32 Identifier;
 
 typedef struct TranslationUnit {
     PlangFunction* functions; // darray
@@ -22,9 +24,10 @@ typedef struct TranslationUnit {
     VarDecl* globalVariables; // darray
     Constant* constants; // darray
 
-    // darray of all ocuring types, no duplicates
-    PlangType* types;
     DynamicBuffer* funcPtrTypes;
+
+    AliasType* aliases; // darray
+    Identifier* opaqueTypes; // darray
 
     u32* stringTableByteOffsets; // darray
     DynamicBuffer* stringTable;
@@ -33,43 +36,16 @@ typedef struct TranslationUnit {
 
 extern TranslationUnit* g_Unit;
 
-u32 appendStringToStringtable(StrSpan word);
-
-typedef u32 Identifier;
 inline char* getIdentifierStringValue(Identifier id) {
     return (char*)(&g_Unit->stringTable->bytes[id]);
 }
+
+u32 appendStringToStringtable(StrSpan word);
 
 typedef struct Node {
     u32 lineNumber;
     char* filepath;
 } Node;
-
-typedef enum Typekind {
-    Typekind_Invalid = 0,
-    Typekind_Primitive,
-    Typekind_Struct,
-    Typekind_Enum,
-    Typekind_Alias,
-    Typekind_FuncPtr
-    // Typekind_FixedArray
-} Typekind;
-
-typedef struct Datatype {
-    u32 typeId;
-    u32 numPointers;
-} Datatype;
-
-typedef struct PlangType {
-    Typekind kind;
-    Identifier name;
-
-    union {
-        Datatype     type_aliasedType;
-        PlangStruct* type_struct;
-        u32          type_funcPtr;
-    };
-} PlangType;
 
 typedef struct FuncPtr {
     Datatype returnType;
@@ -77,57 +53,6 @@ typedef struct FuncPtr {
     Datatype argTypes[];
 } FuncPtr;
 
-
-#define type_null ((Datatype){0})
-
-inline u32 getTypeIdOfType(PlangType* type) { return (u32)(((u64)type) - ((u64)g_Unit->types)) / sizeof(PlangType) + 1; }
-inline PlangType* getTypeById(u32 id) { return &g_Unit->types[id - 1]; }
-inline PlangType* getType(Datatype dt) { return getTypeById(dt.typeId); }
-inline bool typeExists(Datatype dt) { return !(dt.typeId == 0 && dt.numPointers == 0); }
-
-inline bool isAmbiguousNumber(Datatype type) {
-    if (type.typeId == 0) {
-        if (type.numPointers == 1) return true;
-    }
-
-    return false;
-}
-
-inline PlangType* getActualType(Datatype dt) {
-    PlangType* type = getType(dt);
-    if (type->kind == Typekind_Alias) {
-        if (type->type_aliasedType.typeId) type = getActualType(type->type_aliasedType);
-    }
-    return type;
-}
-
-inline bool typeEquals(Datatype a, Datatype b) {
-    return a.typeId == b.typeId && a.numPointers == b.numPointers;
-}
-
-
-inline u32 ensureTypeExistence(Identifier name) {
-    u32 len = darrayLength(g_Unit->types);
-    for (u32 i = 0; i < len; i++) {
-        switch (g_Unit->types[i].kind) {
-            case Typekind_Invalid:
-            case Typekind_Alias:
-            case Typekind_Primitive: {
-                if (g_Unit->types[i].name == name) {
-                    return i + 1;
-                }
-            } break;
-
-            default: break;
-        }
-    }
-
-    PlangType newType;
-    newType.name = name;
-    newType.kind = Typekind_Invalid;
-    darrayAdd(g_Unit->types, newType);
-    return len + 1;
-}
 
 inline FuncPtr* getFuncPtr(u32 id) { return (FuncPtr*)&g_Unit->funcPtrTypes->bytes[id]; }
 Datatype ensureFuncPtrExistsFromFuncDeclaration(FuncDeclaration* decl);

@@ -7,6 +7,7 @@
 #include <assert.h>
 #include <stdlib.h> // malloc
 
+
 void transpileBlock(Codeblock* scope);
 void filewrite(const char* filename, char* content);
 void transpileExpression(Expression* expr);
@@ -20,24 +21,38 @@ inline void newline() {
 }
 
 char* getTypeCname(Datatype type) {
-    PlangType* ptype = getType(type);
+    switch (type.kind) {
 
-    switch (ptype->kind) {
-        case Typekind_Invalid: break;
-        case Typekind_Primitive: {
+        // These should not exist at this point
+        case Typekind_Invalid:
+        case Typekind_Undecided:
+        case Typekind_MustBeInfered:
+        case Typekind_AmbiguousInteger:
+        case Typekind_AmbiguousDecimal:
+            printf("Attempted to transpile a type that should have been resolved. This is a bug!\n");
+            return "$error_type";
 
-            // TODO: this is obviously temporarly hard coded
-            if (type.typeId == 9) return "signed long long";
-            if (type.typeId == 10) return "unsigned long long";
+        case Typekind_uint8: return "uint8";
+        case Typekind_uint16: return "uint16";
+        case Typekind_uint32: return "uint32";
+        case Typekind_uint64: return "uint64";
+        case Typekind_int8: return "int8";
+        case Typekind_int16: return "int16";
+        case Typekind_int32: return "int32";
+        case Typekind_int64: return "int64";
+        case Typekind_float32: return "float32";
+        case Typekind_float64: return "float64";
+        case Typekind_void: return "void";
+        case Typekind_char: return "char";
 
-        } break;
-        case Typekind_Struct: break;
-        case Typekind_Enum: break;
-        case Typekind_Alias: break;
-        case Typekind_FuncPtr: break;
+        case Typekind_Struct: return getIdentifierStringValue(g_Unit->structs[type.ref].name);
+        case Typekind_Enum: return null;
+        case Typekind_Alias: return "SomeTypeAlias";
+        case Typekind_Opaque: return getIdentifierStringValue(type.ref);
+        case Typekind_FuncPtr: return "SomeFuncPtr";
+
     }
-
-    return getIdentifierStringValue(ptype->name);
+    return null;
 }
 
 static void transpileType(Datatype type) {
@@ -329,7 +344,7 @@ static void transpileStatement(Statement* statement) {
             }
 
             transpileExpression(ass->expr);
-            sbAppend(sb, ";");        
+            sbAppend(sb, ";");
         } break;
 
         case Statement_Scope: {
@@ -460,11 +475,10 @@ static u32 countStructDependencies(PlangStruct* stru) {
     for (u32 f = 0; f < fieldsLen; f++) {
         Datatype datatype = stru->fields[f].type;
         if (datatype.numPointers) continue;
-        PlangType* type = getActualType(datatype);
-        if (type->kind != Typekind_Struct) continue;
+        if (datatype.kind != Typekind_Struct) continue;
 
         deps++;
-        deps += countStructDependencies(type->type_struct);
+        deps += countStructDependencies(&g_Unit->structs[datatype.ref]);
     }
 
     return deps;
@@ -480,12 +494,23 @@ void transpile() {
     // sbAppend(sb, "#define true 1\n#define false 0\n");
 
     sbAppend(sb, "\n// types\n");
-    sbAppend(sb, "typedef unsigned int uint;\n");
-    sbAppend(sb, "typedef unsigned char byte;\n");
-    sbAppend(sb, "typedef signed char sbyte;\n");
-    sbAppend(sb, "typedef unsigned short ushort;\n");
+    // sbAppend(sb, "typedef unsigned int uint;\n");
+    // sbAppend(sb, "typedef unsigned char byte;\n");
+    // sbAppend(sb, "typedef signed char sbyte;\n");
+    // sbAppend(sb, "typedef unsigned short ushort;\n");
 
-    u32 typesLen = darrayLength(g_Unit->types);
+    sbAppend(sb, "typedef signed char int8;\n");
+    sbAppend(sb, "typedef unsigned char uint8;\n");
+    sbAppend(sb, "typedef signed short int16;\n");
+    sbAppend(sb, "typedef unsigned short uint16;\n");
+    sbAppend(sb, "typedef signed int int32;\n");
+    sbAppend(sb, "typedef unsigned int uint32;\n");
+    sbAppend(sb, "typedef signed long long int64;\n");
+    sbAppend(sb, "typedef unsigned long long uint64;\n");
+    sbAppend(sb, "typedef float float32;\n");
+    sbAppend(sb, "typedef double float64;\n");
+
+    /*u32 typesLen = darrayLength(g_Unit->types);
     for (u32 i = 0; i < typesLen; i++) {
         PlangType* type = &g_Unit->types[i];
         char* name = getIdentifierStringValue(type->name);
@@ -535,6 +560,17 @@ void transpile() {
                 sbAppend(sb, ");\n");
 
             } break;
+        }
+    }*/
+
+    { // opaque types
+        foreach (optype, g_Unit->opaqueTypes) {
+            char* typename = getIdentifierStringValue(*optype);
+            sbAppend(sb, "typedef struct ");
+            sbAppend(sb, typename);
+            sbAppend(sb, " ");
+            sbAppend(sb, typename);
+            sbAppend(sb, ";\n");
         }
     }
 

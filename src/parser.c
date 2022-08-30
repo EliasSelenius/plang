@@ -12,6 +12,34 @@ Expression* expectExpression();
 bool parseType(Datatype* type);
 Datatype expectType();
 
+static u32 type_name_int8 = 0;
+static u32 type_name_uint8 = 0;
+static u32 type_name_int16 = 0;
+static u32 type_name_uint16 = 0;
+static u32 type_name_int32 = 0;
+static u32 type_name_uint32 = 0;
+static u32 type_name_int64 = 0;
+static u32 type_name_uint64 = 0;
+static u32 type_name_float32 = 0;
+static u32 type_name_float64 = 0;
+static u32 type_name_char = 0;
+static u32 type_name_void = 0;
+
+void initTypenames() {
+    type_name_int8    = appendStringToStringtable(spFrom("int8"));
+    type_name_uint8   = appendStringToStringtable(spFrom("uint8"));
+    type_name_int16   = appendStringToStringtable(spFrom("int16"));
+    type_name_uint16  = appendStringToStringtable(spFrom("uint16"));
+    type_name_int32   = appendStringToStringtable(spFrom("int32"));
+    type_name_uint32  = appendStringToStringtable(spFrom("uint32"));
+    type_name_int64   = appendStringToStringtable(spFrom("int64"));
+    type_name_uint64  = appendStringToStringtable(spFrom("uint64"));
+    type_name_float32 = appendStringToStringtable(spFrom("float32"));
+    type_name_float64 = appendStringToStringtable(spFrom("float64"));
+    type_name_char    = appendStringToStringtable(spFrom("char"));
+    type_name_void    = appendStringToStringtable(spFrom("void"));
+}
+
 static u32 token_index = 0;
 
 static u32 numberOfErrors;
@@ -101,18 +129,6 @@ inline bool tok(TokenType type) {
 }
 
 
-// returns the typeId, and inputs the funcptr reference
-static u32 queryFuncPtrTypeId(u32 funcPtrRef) {
-    u32 len = darrayLength(g_Unit->types);
-    for (u32 i = 0; i < len; i++) {
-        PlangType type = g_Unit->types[i];
-        if (type.kind != Typekind_FuncPtr) continue;
-        if (type.type_funcPtr == funcPtrRef) return i + 1;
-    }
-
-    return 0;
-}
-
 inline bool funcPtrEquivalence(FuncPtr* a, FuncPtr* b) {
     if (a->argCount != b->argCount) return false;
     if (!typeEquals(a->returnType, b->returnType)) return false;
@@ -124,6 +140,7 @@ inline bool funcPtrEquivalence(FuncPtr* a, FuncPtr* b) {
 }
 
 
+/*
 static StringBuilder sb_funcPtrName = {0};
 
 static void funcPtrName_append(Datatype type) {
@@ -151,6 +168,8 @@ static Identifier constructNameForFuncPtr(FuncPtr* funcPtr) {
     return id;
 }
 
+*/
+
 
 Datatype ensureFuncPtrExistsFromFuncDeclaration(FuncDeclaration* decl) {
 
@@ -168,108 +187,111 @@ Datatype ensureFuncPtrExistsFromFuncDeclaration(FuncDeclaration* decl) {
     funcPtr->argCount = argCount;
 
     Datatype funcType;
+    funcType.kind = Typekind_FuncPtr;
+    funcType.ref = fpRef;
     funcType.numPointers = 1;
 
-    { // look if the function pointer is a duplicate
-        u32 i = 0;
-        while (i < oldLength) {
-            FuncPtr* f = getFuncPtr(i);
+    // look if the function pointer is a duplicate
+    u32 i = 0;
+    while (i < oldLength) {
+        FuncPtr* f = getFuncPtr(i);
 
-            if (funcPtrEquivalence(f, funcPtr)) {
-                // is duplicate 
-                g_Unit->funcPtrTypes->length = oldLength; // reset, 
-                funcType.typeId = queryFuncPtrTypeId(i);
-                return funcType;
-            }
-
-            i += sizeof(FuncPtr) + sizeof(Datatype) * f->argCount;
-        }
-
-        // is not a duplicate, create a new entry in the typetable
-        PlangType newType;
-        newType.name = constructNameForFuncPtr(funcPtr);
-        newType.kind = Typekind_FuncPtr;
-        newType.type_funcPtr = fpRef;
-        darrayAdd(g_Unit->types, newType);
-
-        funcType.typeId = darrayLength(g_Unit->types);
-        return funcType;
-    }
-}
-
-static Datatype parseFuncPtrArgs(Datatype retType) {
-    if (tok(Tok_OpenParen)) {
-
-        // construct a new function pointer by reserving memory for it
-        u32 oldLength = g_Unit->funcPtrTypes->length; // remember the old length in case we have a duplicate
-        u32 fpRef = dyReserve(&g_Unit->funcPtrTypes, sizeof(FuncPtr));
-
-        // arguments
-        u32 argCount = 0;
-        Datatype argType;
-        if (parseType(&argType)) {
-            argCount++;
-            u32 argRef = dyReserve(&g_Unit->funcPtrTypes, sizeof(Datatype));
-            *(Datatype*)(&g_Unit->funcPtrTypes->bytes[argRef]) = argType;
-
-            while (tok(Tok_Comma)) {
-                argCount++;
-                argType = expectType();
-                argRef = dyReserve(&g_Unit->funcPtrTypes, sizeof(Datatype));
-                *(Datatype*)(&g_Unit->funcPtrTypes->bytes[argRef]) = argType;
-            }
-        }
-
-        FuncPtr* funcPtr = getFuncPtr(fpRef);
-        funcPtr->returnType = retType;
-        funcPtr->argCount = argCount;
-
-        expect(Tok_CloseParen);
-
-        Datatype funcType;
-        funcType.numPointers = 1;
-
-        { // look if the function pointer is a duplicate
-            u32 i = 0;
-            while (i < oldLength) {
-                FuncPtr* f = getFuncPtr(i);
-
-                if (funcPtrEquivalence(f, funcPtr)) {
-                    // is duplicate 
-                    g_Unit->funcPtrTypes->length = oldLength; // reset, 
-                    funcType.typeId = queryFuncPtrTypeId(i);
-                    return funcType;
-                }
-
-                i += sizeof(FuncPtr) + sizeof(Datatype) * f->argCount;
-            }
-
-            // is not a duplicate, create a new entry in the typetable
-            PlangType newType;
-            newType.name = constructNameForFuncPtr(funcPtr);
-            newType.kind = Typekind_FuncPtr;
-            newType.type_funcPtr = fpRef;
-            darrayAdd(g_Unit->types, newType);
-
-            funcType.typeId = darrayLength(g_Unit->types);
+        if (funcPtrEquivalence(f, funcPtr)) {
+            // is duplicate
+            g_Unit->funcPtrTypes->length = oldLength; // reset
+            funcType.ref = i;
             return funcType;
         }
+
+        i += sizeof(FuncPtr) + sizeof(Datatype) * f->argCount;
     }
 
-    return retType;
+    return funcType;
+}
+
+
+static Datatype parseFuncPtrArgs(Datatype retType) {
+    if (!tok(Tok_OpenParen)) return retType;
+
+    // construct a new function pointer by reserving memory for it
+    u32 oldLength = g_Unit->funcPtrTypes->length; // remember the old length in case we have a duplicate
+    u32 fpRef = dyReserve(&g_Unit->funcPtrTypes, sizeof(FuncPtr));
+
+    // arguments
+    u32 argCount = 0;
+    Datatype argType;
+    if (parseType(&argType)) {
+        argCount++;
+        u32 argRef = dyReserve(&g_Unit->funcPtrTypes, sizeof(Datatype));
+        *(Datatype*)(&g_Unit->funcPtrTypes->bytes[argRef]) = argType;
+
+        while (tok(Tok_Comma)) {
+            argCount++;
+            argType = expectType();
+            argRef = dyReserve(&g_Unit->funcPtrTypes, sizeof(Datatype));
+            *(Datatype*)(&g_Unit->funcPtrTypes->bytes[argRef]) = argType;
+        }
+    }
+
+    FuncPtr* funcPtr = getFuncPtr(fpRef);
+    funcPtr->returnType = retType;
+    funcPtr->argCount = argCount;
+
+    expect(Tok_CloseParen);
+
+    Datatype funcType;
+    funcType.kind = Typekind_FuncPtr;
+    funcType.ref = fpRef;
+    funcType.numPointers = 1;
+
+    // look if the function pointer is a duplicate
+    u32 i = 0;
+    while (i < oldLength) {
+        FuncPtr* f = getFuncPtr(i);
+
+        if (funcPtrEquivalence(f, funcPtr)) {
+            // is duplicate
+            g_Unit->funcPtrTypes->length = oldLength; // reset
+            funcType.ref = i;
+            return funcType;
+        }
+
+        i += sizeof(FuncPtr) + sizeof(Datatype) * f->argCount;
+    }
+
+    return funcType;
 }
 
 // returns false if the token can not be interpreted as a type
 static bool parseInferableType(Datatype* type) {
     if (tok(Tok_Keyword_Let)) {
-        *type = type_null;
+        *type = (Datatype){ Typekind_MustBeInfered, 0, 0 };
         return true;
     }
 
     if (tokens[token_index].type == Tok_Word) {
-        Identifier id = tokens[token_index].stringTableByteOffset;
-        type->typeId = ensureTypeExistence(id);
-        token_index++;
+        u32 stbo = tokens[token_index++].stringTableByteOffset;
+
+        type->ref = 0;
+
+             if (stbo == type_name_int8) type->kind = Typekind_int8;
+        else if (stbo == type_name_uint8) type->kind = Typekind_uint8;
+        else if (stbo == type_name_int16) type->kind = Typekind_int16;
+        else if (stbo == type_name_uint16) type->kind = Typekind_uint16;
+        else if (stbo == type_name_int32) type->kind = Typekind_int32;
+        else if (stbo == type_name_uint32) type->kind = Typekind_uint32;
+        else if (stbo == type_name_int64) type->kind = Typekind_int64;
+        else if (stbo == type_name_uint64) type->kind = Typekind_uint64;
+        else if (stbo == type_name_float32) type->kind = Typekind_float32;
+        else if (stbo == type_name_float64) type->kind = Typekind_float64;
+        else if (stbo == type_name_char) type->kind = Typekind_char;
+        else if (stbo == type_name_void) type->kind = Typekind_void;
+        else {
+            type->kind = Typekind_Undecided;
+            type->ref = stbo;
+        }
+
+
         type->numPointers = 0;
         while (tok(Tok_Mul)) type->numPointers++;
 
@@ -284,7 +306,7 @@ static bool parseInferableType(Datatype* type) {
 // returns false if the token can not be interpreted as a type
 inline bool parseType(Datatype* type) {
     if (parseInferableType(type)) {
-        if (!typeExists(*type)) {
+        if (type->kind == Typekind_MustBeInfered) {
             error("Type cannot be infered here.");
         }
         return true;
@@ -306,7 +328,7 @@ inline Datatype expectInferableType() {
 
 inline Datatype expectType() {
     Datatype res = expectInferableType();
-    if (!typeExists(res)) error("Type cannot be infered here.");
+    if (res.kind == Typekind_MustBeInfered) error("Type cannot be infered here.");
     return res;
 }
 
@@ -349,8 +371,8 @@ static bool tok_scan(char* format, ...) {
                 if (tokens[token_index].type == type) {
                     token_index++;
                     continue;
-                } 
-                
+                }
+
                 goto fail;
             } else if (mode == '*') {
                 while (tokens[token_index].type == type) token_index++;
@@ -496,8 +518,12 @@ static Expression* parseLeafExpression() {
             lit->string = tokens[token_index++].stringTableByteOffset;
             res = (Expression*)lit;
         } break;
+        case Tok_Char: {
+            LiteralExpression* lit = createLiteral(ExprType_Literal_Char);
+            lit->character = tokens[token_index++].character;
+            res = (Expression*)lit;
+        } break;
 
-        case Tok_Char:          res = basicLiteral(ExprType_Literal_Char); break;
         case Tok_Keyword_True:  res = basicLiteral(ExprType_Literal_True); break;
         case Tok_Keyword_False: res = basicLiteral(ExprType_Literal_False); break;
         case Tok_Keyword_Null:  res = basicLiteral(ExprType_Literal_Null); break;
@@ -788,7 +814,7 @@ static VarDecl* expectVarDecl() {
     decl->assignmentOrNull = null;
     if (tok(Tok_Assign)) {
         decl->assignmentOrNull = expectExpression();
-    } else if (!typeExists(decl->type)) {
+    } else if (decl->type.kind == Typekind_MustBeInfered) {
         error("Variable \"%s\" must be assigned to, to be type inferred.", getIdentifierStringValue(decl->name));
     }
 
@@ -983,7 +1009,7 @@ static PlangStruct expectStruct() {
         darrayAdd(stru.fields, field);
 
     } while (tokens[token_index].type != Tok_CloseCurl);
-    
+
     token_index++;
 
     return stru;
@@ -995,10 +1021,10 @@ static FuncArg* expectFuncArgList() {
     FuncArg arg;
     if (parseType(&arg.type)) {
         arg.name = identifier();
-        
+
         res = darrayCreate(FuncArg);
         darrayAdd(res, arg);
-        
+
         while (tok(Tok_Comma)) {
             arg.type = expectType();
             arg.name = identifier();
@@ -1037,7 +1063,7 @@ static void funcOrGlobal() {
 
         if (tok(Tok_Assign)) {
             decl.assignmentOrNull = expectExpression();
-        } else if (!typeExists(decl.type)) {
+        } else if (decl.type.kind == Typekind_MustBeInfered) {
             error("Global variable \"%s\" must be assigned to, to be type inferred.", getIdentifierStringValue(decl.name));
         }
 
@@ -1049,9 +1075,6 @@ static void funcOrGlobal() {
 
 u32 parse() {
 
-    if (!sb_funcPtrName.content) {
-        sb_funcPtrName = sbCreate();
-    }
 
     // token_index = 0;
 
@@ -1068,7 +1091,7 @@ u32 parse() {
                 stru.nodebase.lineNumber = lineNum;
                 u32 struLen = darrayLength(g_Unit->structs);
                 for (u32 i = 0; i < struLen; i++) {
-                    if (g_Unit->structs[i].name == stru.name) { // spanEqualsSpan(g_Unit->structs[i].name, stru.name)
+                    if (g_Unit->structs[i].name == stru.name) {
                         errorLine(stru.nodebase.lineNumber, "Struct \"%s\" is already defined.", getIdentifierStringValue(stru.name));
                         break;
                     }
@@ -1081,15 +1104,17 @@ u32 parse() {
             case Tok_Keyword_Type: {
                 u32 lineNum = tokens[token_index].line;
                 token_index++;
-                Identifier name = identifier();
-                Datatype type = type_null;
-                if (tok(Tok_Assign)) type = expectType();
+
+                AliasType alias;
+                alias.name = identifier();
+                if (tok(Tok_Assign)) {
+                    alias.aliasedType = expectType();
+                    darrayAdd(g_Unit->aliases, alias);
+                } else {
+                    darrayAdd(g_Unit->opaqueTypes, alias.name);
+                }
                 semicolon();
 
-                u32 typeId = ensureTypeExistence(name);
-                PlangType* ptype = getTypeById(typeId);
-                ptype->kind = Typekind_Alias;
-                ptype->type_aliasedType = type;
             } break;
 
             case Tok_Keyword_Const: {

@@ -1,11 +1,45 @@
 
+declare void printf(char* format);
 
-int main() {
+struct Test {
+    uint64 flags;
+    float32 x;
+}
 
-    let i = 0;
+type byte = uint8;
+type OpaqueTypeTest;
+
+void goo() {
+    printf("goo\n");
+}
+
+int32 main() {
+
+    void() func;
+
+    OpaqueTypeTest* d;
+
+    {
+        uint8 g = 20;
+        byte b = g;
+    }
+
+    let i = 124;
     let f = 12.123;
 
-    float g = 1.3 * 2.0;
+    float32 g = 1.3 * 2.0;
+
+    char c = 'h';
+
+    printf("Hello, Sailor!\n");
+
+    Test test;
+
+    test.x = 2;
 
     return 0;
+}
+
+byte foo(byte b) {
+    // return b + 1;
 }

@@ -137,14 +137,6 @@ u32 appendStringToStringtable(StrSpan word) {
     return byteOffset;
 }
 
-void addPrimitiveType(char* name) {
-    PlangType newType;
-    newType.kind = Typekind_Primitive;
-    newType.name = appendStringToStringtable(spFrom(name));
-    darrayAdd(g_Unit->types, newType);
-}
-
-
 void test(u64 number) {
 
 
@@ -152,7 +144,6 @@ void test(u64 number) {
 
 
 int main(int argc, char* argv[]) {
-
 
     if (argc == 1) {
         printf("Insufficent arguments.\n");
@@ -162,14 +153,6 @@ int main(int argc, char* argv[]) {
     // TODO: use higher default capacity here, to minimize the amount of reallocs
     tokens = darrayCreate(Token);
 
-    static char* TypekindNames[] = {
-        [Typekind_Invalid]   = "invalid  ",
-        [Typekind_Primitive] = "primitive",
-        [Typekind_Struct]    = "struct   ",
-        [Typekind_Enum]      = "enum     ",
-        [Typekind_Alias]     = "alias    ",
-        [Typekind_FuncPtr]   = "function ",
-    };
 
     TranslationUnit unit;
     unit.functions = darrayCreate(PlangFunction);
@@ -177,33 +160,14 @@ int main(int argc, char* argv[]) {
     unit.structs = darrayCreate(PlangStruct);
     unit.globalVariables = darrayCreate(VarDecl);
     unit.constants = darrayCreate(Constant);
-    unit.types = darrayCreate(PlangType);
     unit.funcPtrTypes = dyCreate();
+    unit.aliases = darrayCreate(AliasType);
+    unit.opaqueTypes = darrayCreate(Identifier);
     unit.stringTable = dyCreate();
     unit.stringTableByteOffsets = darrayCreate(u32);
     g_Unit = &unit;
 
-    { // add default types to typetable
-        addPrimitiveType("void");
-        addPrimitiveType("char");
-
-        addPrimitiveType("sbyte");
-        addPrimitiveType("byte");
-        addPrimitiveType("short");
-        addPrimitiveType("ushort");
-        addPrimitiveType("int");
-        addPrimitiveType("uint");
-        addPrimitiveType("long");
-        addPrimitiveType("ulong");
-
-        addPrimitiveType("float");
-        addPrimitiveType("double");
-
-        u32 len = darrayLength(g_Unit->types);
-        for (u32 i = 0; i < len; i++) {
-            printf("    %d. %s : %s\n", i, TypekindNames[g_Unit->types[i].kind], getIdentifierStringValue(g_Unit->types[i].name));
-        }
-    }
+    initTypenames();
 
     startPerf();
 
@@ -249,12 +213,6 @@ int main(int argc, char* argv[]) {
 
     printf("Validate...\n");
     u32 numErrors = validate();
-    /*{ // print type table
-        u32 len = darrayLength(g_Unit->types);
-        for (u32 i = 0; i < len; i++) {
-            printf("    %d. %s : %.*s\n", i, TypekindNames[g_Unit->types[i].kind], g_Unit->types[i].name.length, g_Unit->types[i].name.start);
-        }
-    }*/
     if (numErrors) {
         printf("There were %d errors during validation.\nFix errors and try again.\n", numErrors);
         return 0;

@@ -17,20 +17,7 @@ static Codeblock* currentScope;
 static Statement* currentStatement;
 static u32 numberOfErrors = 0;
 
-static Datatype type_void;
-static Datatype type_voidPointer;
-static Datatype type_charPointer;
-static Datatype type_char;
 
-static Datatype type_ambiguousNumber = { .typeId = 0, .numPointers = 1 };
-static Datatype type_int32;
-static Datatype type_uint32;
-static Datatype type_int64;
-static Datatype type_uint64;
-static Datatype type_float32;
-static Datatype type_float64;
-
-Datatype validateExpressionWithAmbiguousTypes(Expression* expr);
 Datatype validateExpression(Expression* expr);
 Datatype getDeclaredVariable(Identifier name);
 bool typeAssignable(Datatype toType, Datatype fromType);
@@ -139,13 +126,13 @@ static Datatype getDeclaredVariable(Identifier name) {
     }
 
 
-    return type_null;
+    return type_invalid;
 }
 
 static Datatype validateVariable(VariableExpression* var) {
 
     Datatype type = getDeclaredVariable(var->name);
-    if (typeExists(type)) return type;
+    if (type.kind != Typekind_Invalid) return type;
 
     FuncDeclaration* decl = getFuncDecl(var->name);
     if (decl) return ensureFuncPtrExistsFromFuncDeclaration(decl);
@@ -156,40 +143,62 @@ static Datatype validateVariable(VariableExpression* var) {
         if (var->name == g_Unit->constants[i].name) {
             var->base.expressionType = ExprType_Constant;
             var->constExpr = g_Unit->constants[i].expr;
-            return validateExpressionWithAmbiguousTypes(var->constExpr);
+            return validateExpression(var->constExpr);
         }
     }
 
     error("Variable \"%s\" is not declared.", getIdentifierStringValue(var->name));
-    return type_null;
+    return type_invalid;
 }
 
-inline void validateType(Datatype type) {
-    PlangType* pt = getType(type);
-    if (pt->kind == Typekind_Invalid) {
-        error("Type \"%s\" does not exist.", getIdentifierStringValue(pt->name));
-        return;
+static void validateType(Datatype* type) {
+    switch (type->kind) {
+
+        case Typekind_Undecided: {
+
+            foreach (stru, g_Unit->structs) {
+                if (stru->name == type->ref) {
+                    type->kind = Typekind_Struct;
+                    type->ref = stru_index;
+                    return;
+                }
+            }
+
+            // TODO: enums
+
+            foreach (alias, g_Unit->aliases) {
+                if (alias->name == type->ref) {
+                    // type->kind = Typekind_Alias;
+                    // type->ref = alias_index;
+
+                    // TODO: recursive aliases
+                    *type = alias->aliasedType;
+                    return;
+                }
+            }
+
+            foreach (optype, g_Unit->opaqueTypes) {
+                if (*optype == type->ref) {
+                    type->kind = Typekind_Opaque;
+                    if (type->numPointers == 0) error("Invalid usage of opaque type. You cannot use opaque types by-value.");
+                    return;
+                }
+            }
+
+        } break;
+
+        case Typekind_FuncPtr: {
+            FuncPtr* f = getFuncPtr(type->ref);
+            validateType(&f->returnType);
+            for (u32 i = 0; i < f->argCount; i++) validateType(&f->argTypes[i]);
+        } return;
+
+        default: return;
     }
 
-    if (pt->kind == Typekind_FuncPtr) {
-        FuncPtr* f = getFuncPtr(pt->type_funcPtr);
-        validateType(f->returnType);
-        for (u32 i = 0; i < f->argCount; i++) {
-            validateType(f->argTypes[i]);
-        }
-    }
-}
-
-static u32 numPointers(Datatype dt) {
-    u32 nump = dt.numPointers;
-    PlangType* type = getType(dt);
-    if (type->kind == Typekind_Alias) {
-        if (typeExists(type->type_aliasedType)) {
-            nump += numPointers(type->type_aliasedType);
-        }
-    }
-
-    return nump;
+    type->kind = Typekind_Invalid;
+    // TODO: print the name here
+    error("Type not recognized.");
 }
 
 static bool funcPtrAssignable(FuncPtr* to, FuncPtr* from) {
@@ -205,46 +214,50 @@ static bool funcPtrAssignable(FuncPtr* to, FuncPtr* from) {
 }
 
 static bool typeAssignable(Datatype toType, Datatype fromType) {
+    if (fromType.kind == Typekind_Invalid) return true;
+    if (toType.kind == Typekind_Invalid) return true;
+
     if (typeEquals(toType, fromType)) return true;
 
-    PlangType* to = getActualType(toType);
-    u32 toPointers = numPointers(toType);
+    if (toType.numPointers != fromType.numPointers) return false;
+    u32 numPointers = toType.numPointers;
 
-    if (isAmbiguousNumber(fromType) && toPointers == 0) {
-        u32 typeId = getTypeIdOfType(to);
+    if (numPointers) { // if we are a pointer of any degree
 
-        if (typeId == type_int32.typeId) return true;
-        else if (typeId == type_uint32.typeId) return true;
-        else if (typeId == type_int64.typeId) return true;
-        else if (typeId == type_uint64.typeId) return true;
-        else if (typeId == type_float32.typeId) return true;
-        else if (typeId == type_float64.typeId) return true;
-        else return false;
+        if (toType.kind == Typekind_void || fromType.kind == Typekind_void) return true;
+
+        if (toType.kind == Typekind_FuncPtr && fromType.kind == Typekind_FuncPtr) {
+            FuncPtr* toPtr = getFuncPtr(toType.ref);
+            FuncPtr* fromPtr = getFuncPtr(fromType.ref);
+            if (funcPtrAssignable(toPtr, fromPtr)) return true;
+        }
+
+        return false;
+    } // if we are a value-type:
+
+
+    // Ambiguous cases
+    if (fromType.kind == Typekind_AmbiguousInteger) switch (toType.kind) {
+        case Typekind_uint8:
+        case Typekind_uint16:
+        case Typekind_uint32:
+        case Typekind_uint64:
+        case Typekind_int8:
+        case Typekind_int16:
+        case Typekind_int32:
+        case Typekind_int64:
+        case Typekind_float32:
+        case Typekind_float64: return true;
+        default: return false;
+    } else if (fromType.kind == Typekind_AmbiguousDecimal) switch (toType.kind) {
+        case Typekind_float32:
+        case Typekind_float64: return true;
+        default: return false;
     }
 
-    PlangType* from = getActualType(fromType);
-    u32 fromPointers = numPointers(fromType);
-
-    if (toPointers == fromPointers) {
-
-        if (to == from) return true;
-
-        // TODO: these checks must also consider the actual type
-        if (toType.typeId == type_uint64.typeId) { // when converting to ulong
-            if (fromType.typeId == type_uint32.typeId) return true; // uint to ulong
-        }
-
-        if (toPointers) { // if we are a pointer to any degree 
-            // void ptr casting
-            if (toType.typeId == type_void.typeId || fromType.typeId == type_void.typeId) return true;
-
-            // func ptr casting
-            if (to->kind == Typekind_FuncPtr && from->kind == Typekind_FuncPtr) {
-                FuncPtr* toPtr = getFuncPtr(to->type_funcPtr);
-                FuncPtr* fromPtr = getFuncPtr(from->type_funcPtr);
-                if (funcPtrAssignable(toPtr, fromPtr)) return true;
-            }
-        }
+    // TODO: complete all numeric casts
+    if (toType.kind == Typekind_uint64) {
+        if (fromType.kind == Typekind_uint32) return true;
     }
 
     return false;
@@ -252,9 +265,6 @@ static bool typeAssignable(Datatype toType, Datatype fromType) {
 
 static void assertAssignability(Datatype toType, Datatype fromType) {
     if (!typeAssignable(toType, fromType)) {
-
-        PlangType* to = getType(toType);
-        PlangType* from = getType(fromType);
 
         // TODO: print correct type names. (include pointers and the proper name of function pointers) 
         // error("Type missmatch. \"%.*s\" is not compatible with \"%.*s\".",
@@ -272,7 +282,7 @@ static Datatype validateFuncCall(FuncCall* call) {
     // validate passed arguments
     u32 passedArgumentsLength = call->args ? darrayLength(call->args) : 0;
     Datatype passedArguments[passedArgumentsLength];
-    for (u32 i = 0; i < passedArgumentsLength; i++) passedArguments[i] = validateExpressionWithAmbiguousTypes(call->args[i]);
+    for (u32 i = 0; i < passedArgumentsLength; i++) passedArguments[i] = validateExpression(call->args[i]);
 
 
     if (call->funcExpr->expressionType != ExprType_Variable) goto funcptrPart;
@@ -308,9 +318,7 @@ static Datatype validateFuncCall(FuncCall* call) {
                 return func->decl.returnType;
             }
 
-            for (u32 i = 0; i < passedArgumentsLength; i++) {
-                if (typeExists(passedArguments[i])) assertAssignability(func->decl.arguments[i].type, passedArguments[i]);
-            }
+            for (u32 i = 0; i < passedArgumentsLength; i++) assertAssignability(func->decl.arguments[i].type, passedArguments[i]);
 
             return func->decl.returnType;
         }
@@ -328,7 +336,6 @@ static Datatype validateFuncCall(FuncCall* call) {
 
         bool compat = true;
         for (u32 i = 0; i < passedArgumentsLength; i++) {
-            if (!typeExists(passedArguments[i])) continue;
             if (!typeAssignable(decl->arguments[i].type, passedArguments[i])) {compat = false; break;}
         }
 
@@ -337,33 +344,35 @@ static Datatype validateFuncCall(FuncCall* call) {
 
     funcptrPart:
     Datatype calleeType = validateExpression(call->funcExpr);
-    if (calleeType.typeId) {
-        PlangType* type = getActualType(calleeType);
-        if (type->kind == Typekind_FuncPtr) {
-            call->base.expressionType = ExprType_FuncPointerCall;
-            FuncPtr* funcptr = getFuncPtr(type->type_funcPtr);
+    if (calleeType.kind == Typekind_FuncPtr) {
+        call->base.expressionType = ExprType_FuncPointerCall;
+        FuncPtr* funcptr = getFuncPtr(calleeType.ref);
 
-            if (passedArgumentsLength != funcptr->argCount) {
-                error("Unexpected number of arguments passed to function pointer, expected %d, but got %d.",
-                    funcptr->argCount, passedArgumentsLength);
-                return funcptr->returnType;
-            }
-
-            for (u32 i = 0; i < passedArgumentsLength; i++) {
-                if (typeExists(passedArguments[i])) assertAssignability(funcptr->argTypes[i], passedArguments[i]);
-            }
-
+        if (passedArgumentsLength != funcptr->argCount) {
+            error("Unexpected number of arguments passed to function pointer, expected %d, but got %d.",
+                funcptr->argCount, passedArgumentsLength);
             return funcptr->returnType;
         }
+
+        for (u32 i = 0; i < passedArgumentsLength; i++) {
+            assertAssignability(funcptr->argTypes[i], passedArguments[i]);
+        }
+
+        return funcptr->returnType;
     }
 
 
     error("Function \"%s\" was not found.", getIdentifierStringValue(name));
-    return type_null;
+    return type_invalid;
 }
 
+inline Datatype resolveType(Datatype type) {
+    if      (type.kind == Typekind_AmbiguousInteger) return type_int32;
+    else if (type.kind == Typekind_AmbiguousDecimal) return type_float32;
+    return type;
+}
 
-static Datatype validateExpressionWithAmbiguousTypes(Expression* expr) {
+static Datatype validateExpression(Expression* expr) {
     switch (expr->expressionType) {
         case ExprType_Constant:
         case ExprType_Variable: {
@@ -374,28 +383,27 @@ static Datatype validateExpressionWithAmbiguousTypes(Expression* expr) {
         case ExprType_Deref: {
             DerefOperator* deref = (DerefOperator*)expr;
             Datatype datatype = validateExpression(deref->expr);
-            if (!datatype.typeId) return type_null;
+            if (datatype.kind == Typekind_Invalid) return type_invalid;
 
             if (datatype.numPointers > 1) {
                 error("Attempted to dereference a %dth-degree pointer.", datatype.numPointers);
-                return type_null;
+                return type_invalid;
             }
 
             deref->derefOp = datatype.numPointers ? "->" : ".";
 
-            PlangType* type = getType(datatype);
-            if (type->kind != Typekind_Struct) {
+            if (datatype.kind != Typekind_Struct) {
                 error("Invalid dereferencing.");
-                return type_null;
+                return type_invalid;
             }
 
-            PlangStruct* stru = getStructByName(type->name);
+            PlangStruct* stru = &g_Unit->structs[datatype.ref];
             Field* field = getField(stru, deref->name);
             if (!field) {
                 error("Field \"%s\" does not exist on type \"%s\".",
                         getIdentifierStringValue(deref->name),
                         getIdentifierStringValue(stru->name));
-                return type_null;
+                return type_invalid;
             }
             return field->type;
         } break;
@@ -405,7 +413,7 @@ static Datatype validateExpressionWithAmbiguousTypes(Expression* expr) {
             Datatype indexedType = validateExpression(ind->indexed);
             if (indexedType.numPointers == 0) {
                 error("Attempted to dereference something that isnt a pointer.");
-                return type_null;
+                return type_invalid;
             }
             Datatype indexType = validateExpression(ind->index);
             // TODO: is indexType a valid integer expression
@@ -481,27 +489,22 @@ static Datatype validateExpressionWithAmbiguousTypes(Expression* expr) {
         case ExprType_Div:
         case ExprType_Mod: {
             BinaryExpression* bop = (BinaryExpression*)expr;
-            Datatype leftType = validateExpressionWithAmbiguousTypes(bop->left);
-            Datatype rightType = validateExpressionWithAmbiguousTypes(bop->right);
+            Datatype leftType = validateExpression(bop->left);
+            Datatype rightType = validateExpression(bop->right);
 
-            if (typeExists(leftType) && typeExists(rightType)) {
-                // TODO: is a valid operator operands pair?
-            } else return type_null;
+            // TODO: is a valid operator operands pair?
 
             return leftType;
         } break;
 
         case ExprType_Alloc: {
             AllocExpression* alloc = (AllocExpression*)expr;
-            validateType(alloc->type);
+            validateType(&alloc->type);
 
             // recurse on possibe size-subexpression
             if (alloc->sizeExpr) {
                 Datatype size = validateExpression(alloc->sizeExpr);
-
-                if (size.typeId) {
-                    // TODO: is this a valid integer expression?
-                }
+                // TODO: is this a valid integer expression?
             }
 
             Datatype type = alloc->type;
@@ -511,7 +514,7 @@ static Datatype validateExpressionWithAmbiguousTypes(Expression* expr) {
 
         case ExprType_Sizeof: {
             SizeofExpression* sof = (SizeofExpression*)expr;
-            validateType(sof->type);
+            validateType(&sof->type);
             return type_uint32;
         } break;
 
@@ -538,14 +541,14 @@ static Datatype validateExpressionWithAmbiguousTypes(Expression* expr) {
             // TODO: is this a valid casting operation
 
             Datatype type = validateExpression(cast->expr);
-            validateType(cast->castToType);
+            validateType(&cast->castToType);
 
             return cast->castToType;
         } break;
 
         { // literals
-            case ExprType_Literal_Integer: return type_ambiguousNumber;
-            case ExprType_Literal_Decimal: return type_ambiguousNumber;
+            case ExprType_Literal_Integer: return type_ambiguousInteger;
+            case ExprType_Literal_Decimal: return type_ambiguousDecimal;
             case ExprType_Literal_Char:    return type_char;
             case ExprType_Literal_String:  return type_charPointer;
             case ExprType_Literal_True:    return type_int32; // TODO: int32? maybe use another type?
@@ -561,13 +564,7 @@ static Datatype validateExpressionWithAmbiguousTypes(Expression* expr) {
     }
 
     error("Unknown expression type. This is a bug!");
-    return type_null;
-}
-
-inline Datatype validateExpression(Expression* expr) {
-    Datatype type = validateExpressionWithAmbiguousTypes(expr);
-    if (isAmbiguousNumber(type)) return type_int32; // int32 is default number type
-    return type;
+    return type_invalid;
 }
 
 static void validateScope(Codeblock* scope) {
@@ -585,15 +582,14 @@ static void validateScope(Codeblock* scope) {
                 VarDecl* decl = (VarDecl*)sta;
 
                 // Check wheter there already is a variable with this name
-                if (getDeclaredVariable(decl->name).typeId) {
+                if (getDeclaredVariable(decl->name).kind != Typekind_Invalid) {
                     error("Variable \"%s\" is already declared.", getIdentifierStringValue(decl->name));
                 }
 
-                if (typeExists(decl->type)) {
-                    validateType(decl->type);
-                }
+                validateType(&decl->type);
 
-                Datatype asstype = validateExpression(decl->assignmentOrNull);
+                // NOTE: decl->assignmentOrNull is used as the size expression for this fixed array
+                Datatype sizetype = validateExpression(decl->assignmentOrNull);
                 // TODO: is asstype a valid integer expression?
 
                 Variable var;
@@ -606,24 +602,20 @@ static void validateScope(Codeblock* scope) {
                 VarDecl* decl = (VarDecl*)sta;
 
                 // Check wheter there already is a variable with this name
-                if (getDeclaredVariable(decl->name).typeId) {
+                if (getDeclaredVariable(decl->name).kind != Typekind_Invalid) {
                     error("Variable \"%s\" is already declared.", getIdentifierStringValue(decl->name));
                 }
 
+                validateType(&decl->type);
+
                 if (decl->assignmentOrNull) {
-                    Datatype assType = validateExpressionWithAmbiguousTypes(decl->assignmentOrNull);
+                    Datatype assType = validateExpression(decl->assignmentOrNull);
 
-                    if (!typeExists(assType)) break; // if type could not be determined then we should not continue, act as if this statement does not exist 
+                    if (assType.kind == Typekind_Invalid) break; // if type could not be determined then we should not continue, act as if this statement does not exist 
 
-                    if (typeExists(decl->type)) {
-                        validateType(decl->type);
-                        assertAssignability(decl->type, assType);
-                    } else {
-                        // type infer
-                        decl->type = isAmbiguousNumber(assType) ? type_int32 : assType;
-                    }
-                } else {
-                    validateType(decl->type);
+                    if (decl->type.kind == Typekind_MustBeInfered)
+                        decl->type = resolveType(assType);
+                    else assertAssignability(decl->type, assType);
                 }
 
                 Variable var;
@@ -637,11 +629,9 @@ static void validateScope(Codeblock* scope) {
                 Assignement* ass = (Assignement*)sta;
 
                 Datatype toType = validateExpression(ass->assigneeExpr);
-                Datatype fromType = validateExpressionWithAmbiguousTypes(ass->expr);
+                Datatype fromType = validateExpression(ass->expr);
 
-                if (typeExists(toType) && typeExists(fromType)) {
-                    assertAssignability(toType, fromType);
-                }
+                assertAssignability(toType, fromType);
             } break;
 
 
@@ -679,18 +669,17 @@ static void validateScope(Codeblock* scope) {
                 ReturnStatement* retSta = (ReturnStatement*)sta;
 
                 Datatype type = type_void;
-                if (retSta->returnExpr) type = validateExpressionWithAmbiguousTypes(retSta->returnExpr);
+                if (retSta->returnExpr) type = validateExpression(retSta->returnExpr);
 
-                if (!typeExists(type)) break;
+                if (type.kind == Typekind_Invalid) break;
 
-                if (typeExists(function->decl.returnType)) {
+                if (function->decl.returnType.kind == Typekind_MustBeInfered) {
+                    function->decl.returnType = resolveType(type);
+                } else {
                     if (!typeAssignable(function->decl.returnType, type)) {
                         error("Return type missmatch in function \"%s\".", getIdentifierStringValue(function->decl.name));
                     }
-                } else {
-                    function->decl.returnType = isAmbiguousNumber(type) ? type_int32 : type;
                 }
-
 
                 // if (retSta->returnExpr) {
                 //     PlangType* returnType = validateExpression(retSta->returnExpr);
@@ -734,34 +723,23 @@ static void validateScope(Codeblock* scope) {
 
 static void validateFunctionDeclaration(FuncDeclaration* decl) {
 
-    validateType(decl->returnType);
+    validateType(&decl->returnType);
 
     if (decl->arguments) {
         u32 len = darrayLength(decl->arguments);
-        for (u32 i = 0; i < len; i++) validateType(decl->arguments[i].type);
+        for (u32 i = 0; i < len; i++) validateType(&decl->arguments[i].type);
     }
 }
 
 static void validateFunction(PlangFunction* func) {
     function = func;
 
-    if (typeExists(func->decl.returnType)) {
-        // TODO: factor all validateType calls out into own loop
-        validateType(func->decl.returnType);
-    }
-
-    if (func->decl.arguments) {
-        u32 len = darrayLength(func->decl.arguments);
-        for (u32 i = 0; i < len; i++) {
-            FuncArg arg = func->decl.arguments[i];
-            validateType(arg.type);
-        }
-    }
+    validateFunctionDeclaration(&func->decl);
 
     currentScope = null;
     validateScope(&func->scope);
 
-    if (!typeExists(func->decl.returnType)) {
+    if (func->decl.returnType.kind == Typekind_MustBeInfered) {
         func->decl.returnType = type_void;
     }
 }
@@ -770,82 +748,34 @@ static void validateStruct(PlangStruct* stru) {
     u32 fieldLen = darrayLength(stru->fields);
     for (u32 i = 0; i < fieldLen; i++) {
         Field* field = &stru->fields[i];
-        validateType(field->type);
-        Identifier fieldTypeName = getType(field->type)->name;
+        validateType(&field->type);
 
-        // TODO: PlangStruct may contain its typeid so we dont have to do the spanEqualsSpan() call
-        if (field->type.numPointers == 0 && fieldTypeName == stru->name) {
-            errorLine(field->nodebase.lineNumber, "Struct \"%s\" self reference by value.", getIdentifierStringValue(stru->name));
-        }
+        // TODO: reimplement this error message
+        // Identifier fieldTypeName = getType(field->type)->name;
+        // if (field->type.numPointers == 0 && fieldTypeName == stru->name) {
+        //     errorLine(field->nodebase.lineNumber, "Struct \"%s\" self reference by value.", getIdentifierStringValue(stru->name));
+        // }
     }
 }
 
 static void validateGlobalVar(VarDecl* decl) {
     if (decl->assignmentOrNull) {
         Datatype assType = validateExpression(decl->assignmentOrNull);
-        if (!typeExists(assType)) return; // if type could not be determined then we should not continue.
+        if (assType.kind == Typekind_Invalid) return; // if type could not be determined then we should not continue.
 
-        if (typeExists(decl->type)) {
-            validateType(decl->type);
-            assertAssignability(decl->type, assType);
+        if (decl->type.kind == Typekind_MustBeInfered) {
+            decl->type = resolveType(assType);
         } else {
-            decl->type = isAmbiguousNumber(assType) ? type_int32 : assType;
+            validateType(&decl->type);
+            assertAssignability(decl->type, assType);
         }
 
     } else {
-        validateType(decl->type);
+        validateType(&decl->type);
     }
 }
 
 u32 validate() {
-
-    type_void           = (Datatype) { .typeId = ensureTypeExistence(appendStringToStringtable(spFrom("void"))), .numPointers = 0 };
-    type_voidPointer    = (Datatype) { .typeId = ensureTypeExistence(appendStringToStringtable(spFrom("void"))), .numPointers = 1 };
-    type_charPointer    = (Datatype) { .typeId = ensureTypeExistence(appendStringToStringtable(spFrom("char"))), .numPointers = 1 };
-    type_char           = (Datatype) { .typeId = ensureTypeExistence(appendStringToStringtable(spFrom("char"))), .numPointers = 0 };
-    type_int32          = (Datatype) { .typeId = ensureTypeExistence(appendStringToStringtable(spFrom("int"))),  .numPointers = 0 };
-    type_uint32         = (Datatype) { .typeId = ensureTypeExistence(appendStringToStringtable(spFrom("uint"))),  .numPointers = 0 };
-    type_int64          = (Datatype) { .typeId = ensureTypeExistence(appendStringToStringtable(spFrom("long"))),  .numPointers = 0 };
-    type_uint64         = (Datatype) { .typeId = ensureTypeExistence(appendStringToStringtable(spFrom("ulong"))),  .numPointers = 0 };
-    type_float32        = (Datatype) { .typeId = ensureTypeExistence(appendStringToStringtable(spFrom("float"))), .numPointers = 0 };
-    type_float64        = (Datatype) { .typeId = ensureTypeExistence(appendStringToStringtable(spFrom("double"))), .numPointers = 0 };
-
-    // validate types
-    u32 typeLen = darrayLength(g_Unit->types);
-    for (u32 i = 0; i < typeLen; i++) {
-        PlangType* type = &g_Unit->types[i];
-        switch (type->kind) {
-            case Typekind_Invalid: {
-
-                // struct
-                PlangStruct* stru = getStructByName(type->name);
-                if (stru) {
-                    type->kind = Typekind_Struct;
-                    type->type_struct = stru;
-                    break;
-                }
-
-                // TODO: enum
-
-            } break;
-
-            // case Typekind_FuncPtr: {
-            //     FuncPtr* fp = getFuncPtr(type->type_funcPtr);
-            // } break;
-
-            default: break;
-        }
-    }
-
-    for (u32 i = 0; i < typeLen; i++) {
-        PlangType* type = &g_Unit->types[i];
-        if (type->kind == Typekind_Alias) {
-            // type does not exist when its an opaque type
-            if (typeExists(type->type_aliasedType)) {
-                validateType(type->type_aliasedType);
-            }
-        }
-    }
 
     // validate structs
     u32 struLen = darrayLength(g_Unit->structs);
@@ -902,8 +832,12 @@ u32 validate() {
     for (u32 i = 0; i < funcLen; i++) {
         validateFunction(&g_Unit->functions[i]);
     }
-    darrayDelete(variables);
 
+    // foreach (func, g_Unit->functions) {
+    //     validateFunction(func);
+    // }
+
+    darrayDelete(variables);
 
     return numberOfErrors;
 }
