@@ -27,3 +27,7 @@ u32 darrayCapacity(void* list);
 u32 darrayStride(void* list);
 
 
+#define foreach(item, list)\
+    typeof(list) item = &list[0];\
+    u32 item##_count = darrayLength(list);\
+    for (u32 item##_index = 0; item##_index < item##_count; item = &list[++item##_index])
