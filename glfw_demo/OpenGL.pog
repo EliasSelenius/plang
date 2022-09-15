@@ -1307,30 +1307,30 @@ const GL_XOR = 0x1506;
 const GL_ZERO = 0;
 
 
-type GLintptr = long;
-type GLint64 = long;
-type GLuint64 = ulong;
-type GLsizeiptr = long;
+type GLintptr = int64;
+type GLint64 = int64;
+type GLuint64 = uint64;
+type GLsizeiptr = int64;
 
 type __GLsync;
 type GLsync = __GLsync*;
 
-type GLenum = uint;
-type GLboolean = byte;
-type GLbitfield = uint;
+type GLenum = uint32;
+type GLboolean = uint8;
+type GLbitfield = uint32;
 type GLvoid = void;
-type GLbyte = sbyte;
-type GLubyte = byte;
-type GLshort = short;
-type GLushort = ushort;
-type GLint = int;
-type GLuint = uint;
-type GLclampx = int;
-type GLsizei = int;
-type GLfloat = float;
-type GLclampf = float;
-type GLdouble = double;
-type GLclampd = double;
+type GLbyte = int8;
+type GLubyte = uint8;
+type GLshort = int16;
+type GLushort = uint16;
+type GLint = int32;
+type GLuint = uint32;
+type GLclampx = int32;
+type GLsizei = int32;
+type GLfloat = float32;
+type GLclampf = float32;
+type GLdouble = float64;
+type GLclampd = float64;
 type GLeglClientBufferEXT = void*;
 type GLeglImageOES = void*;
 type GLchar = char;
@@ -2409,9 +2409,9 @@ proc_glViewportIndexedf glViewportIndexedf = null;
 proc_glViewportIndexedfv glViewportIndexedfv = null;
 proc_glWaitSync glWaitSync = null;
 
-type void_func = void();
+// type void_func = void();
 
-void load_opengl(void_func(char*) getProcAddress) {
+void load_opengl(void*(char*) getProcAddress) {
     glActiveShaderProgram                         = getProcAddress("glActiveShaderProgram")                         as proc_glActiveShaderProgram;
     glActiveTexture                               = getProcAddress("glActiveTexture")                               as proc_glActiveTexture;
     glAttachShader                                = getProcAddress("glAttachShader")                                as proc_glAttachShader;

@@ -102,7 +102,7 @@ typedef enum ExprType {
     ExprType_Literal_False,
     ExprType_Literal_Null,
     ExprType_Variable,
-    ExprType_Constant,
+    ExprType_Constant, // TODO: is this even used for anything important?
     ExprType_Alloc,
     ExprType_Ternary,
     ExprType_FuncCall,

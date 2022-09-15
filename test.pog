@@ -1,45 +1,29 @@
 
 declare void printf(char* format);
 
-struct Test {
-    uint64 flags;
-    float32 x;
+OpaqueType* ot;
+
+type OpaqueType;
+type func = void(OpaqueType*);
+
+
+void take_opaque(OpaqueType* ot) {
+    printf("Hello, Opaque\n");
 }
 
-type byte = uint8;
-type OpaqueTypeTest;
-
-void goo() {
-    printf("goo\n");
+void reg(func f) {
+    printf("reg\n");
 }
 
 int32 main() {
 
-    void() func;
+    reg(take_opaque);
 
-    OpaqueTypeTest* d;
+    void** p = null;
 
-    {
-        uint8 g = 20;
-        byte b = g;
-    }
-
-    let i = 124;
-    let f = 12.123;
-
-    float32 g = 1.3 * 2.0;
-
-    char c = 'h';
+    take_opaque(p);
 
     printf("Hello, Sailor!\n");
 
-    Test test;
-
-    test.x = 2;
-
     return 0;
-}
-
-byte foo(byte b) {
-    // return b + 1;
 }

@@ -13,6 +13,8 @@
 
 /*
 
+    llvm-symbolizer.exe --use-native-pdb-reader --print-source-context-lines=20 -e ./bin/plang.exe
+
     TODO list:
         - localy defined structs
         *- clasic for loop: for (int i = 0; i < 10; i++)
@@ -30,14 +32,15 @@
         - "plang build" CLI. build all .pog files in directory. let output exe be named the name of the directory
         - contextual inclusion (the with keyword on struct fields)
         - member-like functions (the with keyword on function arguments)
+        *- file name in errors
 
     InProgress:
-        - line numbers in validation errors
+        *- line numbers in validation errors
         - localy defined functions
-        - construct list of all string identifiers during tokenizing, to allow for faster string equals and to free the file buffer, and to clear the tokens list after parsing for less memory usage
 
 
     DONE list:
+        - construct list of all string identifiers during tokenizing, to allow for faster string equals and to free the file buffer.
         - function overloads
         *- goto statement and labels
         *- unary minus operation
@@ -99,22 +102,21 @@ void addFile(char* filename, char* extension) {
     char* fileContent = fileread(filename, &filesize);
     if (!fileContent) return;
 
-    printf("Tokenize...\n");
+    // printf("Tokenize...\n");
     u32 numErrors = lex(fileContent);
     if (numErrors) {
         printf("There were %d errors during tokenizing.\nFix errors and try again.\n", numErrors);
         exit(0); // TODO: handle this properly
     }
 
-    printf("Parse...\n");
+    free(fileContent);
+
+    // printf("Parse...\n");
     numErrors = parse();
     if (numErrors) {
         printf("There were %d errors during parsing.\nFix errors and try again.\n", numErrors);
         exit(0);
     }
-
-    // TODO: Tokens are refering to the fileContent, so we can't free yet, but we probably should
-    // free(fileContent);
 
 }
 
@@ -209,7 +211,6 @@ int main(int argc, char* argv[]) {
 
         printf("Printed %d strings\n", len);
     }
-
 
     printf("Validate...\n");
     u32 numErrors = validate();

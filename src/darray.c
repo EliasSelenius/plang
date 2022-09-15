@@ -13,7 +13,7 @@ u32 darrayStride(void* list)   { return ((u32*)list)[-1]; }
 void* _darrayCreate(u32 stride) {
     DarrayHead* head = malloc(
         sizeof(DarrayHead) +
-        stride        // first element
+        stride       // first element
     );
 
     void* list = &head[1];
@@ -39,7 +39,7 @@ void _darrayAdd(void** list, void* value) {
         *list = &head[1];
     }
 
-    
+
     u64 addr = (u64)*list;
     addr += head->length * head->stride;
     memcpy((void*)addr, value, head->stride);

@@ -38,12 +38,7 @@ typedef enum TokenType {
     Tok_Keyword_Const,
 
     Tok_Integer,
-    // Tok_Integer_Uint,
-    // Tok_Integer_Long,
-    // Tok_Integer_Ulong,
     Tok_Decimal,
-    // Tok_Decimal_Float,
-    // Tok_Decimal_Double,
     Tok_String,
     Tok_Char,
 

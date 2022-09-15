@@ -293,7 +293,7 @@ u32 lex(char* input) {
         // Line comment
         if (*cursor == '/' && *(cursor + 1) == '/') {
             char* commentStart = cursor;
-            while (*++cursor != '\n');
+            while (!(*++cursor == '\n' || *cursor == '\0'));
             cursor--;
             continue;
         }

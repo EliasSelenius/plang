@@ -20,6 +20,24 @@ inline void newline() {
     while (t--) sbAppend(sb, "    ");
 }
 
+static char getCharFromU32(u32 num) {
+    // TODO: do better than this...
+    return '0' + num;
+}
+
+static char number_string[20]; // 20 is max char size for 64 bit integer
+static StrSpan numberToString(u64 num) {
+    if (num == 0) return (StrSpan) { "0", 1 };
+    u32 strIndex = 20;
+
+    while (num != 0) {
+        u64 r = num % 10; num /= 10;
+        number_string[--strIndex] = r + '0';
+    }
+
+    return (StrSpan) { &number_string[strIndex], 20 - strIndex };
+}
+
 char* getTypeCname(Datatype type) {
     switch (type.kind) {
 
@@ -47,7 +65,7 @@ char* getTypeCname(Datatype type) {
 
         case Typekind_Struct: return getIdentifierStringValue(g_Unit->structs[type.ref].name);
         case Typekind_Enum: return null;
-        case Typekind_Alias: return "SomeTypeAlias";
+        case Typekind_Alias: return getIdentifierStringValue(g_Unit->aliases[type.ref].name);
         case Typekind_Opaque: return getIdentifierStringValue(type.ref);
         case Typekind_FuncPtr: return "SomeFuncPtr";
 
@@ -56,29 +74,18 @@ char* getTypeCname(Datatype type) {
 }
 
 static void transpileType(Datatype type) {
-    sbAppend(sb, getTypeCname(type));
+
+    if (type.kind == Typekind_FuncPtr) {
+        sbAppend(sb, "proc_");
+        sbAppendSpan(sb, numberToString(type.ref));
+    } else {
+        sbAppend(sb, getTypeCname(type));
+    }
+
     u32 np = type.numPointers;
     while (np-- > 0) {
         sbAppend(sb, "*");
     }
-}
-
-static char getCharFromU32(u32 num) {
-    // TODO: do better than this...
-    return '0' + num;
-}
-
-static char number_string[20]; // 20 is max char size for 64 bit integer
-static StrSpan numberToString(u64 num) {
-    if (num == 0) return (StrSpan) { "0", 1 };
-    u32 strIndex = 20;
-
-    while (num != 0) {
-        u64 r = num % 10; num /= 10;
-        number_string[--strIndex] = r + '0';
-    }
-
-    return (StrSpan) { &number_string[strIndex], 20 - strIndex };
 }
 
 static void transpileFuncCall(FuncCall* call) {
@@ -500,12 +507,12 @@ void transpile() {
     // sbAppend(sb, "typedef unsigned short ushort;\n");
 
     sbAppend(sb, "typedef signed char int8;\n");
-    sbAppend(sb, "typedef unsigned char uint8;\n");
     sbAppend(sb, "typedef signed short int16;\n");
-    sbAppend(sb, "typedef unsigned short uint16;\n");
     sbAppend(sb, "typedef signed int int32;\n");
-    sbAppend(sb, "typedef unsigned int uint32;\n");
     sbAppend(sb, "typedef signed long long int64;\n");
+    sbAppend(sb, "typedef unsigned char uint8;\n");
+    sbAppend(sb, "typedef unsigned short uint16;\n");
+    sbAppend(sb, "typedef unsigned int uint32;\n");
     sbAppend(sb, "typedef unsigned long long uint64;\n");
     sbAppend(sb, "typedef float float32;\n");
     sbAppend(sb, "typedef double float64;\n");
@@ -568,6 +575,52 @@ void transpile() {
             char* typename = getIdentifierStringValue(*optype);
             sbAppend(sb, "typedef struct ");
             sbAppend(sb, typename);
+            sbAppend(sb, " ");
+            sbAppend(sb, typename);
+            sbAppend(sb, ";\n");
+        }
+    }
+
+    { // type aliases (except funcptrs)
+        foreach (alias, g_Unit->aliases) {
+            if (alias->aliasedType.kind == Typekind_FuncPtr) continue;
+            char* typename = getIdentifierStringValue(alias->name);
+            sbAppend(sb, "typedef ");
+            transpileType(alias->aliasedType);
+            sbAppend(sb, " ");
+            sbAppend(sb, typename);
+            sbAppend(sb, ";\n");
+        }
+    }
+
+    { // Func ptrs
+        u32 i = 0;
+        while (i < g_Unit->funcPtrTypes->length) {
+            FuncPtr* f = getFuncPtr(i);
+            sbAppend(sb, "typedef ");
+            transpileType(f->returnType);
+            sbAppend(sb, " ");
+            sbAppend(sb, "proc_");
+            sbAppendSpan(sb, numberToString(i));
+            sbAppend(sb, "(");
+            if (f->argCount) {
+                transpileType(f->argTypes[0]);
+                for (u32 i = 1; i < f->argCount; i++) {
+                    sbAppend(sb, ", ");
+                    transpileType(f->argTypes[i]);
+                }
+            }
+            sbAppend(sb, ");\n");
+            i += sizeof(FuncPtr) + sizeof(Datatype) * f->argCount;
+        }
+    }
+
+    { // type aliases (funcptrs only)
+        foreach (alias, g_Unit->aliases) {
+            if (alias->aliasedType.kind != Typekind_FuncPtr) continue;
+            char* typename = getIdentifierStringValue(alias->name);
+            sbAppend(sb, "typedef ");
+            transpileType(alias->aliasedType);
             sbAppend(sb, " ");
             sbAppend(sb, typename);
             sbAppend(sb, ";\n");

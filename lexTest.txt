@@ -66,9 +66,9 @@ int main() {
         println("No There is no test");
     }
 
-    let p = alloc Person;
-    p.name = g_Name;
-    sayHello(p);
+    // let p = alloc Person;
+    // p.name = g_Name;
+    // sayHello(p);
 
     // printf("Persons name is: %s\n", p.name);
 

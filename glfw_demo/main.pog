@@ -1,9 +1,9 @@
 
 vec2 cam_pos;
-float cam_zoom = 40f;
+float32 cam_zoom = 40f;
 
 const entitiesCapacity = 256;
-int entitiesLength = 0;
+int32 entitiesLength = 0;
 Entity* entities;
 Entity* player;
 
@@ -22,29 +22,29 @@ Entity* appendEntity(Entity e) {
 }
 
 
-void GLFWscrollfunCallback(GLFWwindow* window, double x, double y) {
-    cam_zoom -= cam_zoom * (y as float) * 0.1;
+void GLFWscrollfunCallback(GLFWwindow* window, float64 x, float64 y) {
+    cam_zoom -= cam_zoom * (y as float32) * 0.1;
     cam_zoom = clamp(cam_zoom, 1.0, 10000.0);
 }
 
-Mesh genCircle(int res, float radius) {
-    uint vertsCount = res as uint + 1u;
+Mesh genCircle(int32 res, float32 radius) {
+    uint32 vertsCount = res as uint32 + 1u;
     vec2 verts[vertsCount];
     verts[0].x = 0f;
     verts[0].y = 0f;
 
-    int i = 1;
+    int32 i = 1;
     while i < res + 1 {
-        float angle = (i as float) * Tau / res;
+        float32 angle = (i as float32) * Tau / res;
         verts[i].x = cosf(angle) * radius;
         verts[i].y = sinf(angle) * radius;
         ++i;
     }
 
-    uint indsCount = (res as uint) * 3u;
-    uint inds[indsCount];
+    uint32 indsCount = (res as uint32) * 3u;
+    uint32 inds[indsCount];
     i = 0;
-    uint v = 1u;
+    uint32 v = 1u;
     while i < indsCount {
         inds[i] = 0u;
         inds[i+1] = v++;
@@ -57,14 +57,14 @@ Mesh genCircle(int res, float radius) {
     return createMesh(verts, vertsCount, inds, indsCount);
 }
 
-Planet genPlanet(float radius, float dist, float year) {
+Planet genPlanet(float32 radius, float32 dist, float32 year) {
     Planet p;
     p.radius = radius;
     p.dist = dist;
     p.yearDuration = year;
     p.mesh = genCircle(36 * radius, radius);
     p.rot = 0.0;
-    p.orbitOffset = Pi * random(dist as int);
+    p.orbitOffset = Pi * random(dist as int32);
 
     return p;
 }
@@ -77,38 +77,38 @@ void drawPlanet(Planet* planet) {
 struct Entity {
     Mesh mesh;
     vec2 pos;
-    float rot;
+    float32 rot;
     vec2 vel;
 }
 
 struct Planet {
     Mesh mesh;
     vec2 pos;
-    float rot;
-    float radius;
-    float dist;
-    float yearDuration;
-    float orbitOffset;
+    float32 rot;
+    float32 radius;
+    float32 dist;
+    float32 yearDuration;
+    float32 orbitOffset;
 }
 
-int key(char c) {
-    return glfwGetKey(window, c as int);
+int32 key(char c) {
+    return glfwGetKey(window, c as int32);
 }
 
 void updateEntity(Entity* entity) {
     entity.pos = add(entity.pos, entity.vel);
 
-    uint i = 0u;
+    uint32 i = 0u;
     while i < planetsCount {
         Planet* planet = *planets[i++];
 
         vec2 diff = sub(entity.pos, planet.pos);
         vec2 normal = normalize(diff);
 
-        float intersection = length(diff) - planet.radius; // NOTE: we can neglect the entitys radius because its always 1.0
+        float32 intersection = length(diff) - planet.radius; // NOTE: we can neglect the entitys radius because its always 1.0
 
-        float planetArea = Pi * planet.radius * planet.radius;
-        float planetMass = planetArea; // assuming the same uniform mass-density on all planets.
+        float32 planetArea = Pi * planet.radius * planet.radius;
+        float32 planetMass = planetArea; // assuming the same uniform mass-density on all planets.
         vec2 gravity = mul(normal, planetMass / sqlength(diff) * -0.000003);
         // entity.vel = add(entity.vel, gravity);
 
@@ -130,9 +130,9 @@ void load() {
     entities = malloc(sizeof(Entity) * entitiesCapacity);
     planets = malloc(sizeof(Planet) * planetsCount);
 
-    uint i = 0u;
+    uint32 i = 0u;
     while i < planetsCount {
-        float r = 20.0 + random(i as int);
+        float32 r = 20.0 + random(i as int32);
         Planet p = genPlanet(r,
                             70.0 + r * 30.0 * i,
                             100.0 + 20.0 * random(2 * i + 100));
@@ -147,7 +147,7 @@ void load() {
 
 }
 
-let main() {
+int32 main() {
 
     if !glfwInit() {
         return -1;
@@ -197,19 +197,19 @@ let main() {
 
         glUniform1f(glGetUniformLocation(shader, "zoom"), cam_zoom);
 
-        int w;
-        int h;
+        int32 w;
+        int32 h;
         glfwGetFramebufferSize(window, *w, *h);
         glViewport(0, 0, w, h);
 
         glClear(GL_COLOR_BUFFER_BIT);
 
-        float time = glfwGetTime() as float;
+        float32 time = glfwGetTime() as float32;
         time = 0.0;
-        int i = 0;
+        int32 i = 0;
         while i < planetsCount {
             Planet* planet = *planets[i++];
-            float t = Pi * 2.0;
+            float32 t = Pi * 2.0;
             planet.pos.x = cosf(planet.orbitOffset + t * time / planet.yearDuration) * planet.dist;
             planet.pos.y = sinf(planet.orbitOffset + t * time / planet.yearDuration) * planet.dist;
             drawPlanet(planet);

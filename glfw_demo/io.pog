@@ -1,22 +1,22 @@
 
 
-declare int fopen_s(void** stream, char* filename, char* mode);
-declare int fclose(void* stream);
+declare int32 fopen_s(void** stream, char* filename, char* mode);
+declare int32 fclose(void* stream);
 
-declare int fseek(void* stream, int offset, int origin);
-declare ulong ftell(void* stream);
+declare int32 fseek(void* stream, int32 offset, int32 origin);
+declare uint64 ftell(void* stream);
 declare void rewind(void* stream);
-declare ulong fread(void* buffer, ulong elementSize, ulong elementCount, void* stream);
+declare uint64 fread(void* buffer, uint64 elementSize, uint64 elementCount, void* stream);
 
-declare void printf(char* format, char* arg1, uint arg2);
-declare void* calloc(ulong count, ulong size);
-declare void* malloc(ulong size);
+declare void printf(char* format, char* arg1, uint32 arg2);
+declare void* calloc(uint64 count, uint64 size);
+declare void* malloc(uint64 size);
 
-let println(char* str) {
+void println(char* str) {
     printf("%s\n", str, 0u);
 }
 
-let printNum(uint num) {
+void printNum(uint32 num) {
     printf("%s%d", "", num);
 }
 
@@ -28,7 +28,7 @@ char* fileread(char* filename) {
     }
 
     fseek(stream, 0, 2); // 2 = SEEK_END
-    ulong len = ftell(stream);
+    uint64 len = ftell(stream);
     rewind(stream);
 
     char* res = calloc(len + 1, 1ul);

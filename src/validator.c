@@ -168,11 +168,8 @@ static void validateType(Datatype* type) {
 
             foreach (alias, g_Unit->aliases) {
                 if (alias->name == type->ref) {
-                    // type->kind = Typekind_Alias;
-                    // type->ref = alias_index;
-
-                    // TODO: recursive aliases
-                    *type = alias->aliasedType;
+                    type->kind = Typekind_Alias;
+                    type->ref = alias_index;
                     return;
                 }
             }
@@ -184,14 +181,13 @@ static void validateType(Datatype* type) {
                     return;
                 }
             }
-
         } break;
 
-        case Typekind_FuncPtr: {
-            FuncPtr* f = getFuncPtr(type->ref);
-            validateType(&f->returnType);
-            for (u32 i = 0; i < f->argCount; i++) validateType(&f->argTypes[i]);
-        } return;
+        // case Typekind_FuncPtr: {
+        //     FuncPtr* f = getFuncPtr(type->ref);
+        //     validateType(&f->returnType);
+        //     for (u32 i = 0; i < f->argCount; i++) validateType(&f->argTypes[i]);
+        // } return;
 
         default: return;
     }
@@ -214,6 +210,16 @@ static bool funcPtrAssignable(FuncPtr* to, FuncPtr* from) {
 }
 
 static bool typeAssignable(Datatype toType, Datatype fromType) {
+    if (toType.kind == Typekind_Alias) {
+        Datatype alias = g_Unit->aliases[toType.ref].aliasedType;
+        alias.numPointers += toType.numPointers;
+        return typeAssignable(alias, fromType);
+    } else if (fromType.kind == Typekind_Alias) {
+        Datatype alias = g_Unit->aliases[fromType.ref].aliasedType;
+        alias.numPointers += fromType.numPointers;
+        return typeAssignable(toType, alias);
+    }
+
     if (fromType.kind == Typekind_Invalid) return true;
     if (toType.kind == Typekind_Invalid) return true;
 
@@ -263,17 +269,55 @@ static bool typeAssignable(Datatype toType, Datatype fromType) {
     return false;
 }
 
+static void constructTypename(char* buffer, u32 size, Datatype type) {
+    char* typename = null;
+    switch (type.kind) {
+        case Typekind_Invalid: typename = "error_invalid"; break;
+        case Typekind_Undecided: typename = "error_undecided"; break;
+        case Typekind_MustBeInfered: typename = "error_mustinfer"; break;
+        case Typekind_AmbiguousInteger: typename = "error_ambint"; break;
+        case Typekind_AmbiguousDecimal: typename = "error_ambdec"; break;
+
+        case Typekind_uint8: typename = "uint8"; break;
+        case Typekind_uint16: typename = "uint16"; break;
+        case Typekind_uint32: typename = "uint32"; break;
+        case Typekind_uint64: typename = "uint64"; break;
+        case Typekind_int8: typename = "int8"; break;
+        case Typekind_int16: typename = "int16"; break;
+        case Typekind_int32: typename = "int32"; break;
+        case Typekind_int64: typename = "int64"; break;
+        case Typekind_float32: typename = "float32"; break;
+        case Typekind_float64: typename = "float64"; break;
+        case Typekind_void: typename = "void"; break;
+        case Typekind_char: typename = "char"; break;
+
+        case Typekind_Struct: typename = getIdentifierStringValue(g_Unit->structs[type.ref].name); break;
+        case Typekind_Enum: typename = null; break;
+        case Typekind_Alias: typename = getIdentifierStringValue(g_Unit->aliases[type.ref].name); break;
+        case Typekind_Opaque: typename = getIdentifierStringValue(type.ref); break;
+        case Typekind_FuncPtr: typename = "SomeFuncPtr"; break;
+
+    }
+
+    snprintf(buffer, size, "%s%.*s", typename, type.numPointers, "**********");
+}
+
 static void assertAssignability(Datatype toType, Datatype fromType) {
     if (!typeAssignable(toType, fromType)) {
 
-        // TODO: print correct type names. (include pointers and the proper name of function pointers) 
-        // error("Type missmatch. \"%.*s\" is not compatible with \"%.*s\".",
-            // from->name.length,
-            // from->name.start,
-            // to->name.length,
-            // to->name.start);
-        error("Type missmatch.");
+        char toTypeName[50];
+        char fromTypeName[50];
+        constructTypename(toTypeName, sizeof(toTypeName), toType);
+        constructTypename(fromTypeName, sizeof(fromTypeName), fromType);
+
+        error("Type missmatch. \"%s\" is not assignable to \"%s\".", fromTypeName, toTypeName);
     }
+}
+
+// TODO: what about the numPointers here
+static Datatype getType(Datatype type) {
+    if (type.kind == Typekind_Alias) return getType(g_Unit->aliases[type.ref].aliasedType);
+    return type;
 }
 
 static Datatype validateFuncCall(FuncCall* call) {
@@ -343,7 +387,7 @@ static Datatype validateFuncCall(FuncCall* call) {
     }
 
     funcptrPart:
-    Datatype calleeType = validateExpression(call->funcExpr);
+    Datatype calleeType = getType(validateExpression(call->funcExpr));
     if (calleeType.kind == Typekind_FuncPtr) {
         call->base.expressionType = ExprType_FuncPointerCall;
         FuncPtr* funcptr = getFuncPtr(calleeType.ref);
@@ -734,7 +778,7 @@ static void validateFunctionDeclaration(FuncDeclaration* decl) {
 static void validateFunction(PlangFunction* func) {
     function = func;
 
-    validateFunctionDeclaration(&func->decl);
+    // validateFunctionDeclaration(&func->decl);
 
     currentScope = null;
     validateScope(&func->scope);
@@ -776,6 +820,25 @@ static void validateGlobalVar(VarDecl* decl) {
 }
 
 u32 validate() {
+
+    // validate funcptrs
+    u32 i = 0;
+    while (i < g_Unit->funcPtrTypes->length) {
+        FuncPtr* f = getFuncPtr(i);
+        validateType(&f->returnType);
+        if (f->argCount) {
+            for (u32 i = 0; i < f->argCount; i++) validateType(&f->argTypes[i]);
+        }
+        i += sizeof(FuncPtr) + sizeof(Datatype) * f->argCount;
+    }
+
+    { // validate type aliases (except funcptrs)
+        foreach (alias, g_Unit->aliases) {
+            if (alias->aliasedType.kind == Typekind_FuncPtr) continue;
+            validateType(&alias->aliasedType);
+        }
+    }
+
 
     // validate structs
     u32 struLen = darrayLength(g_Unit->structs);
@@ -827,17 +890,29 @@ u32 validate() {
         if (overloadCount != 1) f1->overload = 1;
     }
 
+
+    // validate the types of all function signatures (return types and argument types) before we validate the function scopes
+    for (u32 i = 0; i < funcLen; i++) {
+        PlangFunction* func = &g_Unit->functions[i];
+        if (func->decl.arguments) {
+            foreach (arg, func->decl.arguments) validateType(&arg->type);
+        }
+
+        if (func->decl.returnType.kind == Typekind_MustBeInfered) {
+            error("Return type inference not implemmented.");
+            func->decl.returnType = type_void;
+        } else {
+            validateType(&func->decl.returnType);
+        }
+    }
+
     // validate functions
     variables = darrayCreate(Variable);
     for (u32 i = 0; i < funcLen; i++) {
         validateFunction(&g_Unit->functions[i]);
     }
-
-    // foreach (func, g_Unit->functions) {
-    //     validateFunction(func);
-    // }
-
     darrayDelete(variables);
+
 
     return numberOfErrors;
 }

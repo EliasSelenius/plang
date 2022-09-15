@@ -477,7 +477,7 @@ static Expression* parseLeafExpression() {
         } break;
 
         case Tok_Keyword_Sizeof: {
-            SizeofExpression* sof = malloc(sizeof(SizeofExpression*));
+            SizeofExpression* sof = malloc(sizeof(SizeofExpression));
             sof->base.expressionType = ExprType_Sizeof;
             sof->base.nodebase.lineNumber = tokens[token_index].line;
             token_index++;

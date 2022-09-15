@@ -1,37 +1,37 @@
 
 
-declare double sin(double t);
-declare float sinf(float t);
-declare double cos(double t);
-declare float cosf(float t);
-declare double sqrt(double x);
-declare float sqrtf(float x);
+declare float64 sin(float64 t);
+declare float32 sinf(float32 t);
+declare float64 cos(float64 t);
+declare float32 cosf(float32 t);
+declare float64 sqrt(float64 x);
+declare float32 sqrtf(float32 x);
 
 const Pi = 3.14159265359;
 const Tau = Pi * 2.0;
 
-// float random(float seed) {
+// float32 random(float32 seed) {
     // return sinf(seed * 9999999.0);
 // }
 
-float random(int seed) {
+float32 random(int32 seed) {
     seed = (seed << 13) ^ seed;
     return (1.0f - ((seed * (seed * seed * 15731 + 789221) + 1376312589) & 0x7fffffff) / 1073741824.0f);
 }
 
 // // TODO: the 'quality' of randomnes is not tested here
-// float random(int seed_x, int seed_y) {
+// float32 random(int32 seed_x, int32 seed_y) {
 //     return random(seed_x + seed_y * 57);
 // }
 
-let clamp(float t, float min, float max) {
+float32 clamp(float32 t, float32 min, float32 max) {
     return t < min ? min : t > max ? max : t;
 }
 
 
 struct vec2 {
-    float x;
-    float y;
+    float32 x;
+    float32 y;
 }
 
 vec2 sub(vec2 a, vec2 b) {
@@ -55,7 +55,7 @@ vec2 mul(vec2 a, vec2 b) {
     return r;
 }
 
-vec2 mul(vec2 a, float s) {
+vec2 mul(vec2 a, float32 s) {
     vec2 r = a;
     r.x *= s;
     r.y *= s;
@@ -63,15 +63,15 @@ vec2 mul(vec2 a, float s) {
 }
 
 
-float dot(vec2 a, vec2 b) {
+float32 dot(vec2 a, vec2 b) {
     return a.x * b.x + a.y * b.y;
 }
 
-float sqlength(vec2 a) {
+float32 sqlength(vec2 a) {
     return dot(a, a);
 }
 
-float length(vec2 a) {
+float32 length(vec2 a) {
     return sqrtf(dot(a, a));
 }
 
