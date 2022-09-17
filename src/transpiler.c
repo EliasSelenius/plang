@@ -1,20 +1,11 @@
 
-#include "parser.h"
-#include "essh-string.h"
-#include "darray.h"
 
-#include <stdio.h>
-#include <assert.h>
-#include <stdlib.h> // malloc
-
-
-void transpileBlock(Codeblock* scope);
-void filewrite(const char* filename, char* content);
-void transpileExpression(Expression* expr);
+static void transpileBlock(Codeblock* scope);
+static void transpileExpression(Expression* expr);
 
 static StringBuilder* sb;
 static u32 tabing = 0;
-inline void newline() {
+static inline void newline() {
     sbAppend(sb, "\n");
     u32 t = tabing;
     while (t--) sbAppend(sb, "    ");
@@ -38,7 +29,7 @@ static StrSpan numberToString(u64 num) {
     return (StrSpan) { &number_string[strIndex], 20 - strIndex };
 }
 
-char* getTypeCname(Datatype type) {
+static char* getTypeCname(Datatype type) {
     switch (type.kind) {
 
         // These should not exist at this point
@@ -491,7 +482,7 @@ static u32 countStructDependencies(PlangStruct* stru) {
     return deps;
 }
 
-void transpile() {
+static void transpile() {
     // TODO: use a higer initial capacity for the string builder
     StringBuilder builder = sbCreate();
     sb = &builder;
@@ -571,6 +562,7 @@ void transpile() {
     }*/
 
     { // opaque types
+        sbAppend(sb, "\n// Opaque types\n");
         foreach (optype, g_Unit->opaqueTypes) {
             char* typename = getIdentifierStringValue(*optype);
             sbAppend(sb, "typedef struct ");
@@ -582,6 +574,7 @@ void transpile() {
     }
 
     { // type aliases (except funcptrs)
+        sbAppend(sb, "\n// Type aliases\n");
         foreach (alias, g_Unit->aliases) {
             if (alias->aliasedType.kind == Typekind_FuncPtr) continue;
             char* typename = getIdentifierStringValue(alias->name);
@@ -594,11 +587,16 @@ void transpile() {
     }
 
     { // Func ptrs
+        sbAppend(sb, "\n// Function pointers\n");
         u32 i = 0;
         while (i < g_Unit->funcPtrTypes->length) {
             FuncPtr* f = getFuncPtr(i);
             sbAppend(sb, "typedef ");
-            transpileType(f->returnType);
+            if (f->returnType.kind == Typekind_Alias) {
+                
+            } else {
+                transpileType(f->returnType);
+            }
             sbAppend(sb, " ");
             sbAppend(sb, "proc_");
             sbAppendSpan(sb, numberToString(i));
@@ -616,6 +614,7 @@ void transpile() {
     }
 
     { // type aliases (funcptrs only)
+        sbAppend(sb, "\n// Function pointer aliases\n");
         foreach (alias, g_Unit->aliases) {
             if (alias->aliasedType.kind != Typekind_FuncPtr) continue;
             char* typename = getIdentifierStringValue(alias->name);

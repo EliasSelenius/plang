@@ -1,10 +1,3 @@
-#include "types.h"
-#include "parser.h"
-#include "darray.h"
-
-#include <stdio.h>
-#include <stdarg.h>
-// #include <stdlib.h> // included for malloc
 
 typedef struct Variable {
     Identifier name;
@@ -15,45 +8,13 @@ static PlangFunction* function;
 static Variable* variables;
 static Codeblock* currentScope;
 static Statement* currentStatement;
-static u32 numberOfErrors = 0;
 
 
-Datatype validateExpression(Expression* expr);
-Datatype getDeclaredVariable(Identifier name);
-bool typeAssignable(Datatype toType, Datatype fromType);
+static Datatype validateExpression(Expression* expr);
+static Datatype getDeclaredVariable(Identifier name);
+static bool typeAssignable(Datatype toType, Datatype fromType);
 
-inline void error(char* format, ...) {
-    // TODO: better line of not only statements
-    u32 lineNum = 0;
-    char* file = "unknown_file";
-    if (currentStatement) {
-        lineNum = currentStatement->nodebase.lineNumber;
-        // file = currentStatement->nodebase.filepath;
-    }
-    printf("%s:%d: error: ", file, lineNum);
 
-    va_list args;
-    va_start(args, format);
-    vprintf(format, args);
-    va_end(args);
-
-    printf("\n");
-
-    numberOfErrors++;
-}
-
-inline void errorLine(u32 line, char* format, ...) {
-    printf("Error Ln%d: ", line);
-
-    va_list args;
-    va_start(args, format);
-    vprintf(format, args);
-    va_end(args);
-
-    printf("\n");
-
-    numberOfErrors++;
-}
 
 static Field* getField(PlangStruct* stru, Identifier name) {
     for (u32 i = 0; i < darrayLength(stru->fields); i++) {
@@ -356,14 +317,13 @@ static Datatype validateFuncCall(FuncCall* call) {
 
         } else {
             if (passedArgumentsLength != expectedArgumentLength) {
-                error("Unexpected number of arguments passed to \"%s\", expected %d, but got %d.", 
+                error("Unexpected number of arguments passed to \"%s\", expected %d, but got %d.",
                     getIdentifierStringValue(name),
                     expectedArgumentLength, passedArgumentsLength);
                 return func->decl.returnType;
             }
 
             for (u32 i = 0; i < passedArgumentsLength; i++) assertAssignability(func->decl.arguments[i].type, passedArguments[i]);
-
             return func->decl.returnType;
         }
     }
@@ -376,14 +336,15 @@ static Datatype validateFuncCall(FuncCall* call) {
 
         u32 expectedArgumentLength = decl->arguments ? darrayLength(decl->arguments) : 0;
 
-        if (passedArgumentsLength != expectedArgumentLength) continue;
-
-        bool compat = true;
-        for (u32 i = 0; i < passedArgumentsLength; i++) {
-            if (!typeAssignable(decl->arguments[i].type, passedArguments[i])) {compat = false; break;}
+        if (passedArgumentsLength != expectedArgumentLength) {
+            error("Unexpected number of arguments passed to \"%s\", expected %d, but got %d.",
+                getIdentifierStringValue(name),
+                expectedArgumentLength, passedArgumentsLength);
+            return decl->returnType;
         }
 
-        if (compat) return decl->returnType;
+        for (u32 i = 0; i < passedArgumentsLength; i++) assertAssignability(decl->arguments[i].type, passedArguments[i]);
+        return decl->returnType;
     }
 
     funcptrPart:
@@ -398,10 +359,7 @@ static Datatype validateFuncCall(FuncCall* call) {
             return funcptr->returnType;
         }
 
-        for (u32 i = 0; i < passedArgumentsLength; i++) {
-            assertAssignability(funcptr->argTypes[i], passedArguments[i]);
-        }
-
+        for (u32 i = 0; i < passedArgumentsLength; i++) assertAssignability(funcptr->argTypes[i], passedArguments[i]);
         return funcptr->returnType;
     }
 
@@ -410,7 +368,7 @@ static Datatype validateFuncCall(FuncCall* call) {
     return type_invalid;
 }
 
-inline Datatype resolveType(Datatype type) {
+static inline Datatype resolveType(Datatype type) {
     if      (type.kind == Typekind_AmbiguousInteger) return type_int32;
     else if (type.kind == Typekind_AmbiguousDecimal) return type_float32;
     return type;
@@ -819,7 +777,7 @@ static void validateGlobalVar(VarDecl* decl) {
     }
 }
 
-u32 validate() {
+static u32 validate() {
 
     // validate funcptrs
     u32 i = 0;

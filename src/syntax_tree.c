@@ -1,62 +1,79 @@
-#pragma once
 
-#include "types.h"
-#include "essh-string.h"
-#include "lexer.h"
-#include "darray.h"
-#include "dynamic_buffer.h"
-#include "typesystem.h"
 
-u32 parse();
+// ----Types---------------------------------------------
 
-typedef struct PlangFunction PlangFunction;
-typedef struct FuncDeclaration FuncDeclaration;
-typedef struct PlangStruct PlangStruct;
-typedef struct VarDecl VarDecl;
-typedef struct Constant Constant;
+typedef enum Typekind {
 
-typedef u32 Identifier;
+    Typekind_Invalid = 0, // used by validator to signify a type that could not be determined because of an error
+    Typekind_Undecided, // used by parser to mean either struct, enum or alias
+    Typekind_MustBeInfered,
+    Typekind_AmbiguousInteger,
+    Typekind_AmbiguousDecimal,
 
-typedef struct TranslationUnit {
-    PlangFunction* functions; // darray
-    FuncDeclaration* functionDeclarations; // darray
-    PlangStruct* structs; // darray
-    VarDecl* globalVariables; // darray
-    Constant* constants; // darray
+    Typekind_uint8,
+    Typekind_uint16,
+    Typekind_uint32,
+    Typekind_uint64,
 
-    DynamicBuffer* funcPtrTypes;
+    Typekind_int8,
+    Typekind_int16,
+    Typekind_int32,
+    Typekind_int64,
 
-    AliasType* aliases; // darray
-    Identifier* opaqueTypes; // darray
+    Typekind_float32,
+    Typekind_float64,
 
-    u32* stringTableByteOffsets; // darray
-    DynamicBuffer* stringTable;
+    Typekind_void,
+    Typekind_char,
 
-} TranslationUnit;
+    Typekind_Struct,
+    Typekind_Enum,
+    Typekind_Alias,
+    Typekind_Opaque,
+    Typekind_FuncPtr
+} Typekind;
 
-extern TranslationUnit* g_Unit;
+typedef struct Datatype {
+    Typekind kind;
+    /*
+        ref:
+            Typekind_Undecided  -> Identifier of struct/enum/alias
+            Typekind_Struct     -> index into structs
+            Typekind_Alias      -> index into aliases
+            Typekind_Opaque     -> Identifier
+    */
+    u32 ref;
+    u32 numPointers;
+} Datatype;
 
-inline char* getIdentifierStringValue(Identifier id) {
-    return (char*)(&g_Unit->stringTable->bytes[id]);
+inline bool typeEquals(Datatype a, Datatype b) {
+    return a.kind == b.kind && a.ref == b.ref && a.numPointers == b.numPointers;
 }
 
-u32 appendStringToStringtable(StrSpan word);
+#define type_invalid     (Datatype) { Typekind_Invalid, 0, 0 }
+#define type_void        (Datatype) { Typekind_void, 0, 0 }
+#define type_voidPointer (Datatype) { Typekind_void, 0, 1 }
+#define type_char        (Datatype) { Typekind_char, 0, 0 }
+#define type_charPointer (Datatype) { Typekind_char, 0, 1 }
+#define type_int32       (Datatype) { Typekind_int32, 0, 0 }
+#define type_uint32      (Datatype) { Typekind_uint32, 0, 0 }
+#define type_int64       (Datatype) { Typekind_int64, 0, 0 }
+#define type_uint64      (Datatype) { Typekind_uint64, 0, 0 }
+#define type_float32     (Datatype) { Typekind_float32, 0, 0 }
+#define type_float64     (Datatype) { Typekind_float64, 0, 0 }
+#define type_ambiguousInteger (Datatype) { Typekind_AmbiguousInteger, 0, 0 }
+#define type_ambiguousDecimal (Datatype) { Typekind_AmbiguousDecimal, 0, 0 }
+
+
+
+
 
 typedef struct Node {
     u32 lineNumber;
     char* filepath;
 } Node;
 
-typedef struct FuncPtr {
-    Datatype returnType;
-    u32 argCount;
-    Datatype argTypes[];
-} FuncPtr;
-
-
-inline FuncPtr* getFuncPtr(u32 id) { return (FuncPtr*)&g_Unit->funcPtrTypes->bytes[id]; }
-Datatype ensureFuncPtrExistsFromFuncDeclaration(FuncDeclaration* decl);
-
+typedef u32 Identifier;
 
 // ----Expressions---------------------------------------------
 

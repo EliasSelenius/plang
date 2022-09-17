@@ -1,9 +1,3 @@
-#include "essh-string.h"
-#include "types.h"
-
-#include <stdlib.h> // included for malloc
-#include <string.h> // included for strlen()
-
 
 StrSpan spFrom(char* str) {
     return (StrSpan) {
@@ -121,7 +115,7 @@ static void growBufferSize(StringBuilder* sb, u32 additionalSpace) {
         // make sure there is sufficent storage space
         while (sb->capacity <= newLength)
             sb->capacity *= 2;
-        
+
         sb->content = realloc(sb->content, sb->capacity);
     }
 }

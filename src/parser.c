@@ -1,16 +1,9 @@
-#include "parser.h"
-#include "lexer.h"
-#include "darray.h"
 
-#include <stdlib.h> // malloc
-#include <stdio.h>  // printf
-#include <stdarg.h>
-
-void expectBlock(Codeblock* scope);
-Expression* parseExpression();
-Expression* expectExpression();
-bool parseType(Datatype* type);
-Datatype expectType();
+static void expectBlock(Codeblock* scope);
+static Expression* parseExpression();
+static Expression* expectExpression();
+static bool parseType(Datatype* type);
+static Datatype expectType();
 
 static u32 type_name_int8 = 0;
 static u32 type_name_uint8 = 0;
@@ -25,7 +18,7 @@ static u32 type_name_float64 = 0;
 static u32 type_name_char = 0;
 static u32 type_name_void = 0;
 
-void initTypenames() {
+static void initTypenames() {
     type_name_int8    = appendStringToStringtable(spFrom("int8"));
     type_name_uint8   = appendStringToStringtable(spFrom("uint8"));
     type_name_int16   = appendStringToStringtable(spFrom("int16"));
@@ -42,34 +35,9 @@ void initTypenames() {
 
 static u32 token_index = 0;
 
-static u32 numberOfErrors;
-static void error(char* format, ...) {
-    printf("Error Ln%d: ", tokens[token_index].line);
-
-    va_list args;
-    va_start(args, format);
-    vprintf(format, args);
-    va_end(args);
-
-    printf("\n");
-    numberOfErrors++;
-}
-
-static void errorLine(u32 lineNum, char* format, ...) {
-    printf("Error Ln%d: ", lineNum);
-
-    va_list args;
-    va_start(args, format);
-    vprintf(format, args);
-    va_end(args);
-
-    printf("\n");
-    numberOfErrors++;
-}
-
 
 // asserts the existence of a semicolon
-inline void semicolon() {
+static inline void semicolon() {
     if (tokens[token_index].type != Tok_Semicolon) {     
         // error("Expected semicolon, but got \"%.*s\" instead.",
             // tokens[token_index].value.length,
@@ -120,7 +88,7 @@ static void unexpectedToken() {
     token_index++;
 }
 
-inline bool tok(TokenType type) {
+static inline bool tok(TokenType type) {
     if (tokens[token_index].type == type) {
         token_index++;
         return true;
@@ -129,7 +97,7 @@ inline bool tok(TokenType type) {
 }
 
 
-inline bool funcPtrEquivalence(FuncPtr* a, FuncPtr* b) {
+static inline bool funcPtrEquivalence(FuncPtr* a, FuncPtr* b) {
     if (a->argCount != b->argCount) return false;
     if (!typeEquals(a->returnType, b->returnType)) return false;
     for (u32 i = 0; i < a->argCount; i++) {
@@ -171,7 +139,7 @@ static Identifier constructNameForFuncPtr(FuncPtr* funcPtr) {
 */
 
 
-Datatype ensureFuncPtrExistsFromFuncDeclaration(FuncDeclaration* decl) {
+static Datatype ensureFuncPtrExistsFromFuncDeclaration(FuncDeclaration* decl) {
 
     u32 oldLength = g_Unit->funcPtrTypes->length; // remember the old length in case we have a duplicate
     u32 fpRef = dyReserve(&g_Unit->funcPtrTypes, sizeof(FuncPtr));
@@ -304,7 +272,7 @@ static bool parseInferableType(Datatype* type) {
 }
 
 // returns false if the token can not be interpreted as a type
-inline bool parseType(Datatype* type) {
+static inline bool parseType(Datatype* type) {
     if (parseInferableType(type)) {
         if (type->kind == Typekind_MustBeInfered) {
             error("Type cannot be infered here.");
@@ -315,7 +283,7 @@ inline bool parseType(Datatype* type) {
     return false;
 }
 
-inline Datatype expectInferableType() {
+static inline Datatype expectInferableType() {
     Datatype res = {0};
     if (!parseInferableType(&res)) {
         // error("Expected type, but got \"%.*s\" instead.",
@@ -326,7 +294,7 @@ inline Datatype expectInferableType() {
     return res;
 }
 
-inline Datatype expectType() {
+static inline Datatype expectType() {
     Datatype res = expectInferableType();
     if (res.kind == Typekind_MustBeInfered) error("Type cannot be infered here.");
     return res;
@@ -424,6 +392,7 @@ static Expression* basicLiteral(ExprType type) {
 
 static LiteralExpression* createLiteral(ExprType type) {
     LiteralExpression* lit = malloc(sizeof(LiteralExpression));
+    lit->base.nodebase.filepath = g_Filename;
     lit->base.expressionType = type;
     lit->base.nodebase.lineNumber = tokens[token_index].line;
     return lit;
@@ -550,6 +519,7 @@ static Expression* parseLeafExpression() {
             res = (Expression*)ind;
         } else if (tok(Tok_OpenParen)) {
             FuncCall* call = malloc(sizeof(FuncCall));
+            call->base.nodebase.filepath = g_Filename;
             call->base.expressionType = ExprType_FuncCall;
             expectFuncCallArgs(call, res);
             res = (Expression*)call;
@@ -618,7 +588,7 @@ static Expression* expectExpression() {
     return res;
 }
 
-u32 operatorPriority(ExprType type) {
+static u32 operatorPriority(ExprType type) {
     switch (type) {
 
         case ExprType_Bitwise_Lshift:
@@ -651,7 +621,7 @@ u32 operatorPriority(ExprType type) {
         default: return 0; // not an operator
     }
 }
-inline u32 binaryOperatorPriority(BinaryExpression* expr) {
+static inline u32 binaryOperatorPriority(BinaryExpression* expr) {
     return operatorPriority(expr->base.expressionType);
 }
 
@@ -665,7 +635,7 @@ static Expression* expectLeafExpression() {
     return res;
 }
 
-ExprType getExprTypeForBinaryOperator(TokenType type) {
+static ExprType getExprTypeForBinaryOperator(TokenType type) {
     switch (type) {
         case Tok_Plus: return ExprType_Plus;
         case Tok_Minus: return ExprType_Minus;
@@ -746,6 +716,7 @@ static Expression* parseExpression() {
 
 static IfStatement* expectIfStatement() {
     IfStatement* res = malloc(sizeof(IfStatement));
+    res->base.nodebase.filepath = g_Filename;
     res->base.statementType = Statement_If;
     res->next = null;
     res->condition = expectExpression();
@@ -1073,7 +1044,7 @@ static void funcOrGlobal() {
     }
 }
 
-u32 parse() {
+static u32 parse() {
 
 
     // token_index = 0;
@@ -1092,7 +1063,7 @@ u32 parse() {
                 u32 struLen = darrayLength(g_Unit->structs);
                 for (u32 i = 0; i < struLen; i++) {
                     if (g_Unit->structs[i].name == stru.name) {
-                        errorLine(stru.nodebase.lineNumber, "Struct \"%s\" is already defined.", getIdentifierStringValue(stru.name));
+                        error_line(stru.nodebase.lineNumber, "Struct \"%s\" is already defined.", getIdentifierStringValue(stru.name));
                         break;
                     }
                 }

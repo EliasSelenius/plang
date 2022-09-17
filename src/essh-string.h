@@ -1,6 +1,3 @@
-#pragma once
-
-#include "types.h"
 
 // TODO: make a string library
 

@@ -1,16 +1,10 @@
-#include "lexer.h"
-#include "darray.h"
-#include "parser.h"
 
-#include <stdio.h>
-#include <math.h>
 
-Token* tokens; // darray
 
 static u32 current_line;
 static char* cursor;
 
-inline void appendToken(TokenType type) {
+static inline void appendToken(TokenType type) {
     Token token;
     token.type = type;
     token.line = current_line;
@@ -44,7 +38,7 @@ static u64 number(u32* numDigits) {
 //     }
 // }
 
-u32 lex(char* input) {
+static u32 lex(char* input) {
     u32 numberOfErrors = 0;
 
     cursor = input - 1;

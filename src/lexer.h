@@ -1,8 +1,3 @@
-#pragma once
-
-#include "types.h"
-#include "essh-string.h"
-
 
 typedef enum TokenType {
     Tok_Whitespace,
@@ -92,11 +87,6 @@ typedef enum TokenType {
 
 } TokenType;
 
-/*
-char* TokenTypeNames[] = {
-    [Tok_Whitespace] = "Whitespace"
-};
-*/
 
 typedef struct Token {
     TokenType type;
@@ -109,15 +99,3 @@ typedef struct Token {
         char character;
     };
 } Token;
-
-typedef enum TypeSuffix {
-    Suffix_f,
-    Suffix_d,
-    Suffix_u,
-    Suffix_l,
-    Suffix_ul
-} TypeSuffix;
-
-extern Token* tokens;
-
-u32 lex(char* input);

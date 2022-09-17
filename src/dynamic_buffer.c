@@ -1,6 +1,11 @@
-#include "dynamic_buffer.h"
 
-#include <stdlib.h> // malloc
+typedef struct DynamicBuffer {
+    u32 length;
+    u32 capacity;
+    u8 bytes[];
+} DynamicBuffer;
+
+inline void dyClear(DynamicBuffer* buffer) { buffer->length = 0; }
 
 DynamicBuffer* dyCreate() {
     u32 cap = 16;//1024;
@@ -10,7 +15,6 @@ DynamicBuffer* dyCreate() {
 
     return buffer;
 }
-
 
 u32 dyReserve(DynamicBuffer** buffer, u32 size) {
     u32 cap = (*buffer)->capacity;

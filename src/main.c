@@ -1,15 +1,3 @@
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-
-
-#include "types.h"
-#include "parser.h"
-#include "lexer.h"
-#include "validator.h"
-#include "darray.h"
-#include "essh-string.h"
-
 
 /*
 
@@ -86,61 +74,29 @@
 
 */
 
-void transpile();
-void startPerf();
-i64 endPerf();
-void foreachFile(char* ext, void (*func)(char* filename, char* extension));
-char* fileread(const char* filename, u32* strLength);
-void filewrite(const char* filename, char* content);
-
-TranslationUnit* g_Unit;
-
 void addFile(char* filename, char* extension) {
-    printf("Adding %s\n", filename);
+
+    u32 filename_len = strlen(filename);
+    g_Filename = malloc(filename_len + 1);
+    strcpy_s(g_Filename, filename_len + 1,  filename);
 
     u32 filesize = 0;
     char* fileContent = fileread(filename, &filesize);
     if (!fileContent) return;
 
-    // printf("Tokenize...\n");
     u32 numErrors = lex(fileContent);
     if (numErrors) {
-        printf("There were %d errors during tokenizing.\nFix errors and try again.\n", numErrors);
+        printf("There were %d errors during tokenizing.\n", numErrors);
         exit(0); // TODO: handle this properly
     }
 
     free(fileContent);
 
-    // printf("Parse...\n");
     numErrors = parse();
     if (numErrors) {
-        printf("There were %d errors during parsing.\nFix errors and try again.\n", numErrors);
+        printf("There were %d errors during parsing.\n", numErrors);
         exit(0);
     }
-
-}
-
-
-
-u32 appendStringToStringtable(StrSpan word) {
-    u32 len = darrayLength(g_Unit->stringTableByteOffsets);
-    for (u32 i = 0; i < len; i++) {
-        u32 byteOffset = g_Unit->stringTableByteOffsets[i];
-        char* s = (char*)(&g_Unit->stringTable->bytes[byteOffset]);
-        if (spanEquals(word, s)) return byteOffset;
-    }
-
-    u32 byteOffset = dyReserve(&g_Unit->stringTable, word.length + 1);
-    u8* p = (&g_Unit->stringTable->bytes[byteOffset]);
-    for (u32 i = 0; i < word.length; i++) p[i] = word.start[i];
-    p[word.length] = '\0';
-
-    darrayAdd(g_Unit->stringTableByteOffsets, byteOffset);
-    return byteOffset;
-}
-
-void test(u64 number) {
-
 
 }
 
@@ -215,7 +171,7 @@ int main(int argc, char* argv[]) {
     printf("Validate...\n");
     u32 numErrors = validate();
     if (numErrors) {
-        printf("There were %d errors during validation.\nFix errors and try again.\n", numErrors);
+        printf("There were %d errors during validation.\n", numErrors);
         return 0;
     }
 
