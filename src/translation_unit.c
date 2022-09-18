@@ -49,3 +49,12 @@ static u32 appendStringToStringtable(StrSpan word) {
     darrayAdd(g_Unit->stringTableByteOffsets, byteOffset);
     return byteOffset;
 }
+
+static Datatype dealiasType(Datatype type) {
+    if (type.kind == Typekind_Alias) {
+        Datatype newType = g_Unit->aliases[type.ref].aliasedType;
+        newType.numPointers += type.numPointers;
+        return dealiasType(newType);
+    }
+    return type;
+}

@@ -2,26 +2,18 @@
 
 static u32 numberOfErrors = 0;
 
-
-// static void error(char* format, ...) {
-//     printf("Error Ln%d: ", tokens[token_index].line);
-
-//     va_list args;
-//     va_start(args, format);
-//     vprintf(format, args);
-//     va_end(args);
-
-//     printf("\n");
-//     numberOfErrors++;
-// }
-
-// validator
-
 static void error_v(u32 line, char* filename, char* format, va_list args) {
     printf("%s:%d: error: ", filename, line);
     vprintf(format, args);
     printf("\n");
     numberOfErrors++;
+}
+
+static void error_temp(char* format, ...) {
+    va_list args;
+    va_start(args, format);
+    error_v(0, "", format, args);
+    va_end(args);
 }
 
 static void error(u32 line, char* filename, char* format, ...) {
@@ -31,13 +23,25 @@ static void error(u32 line, char* filename, char* format, ...) {
     va_end(args);
 }
 
-static void error_line(u32 line, char* format, ...) {
+static void error_at_token(u32 tokenIndex, char* format, ...) {
+    Token* tok = &tokens[tokenIndex];
     va_list args;
     va_start(args, format);
-    error_v(line, "In unknown file", format, args)
+    error_v(tok->line, g_Filename, format, args);
     va_end(args);
 }
 
+static void error_token(char* format, ...) {
+    Token* tok = &tokens[token_index];
+    va_list args;
+    va_start(args, format);
+    error_v(tok->line, g_Filename, format, args);
+    va_end(args);
+}
 
-
-static void error_statement(char* format, ...);
+static void error_node(void* node, char* format, ...) {
+    va_list args;
+    va_start(args, format);
+    error_v(((Node*)node)->lineNumber, ((Node*)node)->filepath, format, args);
+    va_end(args);
+}

@@ -5,45 +5,11 @@ static Expression* expectExpression();
 static bool parseType(Datatype* type);
 static Datatype expectType();
 
-static u32 type_name_int8 = 0;
-static u32 type_name_uint8 = 0;
-static u32 type_name_int16 = 0;
-static u32 type_name_uint16 = 0;
-static u32 type_name_int32 = 0;
-static u32 type_name_uint32 = 0;
-static u32 type_name_int64 = 0;
-static u32 type_name_uint64 = 0;
-static u32 type_name_float32 = 0;
-static u32 type_name_float64 = 0;
-static u32 type_name_char = 0;
-static u32 type_name_void = 0;
-
-static void initTypenames() {
-    type_name_int8    = appendStringToStringtable(spFrom("int8"));
-    type_name_uint8   = appendStringToStringtable(spFrom("uint8"));
-    type_name_int16   = appendStringToStringtable(spFrom("int16"));
-    type_name_uint16  = appendStringToStringtable(spFrom("uint16"));
-    type_name_int32   = appendStringToStringtable(spFrom("int32"));
-    type_name_uint32  = appendStringToStringtable(spFrom("uint32"));
-    type_name_int64   = appendStringToStringtable(spFrom("int64"));
-    type_name_uint64  = appendStringToStringtable(spFrom("uint64"));
-    type_name_float32 = appendStringToStringtable(spFrom("float32"));
-    type_name_float64 = appendStringToStringtable(spFrom("float64"));
-    type_name_char    = appendStringToStringtable(spFrom("char"));
-    type_name_void    = appendStringToStringtable(spFrom("void"));
-}
-
-static u32 token_index = 0;
-
 
 // asserts the existence of a semicolon
 static inline void semicolon() {
     if (tokens[token_index].type != Tok_Semicolon) {     
-        // error("Expected semicolon, but got \"%.*s\" instead.",
-            // tokens[token_index].value.length,
-            // tokens[token_index].value.start);
-
-        error("Expected semicolon.");
+        error_token("Expected semicolon.");
         return;
     }
     token_index++;
@@ -52,10 +18,7 @@ static inline void semicolon() {
 static Identifier identifier() {
     Token* token = &tokens[token_index];
     if (token->type != Tok_Word) {
-        // error("\"%.*s\" is not a valid identifier.",
-            // token->value.length,
-            // token->value.start);
-        error("Invalid identifier.");
+        error_token("Invalid identifier.");
         return -1;
     }
     token_index++;
@@ -65,26 +28,14 @@ static Identifier identifier() {
 static void expect(TokenType type) {
     if (tokens[token_index].type != type) {
         // TODO: get TokenType as string
-        // error("Expected token type %d, but got \"%.*s\" instead.",
-            // type,
-            // tokens[token_index].value.length,
-            // tokens[token_index].value.start);
-
-        error("Unexpected token type %d.", tokens[token_index].type);
-
+        error_token("Unexpected token type %d.", tokens[token_index].type);
         return;
     }
     token_index++;
 }
 
 static void unexpectedToken() {
-
-    // error("Unexpected token \"%.*s\".",
-        // tokens[token_index].value.length,
-        // tokens[token_index].value.start);
-
-    error("Unexpected token.");
-
+    error_token("Unexpected token.");
     token_index++;
 }
 
@@ -275,7 +226,7 @@ static bool parseInferableType(Datatype* type) {
 static inline bool parseType(Datatype* type) {
     if (parseInferableType(type)) {
         if (type->kind == Typekind_MustBeInfered) {
-            error("Type cannot be infered here.");
+            error_at_token(token_index - 1, "Type cannot be infered here.");
         }
         return true;
     }
@@ -286,28 +237,26 @@ static inline bool parseType(Datatype* type) {
 static inline Datatype expectInferableType() {
     Datatype res = {0};
     if (!parseInferableType(&res)) {
-        // error("Expected type, but got \"%.*s\" instead.",
-            // tokens[token_index].value.length,
-            // tokens[token_index].value.start);
-        error("Expected type.");
+        error_token("Expected type.");
     }
     return res;
 }
 
 static inline Datatype expectType() {
     Datatype res = expectInferableType();
-    if (res.kind == Typekind_MustBeInfered) error("Type cannot be infered here.");
+    if (res.kind == Typekind_MustBeInfered) error_at_token(token_index - 1, "Type cannot be infered here.");
     return res;
 }
 
 static Token* anyof(u32 count, ...) {
     va_list args;
-    va_start(args, count);    
+    va_start(args, count);
     for (u32 i = 0; i < count; i++) {
         TokenType type = va_arg(args, TokenType);
         Token* tok = &tokens[token_index];
         if (tok->type == type) {
             token_index++;
+            va_end(args);
             return tok;
         }
     }
@@ -454,9 +403,7 @@ static Expression* parseLeafExpression() {
             bool mustClose = false;
             if (tok(Tok_OpenParen)) mustClose = true;
             sof->type = expectType();
-            if (mustClose) if (!tok(Tok_CloseParen)) {
-                error("Expected a closing parenthesis.");
-            }
+            if (mustClose) expect(Tok_CloseParen);
 
             res = (Expression*)sof;
         } break;
@@ -578,12 +525,8 @@ static Expression* testForTernary(Expression* expr) {
 static Expression* expectExpression() {
     Expression* res = parseExpression();
     if (res == null) {
-        // error("Expected expression, but got \"%.*s\" instead.",
-            // tokens[token_index].value.length,
-            // tokens[token_index].value.start);
-
-        error("Expected expression.");
-        token_index++;
+        error_token("Expected expression.");
+        token_index++; // TODO: why am I incrementing the token index here, but not in expectLeafExpression?
     }
     return res;
 }
@@ -627,11 +570,7 @@ static inline u32 binaryOperatorPriority(BinaryExpression* expr) {
 
 static Expression* expectLeafExpression() {
     Expression* res = parseLeafExpression();
-    if (!res)
-        // error("Expected expression, but got \"%.*s\" instead.",
-            // tokens[token_index].value.length,
-            // tokens[token_index].value.start);
-        error("Expected expression.");
+    if (!res) error_token("Expected expression.");
     return res;
 }
 
@@ -786,7 +725,7 @@ static VarDecl* expectVarDecl() {
     if (tok(Tok_Assign)) {
         decl->assignmentOrNull = expectExpression();
     } else if (decl->type.kind == Typekind_MustBeInfered) {
-        error("Variable \"%s\" must be assigned to, to be type inferred.", getIdentifierStringValue(decl->name));
+        error_token("Variable \"%s\" must be assigned to, to be type inferred.", getIdentifierStringValue(decl->name));
     }
 
     return decl;
@@ -897,8 +836,13 @@ static Statement* expectStatement() {
             }
 
 
-            Expression* expr = parseExpression();
-            if (expr) {
+            { // expression statement
+                Expression* expr = parseExpression();
+                if (!expr) {
+                    unexpectedToken();
+                    return null;
+                }
+
                 switch (expr->expressionType) {
                     case ExprType_Unary_PreIncrement:
                     case ExprType_Unary_PostIncrement:
@@ -925,20 +869,18 @@ static Statement* expectStatement() {
                             ass->expr = expectExpression();
                             res = (Statement*)ass;
                         } else {
-                            error("Expected an assignment.");
+                            error_token("Expected an assignment.");
                         }
 
                     } break;
                     default:
-                        error("This expression is all by its lonesome.");
+                        error_token("This expression is all by its lonesome.");
                         return null;
                 }
+
                 semicolon();
                 break;
             }
-
-            unexpectedToken();
-            return null;
         }
     }
 
@@ -1035,7 +977,7 @@ static void funcOrGlobal() {
         if (tok(Tok_Assign)) {
             decl.assignmentOrNull = expectExpression();
         } else if (decl.type.kind == Typekind_MustBeInfered) {
-            error("Global variable \"%s\" must be assigned to, to be type inferred.", getIdentifierStringValue(decl.name));
+            error_token("Global variable \"%s\" must be assigned to, to be type inferred.", getIdentifierStringValue(decl.name));
         }
 
         darrayAdd(g_Unit->globalVariables, decl);
@@ -1044,7 +986,7 @@ static void funcOrGlobal() {
     }
 }
 
-static u32 parse() {
+static void parse() {
 
 
     // token_index = 0;
@@ -1063,7 +1005,7 @@ static u32 parse() {
                 u32 struLen = darrayLength(g_Unit->structs);
                 for (u32 i = 0; i < struLen; i++) {
                     if (g_Unit->structs[i].name == stru.name) {
-                        error_line(stru.nodebase.lineNumber, "Struct \"%s\" is already defined.", getIdentifierStringValue(stru.name));
+                        error_node(&stru, "Struct \"%s\" is already defined.", getIdentifierStringValue(stru.name));
                         break;
                     }
                 }
@@ -1122,6 +1064,4 @@ static u32 parse() {
             } break;
         }
     }
-
-    return numberOfErrors;
 }

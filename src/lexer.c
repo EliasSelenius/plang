@@ -38,8 +38,7 @@ static u64 number(u32* numDigits) {
 //     }
 // }
 
-static u32 lex(char* input) {
-    u32 numberOfErrors = 0;
+static void lex(char* input) {
 
     cursor = input - 1;
 
@@ -236,16 +235,14 @@ static u32 lex(char* input) {
 
 
             if (*cursor > 0x7E || *cursor < 0x20) {
-                printf("Error: Invalid character. At line %d\n", current_line);
-                numberOfErrors++;
+                error(current_line, g_Filename, "Invalid character.");
             }
 
             char c = *cursor;
 
             cursor++;
             if (*cursor != '\'') {
-                printf("Error: Missing closing single quote. At line %d\n", current_line);
-                numberOfErrors++;
+                error(current_line, g_Filename, "Missing closing single quote.");
             }
 
             Token token = {
@@ -263,8 +260,7 @@ static u32 lex(char* input) {
             while ( !(*++cursor == '"' && *(cursor - 1) != '\\') ) {
                 if (*cursor == '\n') {
                     // TODO: consider whether we want to allow multi-line strings
-                    printf("Error: Strings cannot contain new-lines. At line %d\n", current_line);
-                    numberOfErrors++;
+                    error(current_line, g_Filename, "Strings cannot contain new-lines.");
                     current_line++;
                 }
             }
@@ -376,9 +372,6 @@ static u32 lex(char* input) {
 
 
         // Error: token not recognized
-        printf("Error: Unknown byte value encountered %d. At line %d\n", *cursor, current_line);
-        numberOfErrors++;
+        error(current_line, g_Filename, "Unknown byte value encountered %d.", *cursor);
     }
-
-    return numberOfErrors;
 }

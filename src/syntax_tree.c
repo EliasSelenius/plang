@@ -46,10 +46,6 @@ typedef struct Datatype {
     u32 numPointers;
 } Datatype;
 
-inline bool typeEquals(Datatype a, Datatype b) {
-    return a.kind == b.kind && a.ref == b.ref && a.numPointers == b.numPointers;
-}
-
 #define type_invalid     (Datatype) { Typekind_Invalid, 0, 0 }
 #define type_void        (Datatype) { Typekind_void, 0, 0 }
 #define type_voidPointer (Datatype) { Typekind_void, 0, 1 }
@@ -64,7 +60,15 @@ inline bool typeEquals(Datatype a, Datatype b) {
 #define type_ambiguousInteger (Datatype) { Typekind_AmbiguousInteger, 0, 0 }
 #define type_ambiguousDecimal (Datatype) { Typekind_AmbiguousDecimal, 0, 0 }
 
+static inline bool typeEquals(Datatype a, Datatype b) {
+    return a.kind == b.kind && a.ref == b.ref && a.numPointers == b.numPointers;
+}
 
+static inline Datatype resolveTypeAmbiguity(Datatype type) {
+    if      (type.kind == Typekind_AmbiguousInteger) return type_int32;
+    else if (type.kind == Typekind_AmbiguousDecimal) return type_float32;
+    return type;
+}
 
 
 
@@ -73,6 +77,7 @@ typedef struct Node {
     char* filepath;
 } Node;
 
+// signifies a string thats stored in the string-table
 typedef u32 Identifier;
 
 // ----Expressions---------------------------------------------

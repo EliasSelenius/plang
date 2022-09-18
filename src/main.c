@@ -16,13 +16,13 @@
         - nested multi-line comments
         - disallow void as variable type in declaration
         - nesting funcptr types inside funcptrs arguments. void(void*(char*), uint) seems to produce a bug
-        *- make assignments be expressions 
-        - "plang build" CLI. build all .pog files in directory. let output exe be named the name of the directory
+        *- make assignments be expressions
         - contextual inclusion (the with keyword on struct fields)
         - member-like functions (the with keyword on function arguments)
-        *- file name in errors
 
     InProgress:
+        - "plang build" CLI. build all .pog files in directory. let output exe be named the name of the directory
+        *- file name in errors
         *- line numbers in validation errors
         - localy defined functions
 
@@ -84,20 +84,19 @@ void addFile(char* filename, char* extension) {
     char* fileContent = fileread(filename, &filesize);
     if (!fileContent) return;
 
-    u32 numErrors = lex(fileContent);
-    if (numErrors) {
-        printf("There were %d errors during tokenizing.\n", numErrors);
+    lex(fileContent);
+    if (numberOfErrors) {
+        printf("There were %d errors during tokenizing.\n", numberOfErrors);
         exit(0); // TODO: handle this properly
     }
 
     free(fileContent);
 
-    numErrors = parse();
-    if (numErrors) {
-        printf("There were %d errors during parsing.\n", numErrors);
+    parse();
+    if (numberOfErrors) {
+        printf("There were %d errors during parsing.\n", numberOfErrors);
         exit(0);
     }
-
 }
 
 
@@ -169,9 +168,9 @@ int main(int argc, char* argv[]) {
     }
 
     printf("Validate...\n");
-    u32 numErrors = validate();
-    if (numErrors) {
-        printf("There were %d errors during validation.\n", numErrors);
+    validate();
+    if (numberOfErrors) {
+        printf("There were %d errors during validation.\n", numberOfErrors);
         return 0;
     }
 

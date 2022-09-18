@@ -593,10 +593,13 @@ static void transpile() {
             FuncPtr* f = getFuncPtr(i);
             sbAppend(sb, "typedef ");
             if (f->returnType.kind == Typekind_Alias) {
-                
-            } else {
-                transpileType(f->returnType);
-            }
+                Datatype retType = dealiasType(f->returnType);
+                if (retType.kind == Typekind_FuncPtr) {
+                    transpileType(retType);
+
+                } else transpileType(f->returnType);
+            } else transpileType(f->returnType);
+
             sbAppend(sb, " ");
             sbAppend(sb, "proc_");
             sbAppendSpan(sb, numberToString(i));

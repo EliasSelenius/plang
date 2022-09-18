@@ -108,7 +108,7 @@ static Datatype validateVariable(VariableExpression* var) {
         }
     }
 
-    error("Variable \"%s\" is not declared.", getIdentifierStringValue(var->name));
+    error_node(var, "Variable \"%s\" is not declared.", getIdentifierStringValue(var->name));
     return type_invalid;
 }
 
@@ -138,7 +138,7 @@ static void validateType(Datatype* type) {
             foreach (optype, g_Unit->opaqueTypes) {
                 if (*optype == type->ref) {
                     type->kind = Typekind_Opaque;
-                    if (type->numPointers == 0) error("Invalid usage of opaque type. You cannot use opaque types by-value.");
+                    if (type->numPointers == 0) error_temp("Invalid usage of opaque type. You cannot use opaque types by-value.");
                     return;
                 }
             }
@@ -155,7 +155,7 @@ static void validateType(Datatype* type) {
 
     type->kind = Typekind_Invalid;
     // TODO: print the name here
-    error("Type not recognized.");
+    error_temp("Type not recognized.");
 }
 
 static bool funcPtrAssignable(FuncPtr* to, FuncPtr* from) {
@@ -271,14 +271,8 @@ static void assertAssignability(Datatype toType, Datatype fromType) {
         constructTypename(toTypeName, sizeof(toTypeName), toType);
         constructTypename(fromTypeName, sizeof(fromTypeName), fromType);
 
-        error("Type missmatch. \"%s\" is not assignable to \"%s\".", fromTypeName, toTypeName);
+        error_temp("Type missmatch. \"%s\" is not assignable to \"%s\".", fromTypeName, toTypeName);
     }
-}
-
-// TODO: what about the numPointers here
-static Datatype getType(Datatype type) {
-    if (type.kind == Typekind_Alias) return getType(g_Unit->aliases[type.ref].aliasedType);
-    return type;
 }
 
 static Datatype validateFuncCall(FuncCall* call) {
@@ -317,7 +311,7 @@ static Datatype validateFuncCall(FuncCall* call) {
 
         } else {
             if (passedArgumentsLength != expectedArgumentLength) {
-                error("Unexpected number of arguments passed to \"%s\", expected %d, but got %d.",
+                error_temp("Unexpected number of arguments passed to \"%s\", expected %d, but got %d.",
                     getIdentifierStringValue(name),
                     expectedArgumentLength, passedArgumentsLength);
                 return func->decl.returnType;
@@ -337,7 +331,7 @@ static Datatype validateFuncCall(FuncCall* call) {
         u32 expectedArgumentLength = decl->arguments ? darrayLength(decl->arguments) : 0;
 
         if (passedArgumentsLength != expectedArgumentLength) {
-            error("Unexpected number of arguments passed to \"%s\", expected %d, but got %d.",
+            error_temp("Unexpected number of arguments passed to \"%s\", expected %d, but got %d.",
                 getIdentifierStringValue(name),
                 expectedArgumentLength, passedArgumentsLength);
             return decl->returnType;
@@ -348,13 +342,13 @@ static Datatype validateFuncCall(FuncCall* call) {
     }
 
     funcptrPart:
-    Datatype calleeType = getType(validateExpression(call->funcExpr));
-    if (calleeType.kind == Typekind_FuncPtr) {
+    Datatype calleeType = dealiasType(validateExpression(call->funcExpr));
+    if (calleeType.kind == Typekind_FuncPtr) { // what if it is a double pointer? Then this shouldnt work.
         call->base.expressionType = ExprType_FuncPointerCall;
         FuncPtr* funcptr = getFuncPtr(calleeType.ref);
 
         if (passedArgumentsLength != funcptr->argCount) {
-            error("Unexpected number of arguments passed to function pointer, expected %d, but got %d.",
+            error_temp("Unexpected number of arguments passed to function pointer, expected %d, but got %d.",
                 funcptr->argCount, passedArgumentsLength);
             return funcptr->returnType;
         }
@@ -364,14 +358,8 @@ static Datatype validateFuncCall(FuncCall* call) {
     }
 
 
-    error("Function \"%s\" was not found.", getIdentifierStringValue(name));
+    error_temp("Function \"%s\" was not found.", getIdentifierStringValue(name));
     return type_invalid;
-}
-
-static inline Datatype resolveType(Datatype type) {
-    if      (type.kind == Typekind_AmbiguousInteger) return type_int32;
-    else if (type.kind == Typekind_AmbiguousDecimal) return type_float32;
-    return type;
 }
 
 static Datatype validateExpression(Expression* expr) {
@@ -388,21 +376,21 @@ static Datatype validateExpression(Expression* expr) {
             if (datatype.kind == Typekind_Invalid) return type_invalid;
 
             if (datatype.numPointers > 1) {
-                error("Attempted to dereference a %dth-degree pointer.", datatype.numPointers);
+                error_node(expr, "Attempted to dereference a %dth-degree pointer.", datatype.numPointers);
                 return type_invalid;
             }
 
             deref->derefOp = datatype.numPointers ? "->" : ".";
 
             if (datatype.kind != Typekind_Struct) {
-                error("Invalid dereferencing.");
+                error_node(expr, "Invalid dereferencing.");
                 return type_invalid;
             }
 
             PlangStruct* stru = &g_Unit->structs[datatype.ref];
             Field* field = getField(stru, deref->name);
             if (!field) {
-                error("Field \"%s\" does not exist on type \"%s\".",
+                error_node(expr, "Field \"%s\" does not exist on type \"%s\".",
                         getIdentifierStringValue(deref->name),
                         getIdentifierStringValue(stru->name));
                 return type_invalid;
@@ -414,7 +402,7 @@ static Datatype validateExpression(Expression* expr) {
             IndexingExpression* ind = (IndexingExpression*)expr;
             Datatype indexedType = validateExpression(ind->indexed);
             if (indexedType.numPointers == 0) {
-                error("Attempted to dereference something that isnt a pointer.");
+                error_node(expr, "Attempted to index something that isnt a pointer.");
                 return type_invalid;
             }
             Datatype indexType = validateExpression(ind->index);
@@ -565,7 +553,8 @@ static Datatype validateExpression(Expression* expr) {
 
     }
 
-    error("Unknown expression type. This is a bug!");
+    // this should never happen
+    error_node(expr, "Unknown expression type. This is a bug!");
     return type_invalid;
 }
 
@@ -585,7 +574,7 @@ static void validateScope(Codeblock* scope) {
 
                 // Check wheter there already is a variable with this name
                 if (getDeclaredVariable(decl->name).kind != Typekind_Invalid) {
-                    error("Variable \"%s\" is already declared.", getIdentifierStringValue(decl->name));
+                    error_node(sta, "Variable \"%s\" is already declared.", getIdentifierStringValue(decl->name));
                 }
 
                 validateType(&decl->type);
@@ -605,7 +594,7 @@ static void validateScope(Codeblock* scope) {
 
                 // Check wheter there already is a variable with this name
                 if (getDeclaredVariable(decl->name).kind != Typekind_Invalid) {
-                    error("Variable \"%s\" is already declared.", getIdentifierStringValue(decl->name));
+                    error_node(sta, "Variable \"%s\" is already declared.", getIdentifierStringValue(decl->name));
                 }
 
                 validateType(&decl->type);
@@ -616,7 +605,7 @@ static void validateScope(Codeblock* scope) {
                     if (assType.kind == Typekind_Invalid) break; // if type could not be determined then we should not continue, act as if this statement does not exist 
 
                     if (decl->type.kind == Typekind_MustBeInfered)
-                        decl->type = resolveType(assType);
+                        decl->type = resolveTypeAmbiguity(assType);
                     else assertAssignability(decl->type, assType);
                 }
 
@@ -676,30 +665,12 @@ static void validateScope(Codeblock* scope) {
                 if (type.kind == Typekind_Invalid) break;
 
                 if (function->decl.returnType.kind == Typekind_MustBeInfered) {
-                    function->decl.returnType = resolveType(type);
+                    function->decl.returnType = resolveTypeAmbiguity(type);
                 } else {
                     if (!typeAssignable(function->decl.returnType, type)) {
-                        error("Return type missmatch in function \"%s\".", getIdentifierStringValue(function->decl.name));
+                        error_node(sta, "Return type missmatch in function \"%s\".", getIdentifierStringValue(function->decl.name));
                     }
                 }
-
-                // if (retSta->returnExpr) {
-                //     PlangType* returnType = validateExpression(retSta->returnExpr);
-                //     if (returnType) {
-                //         if (!typeEquals(*returnType, function->decl.returnType)) {
-                //             error("Return type missmatch in function \"%.*s\".", function->decl.name.length, function->decl.name.start);
-                //         }
-                //     }
-                // } else {
-                //     if (function->decl.returnType.numPointers == 0 && spanEquals(function->decl.returnType.structName, "void"));
-                //     else {
-                //         // TODO: proper type string in print
-                //         error("Function \"%.*s\" returns %.*s, but return statement does not return any value.",
-                //             function->decl.name.length, function->decl.name.start,
-                //             function->decl.returnType.structName.length, function->decl.returnType.structName.start);
-                //     }
-                // }
-
             } break;
 
             case Statement_Goto: {
@@ -752,11 +723,12 @@ static void validateStruct(PlangStruct* stru) {
         Field* field = &stru->fields[i];
         validateType(&field->type);
 
-        // TODO: reimplement this error message
-        // Identifier fieldTypeName = getType(field->type)->name;
-        // if (field->type.numPointers == 0 && fieldTypeName == stru->name) {
-        //     errorLine(field->nodebase.lineNumber, "Struct \"%s\" self reference by value.", getIdentifierStringValue(stru->name));
-        // }
+        // TODO: field may be an alias
+        if (field->type.kind == Typekind_Struct && field->type.numPointers == 0) {
+            if (stru == &g_Unit->structs[field->type.ref]) {
+                error_node(field, "Struct \"%s\" self reference by value.", getIdentifierStringValue(stru->name));
+            }
+        }
     }
 }
 
@@ -766,7 +738,7 @@ static void validateGlobalVar(VarDecl* decl) {
         if (assType.kind == Typekind_Invalid) return; // if type could not be determined then we should not continue.
 
         if (decl->type.kind == Typekind_MustBeInfered) {
-            decl->type = resolveType(assType);
+            decl->type = resolveTypeAmbiguity(assType);
         } else {
             validateType(&decl->type);
             assertAssignability(decl->type, assType);
@@ -777,7 +749,7 @@ static void validateGlobalVar(VarDecl* decl) {
     }
 }
 
-static u32 validate() {
+static void validate() {
 
     // validate funcptrs
     u32 i = 0;
@@ -812,7 +784,7 @@ static u32 validate() {
 
         for (u32 j = i+1; j < globLen; j++) {
             if (g_Unit->globalVariables[j].name == decl->name) {
-                error("Global variable \"%s\" name conflict.", getIdentifierStringValue(decl->name));
+                error_node(decl, "Global variable \"%s\" name conflict.", getIdentifierStringValue(decl->name));
             }
         }
     }
@@ -857,7 +829,7 @@ static u32 validate() {
         }
 
         if (func->decl.returnType.kind == Typekind_MustBeInfered) {
-            error("Return type inference not implemmented.");
+            error_temp("Return type inference not implemmented.");
             func->decl.returnType = type_void;
         } else {
             validateType(&func->decl.returnType);
@@ -870,7 +842,4 @@ static u32 validate() {
         validateFunction(&g_Unit->functions[i]);
     }
     darrayDelete(variables);
-
-
-    return numberOfErrors;
 }
