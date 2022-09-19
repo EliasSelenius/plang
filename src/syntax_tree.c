@@ -216,12 +216,6 @@ typedef struct TernaryExpression {
 } TernaryExpression;
 
 
-u32 operatorPriority(ExprType type);
-
-inline bool isBinaryExpression(Expression* expr) {
-    return operatorPriority(expr->expressionType) != 0;
-}
-
 
 // ----Statements----------------------------------------------
 

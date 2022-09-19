@@ -17,31 +17,6 @@ int64
 float32
 float64
 
-TODO list {
-    literals:
-        int32: 12
-        float: 12.0f
-        double: 12.0
-        string: "Hello \"World\""
-
-    arithmetic expessions:
-        i + 12
-        i * (12 - 4)
-
-
-    functions:
-        overloads
-
-    types:
-        pointers
-
-        structs
-            member functions
-        function pointers
-       
-}
-
-
 struct Gameobject {
 
     (float => void) update;
@@ -89,6 +64,8 @@ void boolExprTest() {
 }
 
 
+import "glfw3.h";
+link "glfw3dll";
 
 
 

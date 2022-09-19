@@ -1,10 +1,10 @@
 
-declare void printf(char* str, int i);
+declare void printf(char* str, int32 i);
 
 struct vec3 {
-    float x;
-    float y; 
-    float z;
+    float32 x;
+    float32 y;
+    float32 z;
 }
 
 struct Transform {
@@ -15,20 +15,20 @@ struct Entity {
     Transform trans;
 }
 
-Entity* createEntity(int x, int z) {
+Entity* createEntity(int32 x, int32 z) {
     let e = alloc Entity;
     // e.trans.pos.x = x;
     // e.trans.pos.z = z;
     return e;
 }
 
-int get_Number(int i) {
+int32 get_Number(int32 i) {
     return i * 2;
 }
 
 Entity entity;
 
-int main() {
+int32 main() {
     printf("Testing deref.%d\n", 0);
 
     let n = get_Number(2);
@@ -45,9 +45,12 @@ int main() {
     vec3* vpp = alloc vec3;
     let h = @(vpp + 2);
 
+    vpp[n-1].x = 10;
 
-    // TODO: fix tokenizing of numbers to allow for this:
-    // let dwa = 12.name;
+
+    let tok_number = 3.14;
+
+    let dwa = 12.name;
 
     return 0;
 }

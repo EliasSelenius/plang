@@ -564,8 +564,12 @@ static u32 operatorPriority(ExprType type) {
         default: return 0; // not an operator
     }
 }
+
 static inline u32 binaryOperatorPriority(BinaryExpression* expr) {
     return operatorPriority(expr->base.expressionType);
+}
+static inline bool isBinaryExpression(Expression* expr) {
+    return operatorPriority(expr->expressionType) != 0;
 }
 
 static Expression* expectLeafExpression() {

@@ -1,5 +1,4 @@
 
-// TODO: make a string library
 
 typedef struct StrSpan {
     char* start;

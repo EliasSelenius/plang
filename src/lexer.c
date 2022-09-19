@@ -138,7 +138,7 @@ static void lex(char* input) {
             continue;
         }
 
-        // new number
+        // number
         if (isDigit(*cursor)) {
             Token token = {0};
             token.line = current_line;
@@ -148,7 +148,7 @@ static void lex(char* input) {
             u64 num = number(&numDigits);
             token.integer = num;
 
-            if (*cursor == '.') {
+            if (*cursor == '.' && isDigit(*(cursor+1))) {
                 cursor++;
                 f64 fraction = (f64)number(&numDigits);
 
@@ -174,60 +174,6 @@ static void lex(char* input) {
             darrayAdd(tokens, token);
             continue;
         }
-
-        // number
-        /* if ( isDigit(*cursor) ||            // TODO: dont tokenize minus as part of the number token. it fucks up things like (list[i-1]) the minus token needs to be sepperate from the number
-                (isDigit(*(cursor + 1)) && *cursor == '-')
-           ) {
-            // integer part
-            char* digitStart = cursor;
-            while (isDigit(*++cursor));
-
-            // 123.123
-            u32 length = cursor - digitStart;
-
-            TokenType tt = Tok_Integer;
-
-            switch (*cursor) {
-                case 'u': {
-                    if (*(cursor + 1) == 'l') {
-                        tt = Tok_Integer_Ulong;
-                        cursor++;
-                    } else {
-                        tt = Tok_Integer_Uint;
-                    }
-                } break;
-
-                case 'l': tt = Tok_Integer_Long; break;
-                case 'f': tt = Tok_Decimal_Float; break;
-                case 'd': tt = Tok_Decimal_Double; break;
-
-                case '.': {
-                    tt = Tok_Decimal;
-                    while (isDigit(*++cursor));
-                    length = cursor - digitStart;
-
-                    if (*cursor == 'f') tt = Tok_Decimal_Float;
-                    else if (*cursor == 'd') tt = Tok_Decimal_Double;
-                    else cursor--;
-
-                } break;
-
-                default: cursor--; break;
-            }
-
-            Token token = {
-                .type = tt,
-                .line = current_line,
-                .value = {
-                    .start = digitStart,
-                    .length = length
-                }
-            };
-            darrayAdd(tokens, token);
-
-            continue;
-        } */
 
         // chars
         if (*cursor == '\'') {
