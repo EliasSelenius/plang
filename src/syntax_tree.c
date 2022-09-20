@@ -261,6 +261,7 @@ typedef struct Assignement {
     Expression* expr;
 } Assignement;
 
+// TODO: is it necessary to have both Codeblock and Scope?
 typedef struct Codeblock {
     struct Codeblock* parentScope;
     Statement** statements; // darray
@@ -274,13 +275,13 @@ typedef struct Scope {
 typedef struct WhileStatement {
     Statement base;
     Expression* condition;
-    Codeblock scope;
+    Statement* statement;
 } WhileStatement;
 
 typedef struct IfStatement {
     Statement base;
     Expression* condition; // if condition is null, this is an else-statement
-    Codeblock scope;
+    Statement* statement;
     struct IfStatement* next;
 } IfStatement;
 

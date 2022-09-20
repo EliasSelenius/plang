@@ -2,6 +2,7 @@
 
 static void transpileBlock(Codeblock* scope);
 static void transpileExpression(Expression* expr);
+static void transpileStatement(Statement* statement);
 
 static StringBuilder* sb;
 static u32 tabing = 0;
@@ -288,7 +289,7 @@ static void transpileIfStatement(IfStatement* ifst) {
         sbAppend(sb, " ");
     }
 
-    transpileBlock(&ifst->scope);
+    transpileStatement(ifst->statement);
 
     if (ifst->next) {
         sbAppend(sb, " else ");
@@ -356,7 +357,7 @@ static void transpileStatement(Statement* statement) {
             sbAppend(sb, "while ");
             transpileCondition(sta->condition);
             sbAppend(sb, " ");
-            transpileBlock(&sta->scope);
+            transpileStatement(sta->statement);
         } break;
 
         case Statement_Break: sbAppend(sb, "break;"); break;
@@ -482,6 +483,16 @@ static u32 countStructDependencies(PlangStruct* stru) {
     return deps;
 }
 
+static void transpileFuncptrType(Datatype type) {
+    if (type.kind == Typekind_Alias) {
+        Datatype dealiased = dealiasType(type);
+        if (dealiased.kind == Typekind_FuncPtr) {
+            transpileType(dealiased);
+
+        } else transpileType(type);
+    } else transpileType(type);
+}
+
 static void transpile() {
     // TODO: use a higer initial capacity for the string builder
     StringBuilder builder = sbCreate();
@@ -592,23 +603,16 @@ static void transpile() {
         while (i < g_Unit->funcPtrTypes->length) {
             FuncPtr* f = getFuncPtr(i);
             sbAppend(sb, "typedef ");
-            if (f->returnType.kind == Typekind_Alias) {
-                Datatype retType = dealiasType(f->returnType);
-                if (retType.kind == Typekind_FuncPtr) {
-                    transpileType(retType);
-
-                } else transpileType(f->returnType);
-            } else transpileType(f->returnType);
-
+            transpileFuncptrType(f->returnType);
             sbAppend(sb, " ");
             sbAppend(sb, "proc_");
             sbAppendSpan(sb, numberToString(i));
             sbAppend(sb, "(");
             if (f->argCount) {
-                transpileType(f->argTypes[0]);
+                transpileFuncptrType(f->argTypes[0]);
                 for (u32 i = 1; i < f->argCount; i++) {
                     sbAppend(sb, ", ");
-                    transpileType(f->argTypes[i]);
+                    transpileFuncptrType(f->argTypes[i]);
                 }
             }
             sbAppend(sb, ");\n");

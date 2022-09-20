@@ -4,11 +4,11 @@ static Expression* parseExpression();
 static Expression* expectExpression();
 static bool parseType(Datatype* type);
 static Datatype expectType();
-
+static Statement* expectStatement();
 
 // asserts the existence of a semicolon
 static inline void semicolon() {
-    if (tokens[token_index].type != Tok_Semicolon) {     
+    if (tokens[token_index].type != Tok_Semicolon) {
         error_token("Expected semicolon.");
         return;
     }
@@ -664,7 +664,7 @@ static IfStatement* expectIfStatement() {
     res->next = null;
     res->condition = expectExpression();
 
-    expectBlock(&res->scope);
+    res->statement = expectStatement();
 
     if (tok(Tok_Keyword_Else)) {
         if (tok(Tok_Keyword_If)) {
@@ -675,7 +675,7 @@ static IfStatement* expectIfStatement() {
             elseStatement->base.statementType = Statement_If;
             elseStatement->condition = null;
             elseStatement->next = null;
-            expectBlock(&elseStatement->scope);
+            elseStatement->statement = expectStatement();
 
             res->next = elseStatement;
         }
@@ -754,10 +754,8 @@ static Statement* expectStatement() {
 
             WhileStatement* whileStatement = malloc(sizeof(WhileStatement));
             whileStatement->base.statementType = Statement_While;
-
             whileStatement->condition = expectExpression();
-
-            expectBlock(&whileStatement->scope);
+            whileStatement->statement = expectStatement();
 
             res = (Statement*)whileStatement;
         } break;

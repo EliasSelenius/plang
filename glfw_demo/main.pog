@@ -149,9 +149,18 @@ void load() {
 
 int32 main() {
 
-    if !glfwInit() {
-        return -1;
+    { // test
+        char* strings[10];
+        int32 i = -1;
+        while i++ < 10 strings[i] = "Blank";
+
+        strings[6] = "Hello";
+
+        i = -1;
+        while i++ < 10 printf("%s %d\n", strings[i], i as uint32);
     }
+
+    if !glfwInit() return -1;
 
     let width = 1600;
     let height = 900;
@@ -171,19 +180,17 @@ int32 main() {
     load();
 
     let error = glGetError();
-    if error {
-        printf("%s %d\n", "OpenGL error.", error);
-    }
+    if error printf("%s %d\n", "OpenGL error.", error);
 
     while !glfwWindowShouldClose(window) {
 
         vec2 wasd;
         wasd.x = 0f;
         wasd.y = 0f;
-        if key('W') { wasd.y += 1f; }
-        if key('S') { wasd.y -= 1f; }
-        if key('A') { wasd.x -= 1f; }
-        if key('D') { wasd.x += 1f; }
+        if key('W') wasd.y += 1f;
+        if key('S') wasd.y -= 1f;
+        if key('A') wasd.x -= 1f;
+        if key('D') wasd.x += 1f;
         // if (wasd.x != 0.0f or wasd.y != 0.0f) {
         //     vec2Normalize(&wasd);
         // }

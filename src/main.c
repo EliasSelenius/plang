@@ -12,13 +12,16 @@
         - modules or namespaces ?
         - allow underscores in number literals
         *- switch statements
-        - omit curl brackets in if/while etc. for single statement block
         - nested multi-line comments
         - disallow void as variable type in declaration
         - nesting funcptr types inside funcptrs arguments. void(void*(char*), uint) seems to produce a bug
         *- make assignments be expressions
         - contextual inclusion (the with keyword on struct fields)
         - member-like functions (the with keyword on function arguments)
+        *- enums
+        - explicitly sized enums e.g (enum Type : uint32 {})?
+        - unions
+        *- fixed sized arrays as struct fields
 
     InProgress:
         - "plang build" CLI. build all .pog files in directory. let output exe be named the name of the directory
@@ -28,6 +31,7 @@
 
 
     DONE list:
+        - omit curl brackets in if/while etc. for single statement block
         - construct list of all string identifiers during tokenizing, to allow for faster string equals and to free the file buffer.
         - function overloads
         *- goto statement and labels

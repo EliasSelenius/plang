@@ -13,7 +13,7 @@ static Statement* currentStatement;
 static Datatype validateExpression(Expression* expr);
 static Datatype getDeclaredVariable(Identifier name);
 static bool typeAssignable(Datatype toType, Datatype fromType);
-
+static void validateScope(Codeblock* scope);
 
 
 static Field* getField(PlangStruct* stru, Identifier name) {
@@ -558,6 +558,127 @@ static Datatype validateExpression(Expression* expr) {
     return type_invalid;
 }
 
+static void validateStatement(Statement* sta) {
+    switch (sta->statementType) {
+        case Statement_FixedArray_Declaration: {
+            VarDecl* decl = (VarDecl*)sta;
+
+            // Check wheter there already is a variable with this name
+            if (getDeclaredVariable(decl->name).kind != Typekind_Invalid) {
+                error_node(sta, "Variable \"%s\" is already declared.", getIdentifierStringValue(decl->name));
+            }
+
+            validateType(&decl->type);
+
+            // NOTE: decl->assignmentOrNull is used as the size expression for this fixed array
+            Datatype sizetype = validateExpression(decl->assignmentOrNull);
+            // TODO: is asstype a valid integer expression?
+
+            Variable var;
+            var.name = decl->name;
+            var.type = &decl->type;
+
+            darrayAdd(variables, var);
+        } break;
+        case Statement_Declaration: {
+            VarDecl* decl = (VarDecl*)sta;
+
+            // Check wheter there already is a variable with this name
+            if (getDeclaredVariable(decl->name).kind != Typekind_Invalid) {
+                error_node(sta, "Variable \"%s\" is already declared.", getIdentifierStringValue(decl->name));
+            }
+
+            validateType(&decl->type);
+
+            if (decl->assignmentOrNull) {
+                Datatype assType = validateExpression(decl->assignmentOrNull);
+
+                if (assType.kind == Typekind_Invalid) break; // if type could not be determined then we should not continue, act as if this statement does not exist 
+
+                if (decl->type.kind == Typekind_MustBeInfered)
+                    decl->type = resolveTypeAmbiguity(assType);
+                else assertAssignability(decl->type, assType);
+            }
+
+            Variable var;
+            var.name = decl->name;
+            var.type = &decl->type;
+
+            darrayAdd(variables, var);
+
+        } break;
+        case Statement_Assignment: {
+            Assignement* ass = (Assignement*)sta;
+
+            Datatype toType = validateExpression(ass->assigneeExpr);
+            Datatype fromType = validateExpression(ass->expr);
+
+            assertAssignability(toType, fromType);
+        } break;
+
+
+        case Statement_Scope: {
+            validateScope(&((Scope*)sta)->codeblock);
+        } break;
+        case Statement_If: {
+            IfStatement* ifsta = (IfStatement*)sta;
+
+            // TODO: check if condition is a boolean expression
+            validateExpression(ifsta->condition);
+
+            validateStatement(ifsta->statement);
+
+            while (ifsta->next) {
+                ifsta = ifsta->next;
+                if (ifsta->condition) validateExpression(ifsta->condition);
+                validateStatement(ifsta->statement);
+            }
+
+        } break;
+        case Statement_While: {
+            WhileStatement* whileSta = (WhileStatement*)sta;
+            // TODO: check if condition is a boolean expression
+            validateExpression(whileSta->condition);
+            validateStatement(whileSta->statement);
+        } break;
+
+        case Statement_Break: {
+            // TODO: is inside loop?
+        } break;
+        case Statement_Continue: {
+            // TODO: is inside loop?
+        } break;
+        case Statement_Return: {
+            ReturnStatement* retSta = (ReturnStatement*)sta;
+
+            Datatype type = type_void;
+            if (retSta->returnExpr) type = validateExpression(retSta->returnExpr);
+
+            if (type.kind == Typekind_Invalid) break;
+
+            if (function->decl.returnType.kind == Typekind_MustBeInfered) {
+                function->decl.returnType = resolveTypeAmbiguity(type);
+            } else {
+                if (!typeAssignable(function->decl.returnType, type)) {
+                    error_node(sta, "Return type missmatch in function \"%s\".", getIdentifierStringValue(function->decl.name));
+                }
+            }
+        } break;
+
+        case Statement_Goto: {
+            // TODO: does label exist?
+        } break;
+        case Statement_Label: {
+            // TODO: is label already declared?
+        } break;
+
+        case Statement_Expression: {
+            StatementExpression* staExpr = (StatementExpression*)sta;
+            validateExpression(staExpr->expr);
+        } break;
+    }
+}
+
 static void validateScope(Codeblock* scope) {
     Codeblock* parentScope = currentScope;
     scope->parentScope = parentScope;
@@ -568,129 +689,11 @@ static void validateScope(Codeblock* scope) {
     for (u32 i = 0; i < darrayLength(scope->statements); i++) {
         Statement* sta = scope->statements[i];
         currentStatement = sta;
-        switch (sta->statementType) {
-            case Statement_FixedArray_Declaration: {
-                VarDecl* decl = (VarDecl*)sta;
-
-                // Check wheter there already is a variable with this name
-                if (getDeclaredVariable(decl->name).kind != Typekind_Invalid) {
-                    error_node(sta, "Variable \"%s\" is already declared.", getIdentifierStringValue(decl->name));
-                }
-
-                validateType(&decl->type);
-
-                // NOTE: decl->assignmentOrNull is used as the size expression for this fixed array
-                Datatype sizetype = validateExpression(decl->assignmentOrNull);
-                // TODO: is asstype a valid integer expression?
-
-                Variable var;
-                var.name = decl->name;
-                var.type = &decl->type;
-
-                darrayAdd(variables, var);
-            } break;
-            case Statement_Declaration: {
-                VarDecl* decl = (VarDecl*)sta;
-
-                // Check wheter there already is a variable with this name
-                if (getDeclaredVariable(decl->name).kind != Typekind_Invalid) {
-                    error_node(sta, "Variable \"%s\" is already declared.", getIdentifierStringValue(decl->name));
-                }
-
-                validateType(&decl->type);
-
-                if (decl->assignmentOrNull) {
-                    Datatype assType = validateExpression(decl->assignmentOrNull);
-
-                    if (assType.kind == Typekind_Invalid) break; // if type could not be determined then we should not continue, act as if this statement does not exist 
-
-                    if (decl->type.kind == Typekind_MustBeInfered)
-                        decl->type = resolveTypeAmbiguity(assType);
-                    else assertAssignability(decl->type, assType);
-                }
-
-                Variable var;
-                var.name = decl->name;
-                var.type = &decl->type;
-
-                darrayAdd(variables, var);
-
-            } break;
-            case Statement_Assignment: {
-                Assignement* ass = (Assignement*)sta;
-
-                Datatype toType = validateExpression(ass->assigneeExpr);
-                Datatype fromType = validateExpression(ass->expr);
-
-                assertAssignability(toType, fromType);
-            } break;
-
-
-            case Statement_Scope: {
-                validateScope(&((Scope*)sta)->codeblock);
-            } break;
-            case Statement_If: {
-                IfStatement* ifsta = (IfStatement*)sta;
-
-                // TODO: check if condition is a boolean expression
-                validateExpression(ifsta->condition);
-                validateScope(&ifsta->scope);
-
-                while (ifsta->next) {
-                    ifsta = ifsta->next;
-                    if (ifsta->condition) validateExpression(ifsta->condition);
-                    validateScope(&ifsta->scope);
-                }
-
-            } break;
-            case Statement_While: {
-                WhileStatement* whileSta = (WhileStatement*)sta;
-                // TODO: check if condition is a boolean expression
-                validateExpression(whileSta->condition);
-                validateScope(&whileSta->scope);
-            } break;
-
-            case Statement_Break: {
-                // TODO: is inside loop?
-            } break;
-            case Statement_Continue: {
-                // TODO: is inside loop?
-            } break;
-            case Statement_Return: {
-                ReturnStatement* retSta = (ReturnStatement*)sta;
-
-                Datatype type = type_void;
-                if (retSta->returnExpr) type = validateExpression(retSta->returnExpr);
-
-                if (type.kind == Typekind_Invalid) break;
-
-                if (function->decl.returnType.kind == Typekind_MustBeInfered) {
-                    function->decl.returnType = resolveTypeAmbiguity(type);
-                } else {
-                    if (!typeAssignable(function->decl.returnType, type)) {
-                        error_node(sta, "Return type missmatch in function \"%s\".", getIdentifierStringValue(function->decl.name));
-                    }
-                }
-            } break;
-
-            case Statement_Goto: {
-                // TODO: does label exist?
-            } break;
-            case Statement_Label: {
-                // TODO: is label already declared?
-            } break;
-
-            case Statement_Expression: {
-                StatementExpression* staExpr = (StatementExpression*)sta;
-                validateExpression(staExpr->expr);
-            } break;
-        }
+        validateStatement(sta);
     }
 
     currentStatement = null;
-
     darrayHead(variables)->length = vars_start_index;
-
     currentScope = parentScope;
 }
 
