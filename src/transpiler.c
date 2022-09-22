@@ -488,9 +488,11 @@ static void transpileFuncptrType(Datatype type) {
         Datatype dealiased = dealiasType(type);
         if (dealiased.kind == Typekind_FuncPtr) {
             transpileType(dealiased);
+            return;
+        }
+    }
 
-        } else transpileType(type);
-    } else transpileType(type);
+    transpileType(type);
 }
 
 static void transpile() {

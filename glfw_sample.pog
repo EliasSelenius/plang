@@ -1,0 +1,32 @@
+
+declare void printf(char* format, uint32 arg);
+
+int32 main() {
+
+    if !glfwInit() return -1;
+
+    let window = glfwCreateWindow(1600, 900, "My Window", null, null);
+    if !window {
+        glfwTerminate();
+        return -1;
+    }
+
+    glfwMakeContextCurrent(window);
+    load_opengl(glfwGetProcAddress);
+
+    glClearColor(0.4, 1.0, 0.1, 1.0);
+
+    let error = glGetError();
+    if error printf("OpenGL error. %d\n", error);
+
+    while !glfwWindowShouldClose(window) {
+        glClear(GL_COLOR_BUFFER_BIT);
+
+        glfwSwapBuffers(window);
+        glfwPollEvents();
+    }
+
+    glfwDestroyWindow(window);
+    glfwTerminate();
+    return 0;
+}
