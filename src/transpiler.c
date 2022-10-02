@@ -202,8 +202,10 @@ static void transpileExpression(Expression* expr) {
 
         case ExprType_Literal_Decimal: {
             LiteralExpression* lit = (LiteralExpression*)expr;
-            // sbAppendSpan(sb, lit->value);
-            sbAppend(sb, "0.0");
+            char temp_buffer[24];
+            u32 i = snprintf(temp_buffer, 23, "%f", lit->decimal);
+            temp_buffer[i] = '\0';
+            sbAppend(sb, temp_buffer);
         } break;
 
         case ExprType_Variable: {

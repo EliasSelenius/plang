@@ -6,6 +6,7 @@ OpaqueType* ot;
 type OpaqueType;
 type func = void(OpaqueType*);
 
+const Foo = 0x1FFaBC09;
 
 void take_opaque(OpaqueType* ot) {
     printf("Hello, Opaque\n");
@@ -17,11 +18,13 @@ void reg(func f) {
 
 int32 main() {
 
+    let f = Foo;
+    f = 0x10;
+
+    f = 0x;
+
     reg(take_opaque);
 
-    void** p = null;
-
-    take_opaque(p);
 
     printf("Hello, Sailor!\n");
 

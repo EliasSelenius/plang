@@ -11,6 +11,31 @@ static inline void appendToken(TokenType type) {
     darrayAdd(tokens, token);
 }
 
+static u64 hex_char_to_value(char h) {
+    if (h >= '0' && h <= '9') return h - '0';
+    if (h >= 'a' && h <= 'f') return 10 + h - 'a';
+    if (h >= 'A' && h <= 'F') return 10 + h - 'A';
+
+    return -1;
+}
+
+static u64 hex_number(u32* numDigits) {
+    char* start = cursor;
+    while (isHexDigit(*cursor)) cursor++;
+    u32 len = cursor - start;
+
+    u64 acc = 0;
+    u64 place = 1;
+    for (i32 i = len - 1; i >= 0; i--) {
+        u64 d = hex_char_to_value(start[i]);
+        acc += place * d;
+        place *= 16;
+    }
+
+    *numDigits = len;
+    return acc;
+}
+
 static u64 number(u32* numDigits) {
     char* start = cursor;
     while (isDigit(*++cursor));
@@ -119,22 +144,17 @@ static void lex(char* input) {
 
         // hex number
         if (*cursor == '0' && *(cursor + 1) == 'x') {
-            char* digitStart = cursor;
-            cursor++;
-            while (isHexDigit(*++cursor));
+            cursor += 2;
+
+            Token token = {0};
+            token.line = current_line;
+            token.type = Tok_Integer;
+
+            u32 numDigits;
+            token.integer = hex_number(&numDigits);
             cursor--;
 
-            Token token = {
-                .type = Tok_Integer, // Tok_Integer_Uint,
-                .line = current_line,
-                // .value = {
-                    // .start = digitStart,
-                    // .length = cursor - digitStart + 1
-                // }
-                .integer = 0
-            };
             darrayAdd(tokens, token);
-
             continue;
         }
 

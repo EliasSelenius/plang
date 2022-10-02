@@ -31,6 +31,8 @@
 
 
     DONE list:
+        *- transpile decimal literals
+        *- parse hex literals
         - omit curl brackets in if/while etc. for single statement block
         - construct list of all string identifiers during tokenizing, to allow for faster string equals and to free the file buffer.
         - function overloads

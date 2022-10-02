@@ -152,12 +152,12 @@ int32 main() {
     { // test
         char* strings[10];
         int32 i = -1;
-        while i++ < 10 strings[i] = "Blank";
+        while ++i < 10 strings[i] = "Blank";
 
         strings[6] = "Hello";
 
         i = -1;
-        while i++ < 10 printf("%s %d\n", strings[i], i as uint32);
+        while ++i < 10 printf("%s %d\n", strings[i], i as uint32);
     }
 
     if !glfwInit() return -1;
