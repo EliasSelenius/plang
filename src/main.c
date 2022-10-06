@@ -22,6 +22,7 @@
         - explicitly sized enums e.g (enum Type : uint32 {})?
         - unions
         *- fixed sized arrays as struct fields
+        - local consts
 
     InProgress:
         - "plang build" CLI. build all .pog files in directory. let output exe be named the name of the directory
@@ -31,6 +32,7 @@
 
 
     DONE list:
+        *- bitwise assignments
         *- transpile decimal literals
         *- parse hex literals
         - omit curl brackets in if/while etc. for single statement block

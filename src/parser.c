@@ -862,7 +862,14 @@ static Statement* expectStatement() {
                     case ExprType_Variable:
                     case ExprType_Deref: {
 
-                        Token* token = anyof(5, Tok_Assign, Tok_PlusAssign, Tok_MinusAssign, Tok_MulAssign, Tok_DivAssign);
+                        Token* token = anyof(8, Tok_Assign,
+                                                Tok_PlusAssign,
+                                                Tok_MinusAssign,
+                                                Tok_MulAssign,
+                                                Tok_DivAssign,
+                                                Tok_BitAndAssign,
+                                                Tok_BitOrAssign,
+                                                Tok_BitXorAssign);
                         if (token) {
                             Assignement* ass = malloc(sizeof(Assignement));
                             ass->base.statementType = Statement_Assignment;

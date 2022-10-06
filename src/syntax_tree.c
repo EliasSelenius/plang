@@ -257,7 +257,7 @@ typedef struct VarDecl {
 typedef struct Assignement {
     Statement base;
     Expression* assigneeExpr;
-    TokenType assignmentOper; // = += -= *= /=
+    TokenType assignmentOper; // = += -= *= /= etc...
     Expression* expr;
 } Assignement;
 

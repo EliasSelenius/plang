@@ -341,6 +341,9 @@ static void transpileStatement(Statement* statement) {
                 case Tok_MinusAssign: sbAppend(sb, " -= "); break;
                 case Tok_MulAssign: sbAppend(sb, " *= "); break;
                 case Tok_DivAssign: sbAppend(sb, " /= "); break;
+                case Tok_BitAndAssign: sbAppend(sb, " &= "); break;
+                case Tok_BitOrAssign: sbAppend(sb, " |= "); break;
+                case Tok_BitXorAssign: sbAppend(sb, " ^= "); break;
                 default: break;
             }
 

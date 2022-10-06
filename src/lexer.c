@@ -275,9 +275,20 @@ static void lex(char* input) {
             case '?': appendToken(Tok_QuestionMark); continue;
             case '@': appendToken(Tok_At); continue;
             case '~': appendToken(Tok_Tilde); continue;
-            case '&': appendToken(Tok_Ampersand); continue;
-            case '|': appendToken(Tok_Pipe); continue;
-            case '^': appendToken(Tok_Caret); continue;
+
+            case '&': switch (*(cursor + 1)) {
+                case '=': appendToken(Tok_BitAndAssign); cursor++; continue;
+                default: appendToken(Tok_Ampersand); continue;
+            }
+            case '|': switch (*(cursor + 1)) {
+                case '=': appendToken(Tok_BitOrAssign); cursor++; continue;
+                default: appendToken(Tok_Pipe); continue;
+            }
+            case '^': switch (*(cursor + 1)) {
+                case '=': appendToken(Tok_BitXorAssign); cursor++; continue;
+                default: appendToken(Tok_Caret); continue;
+            }
+
             case '{': appendToken(Tok_OpenCurl); continue;
             case '}': appendToken(Tok_CloseCurl); continue;
             case '(': appendToken(Tok_OpenParen); continue;
@@ -297,6 +308,18 @@ static void lex(char* input) {
                 default: appendToken(Tok_GreaterThan); continue;
             }
 
+            case '+': switch (*(cursor + 1)) {
+                case '+': appendToken(Tok_PlusPlus); cursor++; continue;
+                case '=': appendToken(Tok_PlusAssign); cursor++; continue;
+                default: appendToken(Tok_Plus); continue;
+            }
+
+            case '-': switch (*(cursor + 1)) {
+                case '-': appendToken(Tok_MinusMinus); cursor++; continue;
+                case '=': appendToken(Tok_MinusAssign); cursor++; continue;
+                default: appendToken(Tok_Minus); continue;
+            }
+
         }
 
         #define test_op_eq(c, token, tokenEqual) \
@@ -311,27 +334,6 @@ static void lex(char* input) {
 
         test_op_eq('=', Tok_Assign, Tok_Equals);
         test_op_eq('!', Tok_ExclamationMark, Tok_NotEquals);
-
-        if (*cursor == '+') {
-            switch (*(cursor + 1)) {
-                case '+': appendToken(Tok_PlusPlus); cursor++; break;
-                case '=': appendToken(Tok_PlusAssign); cursor++; break;
-                default: appendToken(Tok_Plus); break;
-            }
-            continue;
-        }
-
-        if (*cursor == '-') {
-            switch (*(cursor + 1)) {
-                case '-': appendToken(Tok_MinusMinus); cursor++; break;
-                case '=': appendToken(Tok_MinusAssign); cursor++; break;
-                default: appendToken(Tok_Minus); break;
-            }
-            continue;
-        }
-
-        // test_op_eq('+', Tok_Plus, Tok_PlusAssign);
-        // test_op_eq('-', Tok_Minus, Tok_MinusAssign);
         test_op_eq('*', Tok_Mul, Tok_MulAssign);
         test_op_eq('/', Tok_Div, Tok_DivAssign);
         test_op_eq('%', Tok_Mod, Tok_ModAssign);

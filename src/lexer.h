@@ -83,7 +83,10 @@ typedef enum TokenType {
     Tok_MinusAssign,
     Tok_MulAssign,
     Tok_DivAssign,
-    Tok_ModAssign
+    Tok_ModAssign,
+    Tok_BitAndAssign,
+    Tok_BitOrAssign,
+    Tok_BitXorAssign
 
 } TokenType;
 
