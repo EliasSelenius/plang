@@ -642,6 +642,13 @@ static void validateStatement(Statement* sta) {
             validateStatement(whileSta->statement);
         } break;
 
+        case Statement_Switch: {
+            SwitchStatement* switchSta = (SwitchStatement*)sta;
+            // TODO: check if expr is a valid type to switch on
+            validateExpression(switchSta->expr);
+            validateScope(&switchSta->scope);
+        } break;
+
         case Statement_Break: {
             // TODO: is inside loop?
         } break;
@@ -670,6 +677,15 @@ static void validateStatement(Statement* sta) {
         } break;
         case Statement_Label: {
             // TODO: is label already declared?
+        } break;
+        case Statement_CaseLabel: {
+            // TODO: is inside switch?
+            CaseLabelStatement* caseLabel = (CaseLabelStatement*)sta;
+            // TODO: is compiletime expr?
+            validateExpression(caseLabel->expr);
+        } break;
+        case Statement_DefaultLabel: {
+            // TODO: is inside switch?
         } break;
 
         case Statement_Expression: {

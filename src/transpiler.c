@@ -365,6 +365,14 @@ static void transpileStatement(Statement* statement) {
             transpileStatement(sta->statement);
         } break;
 
+        case Statement_Switch: {
+            SwitchStatement* switchSta = (SwitchStatement*)statement;
+            sbAppend(sb, "switch ");
+            transpileExpression(switchSta->expr);
+            sbAppend(sb, " ");
+            transpileBlock(&switchSta->scope);
+        } break;
+
         case Statement_Break: sbAppend(sb, "break;"); break;
         case Statement_Continue: sbAppend(sb, "continue;"); break;
 
@@ -390,6 +398,15 @@ static void transpileStatement(Statement* statement) {
             LabelStatement* l = (LabelStatement*)statement;
             sbAppend(sb, getIdentifierStringValue(l->label));
             sbAppend(sb, ":");
+        } break;
+        case Statement_CaseLabel: {
+            CaseLabelStatement* caseLabel = (CaseLabelStatement*)statement;
+            sbAppend(sb, "case ");
+            transpileExpression(caseLabel->expr);
+            sbAppend(sb, ":");
+        } break;
+        case Statement_DefaultLabel: {
+            sbAppend(sb, "default:");
         } break;
 
         case Statement_Expression: {

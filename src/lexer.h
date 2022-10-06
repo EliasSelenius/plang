@@ -16,6 +16,7 @@ typedef enum TokenType {
     Tok_Keyword_For,
     Tok_Keyword_Switch,
     Tok_Keyword_Case,
+    Tok_Keyword_Default,
     Tok_Keyword_Goto,
 
     Tok_Keyword_True,

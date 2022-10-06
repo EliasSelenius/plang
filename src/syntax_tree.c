@@ -229,12 +229,15 @@ typedef enum StatementType {
     Statement_Scope,
     Statement_If,
     Statement_While,
+    Statement_Switch,
 
     Statement_Continue,
     Statement_Break,
     Statement_Return,
     Statement_Goto,
-    Statement_Label
+    Statement_Label,
+    Statement_CaseLabel,
+    Statement_DefaultLabel
 } StatementType;
 
 typedef struct Statement {
@@ -285,6 +288,12 @@ typedef struct IfStatement {
     struct IfStatement* next;
 } IfStatement;
 
+typedef struct SwitchStatement {
+    Statement base;
+    Expression* expr;
+    Codeblock scope;
+} SwitchStatement;
+
 typedef struct ReturnStatement {
     Statement base;
     Expression* returnExpr;
@@ -299,6 +308,11 @@ typedef struct LabelStatement {
     Statement base;
     Identifier label;
 } LabelStatement;
+
+typedef struct CaseLabelStatement {
+    Statement base;
+    Expression* expr;
+} CaseLabelStatement;
 
 // ----Functions----------------------------------------------
 

@@ -764,6 +764,32 @@ static Statement* expectStatement() {
             res = (Statement*)expectIfStatement();
         } break;
 
+        case Tok_Keyword_Switch: {
+            token_index++;
+
+            SwitchStatement* switchStatement = malloc(sizeof(SwitchStatement));
+            switchStatement->base.statementType = Statement_Switch;
+            switchStatement->expr = expectExpression();
+            expectBlock(&switchStatement->scope);
+
+            res = (Statement*)switchStatement;
+        } break;
+        case Tok_Keyword_Case: {
+            token_index++;
+
+            CaseLabelStatement* caseLabel = malloc(sizeof(CaseLabelStatement));
+            caseLabel->base.statementType = Statement_CaseLabel;
+            caseLabel->expr = expectExpression();
+            expect(Tok_Colon);
+
+            res = (Statement*)caseLabel;
+        } break;
+        case Tok_Keyword_Default: {
+            res = malloc(sizeof(Statement));
+            res->statementType = Statement_DefaultLabel;
+            token_index++;
+            expect(Tok_Colon);
+        } break;
 
         case Tok_Keyword_Continue: {
             res = malloc(sizeof(Statement));

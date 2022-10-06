@@ -123,6 +123,7 @@ static void lex(char* input) {
             else if (spanEquals(word, "const")) tokType = Tok_Keyword_Const;
             else if (spanEquals(word, "for")) tokType = Tok_Keyword_For;
             else if (spanEquals(word, "switch")) tokType = Tok_Keyword_Switch;
+            else if (spanEquals(word, "default")) tokType = Tok_Keyword_Default;
             else if (spanEquals(word, "case")) tokType = Tok_Keyword_Case;
             else if (spanEquals(word, "goto")) tokType = Tok_Keyword_Goto;
             else if (spanEquals(word, "with")) tokType = Tok_Keyword_With;
