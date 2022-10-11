@@ -145,20 +145,27 @@ void load() {
 
     player = appendEntity(entity);
 
+
+    { // Voxels
+        VoxelGrid grid;
+        grid.res = 100;
+        grid.data = alloc float32[grid.res * grid.res];
+        i = -1; while ++i < grid.res * grid.res {
+            // if random(i as int32) < 0 grid.data[i] = 1;
+            // else
+                grid.data[i] = clamp(sinf(i as float32), 0, 1);
+        }
+
+        voxelMesh = generateMesh(grid);
+
+        printf("%s %d", "VoxelMesh Tri Count:", length(voxelMesh.inds) / 3);
+    }
+
 }
 
+VoxelMesh voxelMesh;
+
 int32 main() {
-
-    { // test
-        char* strings[10];
-        int32 i = -1;
-        while ++i < 10 strings[i] = "Blank";
-
-        strings[6] = "Hello";
-
-        i = -1;
-        while ++i < 10 printf("%s %d\n", strings[i], i as uint32);
-    }
 
     if !glfwInit() return -1;
 
@@ -232,6 +239,11 @@ int32 main() {
             i++;
         }
 
+        glUniform2f(glGetUniformLocation(shader, "entity_pos"), 0, 0);
+        drawMesh(voxelMesh.mesh);
+        glBindVertexArray(voxelMesh.mesh.vao);
+        glDrawArrays(GL_POINTS, 0, voxelMesh.numVerts as int32);
+        glBindVertexArray(0);
 
         glfwSwapBuffers(window);
         glfwPollEvents();

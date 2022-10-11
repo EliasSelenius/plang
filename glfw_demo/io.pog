@@ -11,6 +11,8 @@ declare uint64 fread(void* buffer, uint64 elementSize, uint64 elementCount, void
 declare void printf(char* format, char* arg1, uint32 arg2);
 declare void* calloc(uint64 count, uint64 size);
 declare void* malloc(uint64 size);
+declare void* realloc(void* buffer, uint64 size);
+declare void* memcpy(void* dst, void* src, uint64 size);
 
 void println(char* str) {
     printf("%s\n", str, 0u);
