@@ -16,6 +16,8 @@ const TopRightBit = 4;
 const BottomLeftBit = 2;
 const BottomRightBit = 1;
 
+const PointOnThreshold = 0.001;
+
 vec2* initVertexBuffer(VoxelGrid grid, uint32* numVerts) {
     //             3r^2 - 2r
     @numVerts = 3 * grid.res * grid.res - 2 * grid.res;
@@ -112,10 +114,10 @@ VoxelMesh generateMesh(VoxelGrid grid) {
             let p4 = grid.data[i4];
 
             uint8 mask = 0;
-            if p1 > 0.01 mask |= TopLeftBit;
-            if p2 > 0.01 mask |= TopRightBit;
-            if p3 > 0.01 mask |= BottomLeftBit;
-            if p4 > 0.01 mask |= BottomRightBit;
+            if p1 > PointOnThreshold mask |= TopLeftBit;
+            if p2 > PointOnThreshold mask |= TopRightBit;
+            if p3 > PointOnThreshold mask |= BottomLeftBit;
+            if p4 > PointOnThreshold mask |= BottomRightBit;
 
             switch (mask) {
 
@@ -181,6 +183,52 @@ VoxelMesh generateMesh(VoxelGrid grid) {
                     addTri(*inds, i1, i3, i2);
                     addTri(*inds, i2, i3, i4);
                     break;
+            }
+        }
+    }
+
+    if true { // smoothing
+        x = -1;
+        while ++x < grid.res {
+            uint32 y = -1;
+            while ++y < size {
+
+                let p1 = grid.data[getIndex(grid.res, x, y)];
+                let p2 = grid.data[getIndex(grid.res, x, y + 1)];
+
+                let b1 = p1 > PointOnThreshold;
+                let b2 = p2 > PointOnThreshold;
+
+                float32 ofs;
+                if b1 == b2 ofs = 0.5;
+                else if b1  ofs = p1;
+                else        ofs = 1.0 - p2;
+
+                let i = g1_size + x * size + y;
+                vmesh.verts[i].x = x as float32;
+                vmesh.verts[i].y = y as float32 + ofs;
+            }
+        }
+
+        x = -1;
+        while ++x < size {
+            uint32 y = -1;
+            while ++y < grid.res {
+
+                let p1 = grid.data[getIndex(grid.res, x, y)];
+                let p2 = grid.data[getIndex(grid.res, x + 1, y)];
+
+                let b1 = p1 > PointOnThreshold;
+                let b2 = p2 > PointOnThreshold;
+
+                float32 ofs;
+                if b1 == b2 ofs = 0.5;
+                else if b1  ofs = p1;
+                else        ofs = 1.0 - p2;
+
+                let i = g1_size + g2_size + x * grid.res + y;
+                vmesh.verts[i].x = x as float32 + ofs;
+                vmesh.verts[i].y = y as float32;
             }
         }
     }

@@ -62,7 +62,7 @@ void loadGL() {
     shader = createShader();
     glUseProgram(shader);
 
-    glPointSize(5.0);
+    glPointSize(1.0);
     // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
 }
