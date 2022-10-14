@@ -95,6 +95,12 @@ int32 key(char c) {
     return glfwGetKey(window, c as int32);
 }
 
+const Left_Mouse = 0;
+const Right_Mouse = 1;
+int32 mouse(int32 btn) {
+    return glfwGetMouseButton(window, btn);
+}
+
 void updateEntity(Entity* entity) {
     entity.pos = add(entity.pos, entity.vel);
 
@@ -145,9 +151,9 @@ void load() {
 
     player = appendEntity(entity);
 
-    let grid = generatePlanet();
-    voxelMesh = generateMesh(grid);
-    printf("%s %d", "VoxelMesh Tri Count:", length(voxelMesh.inds) / 3);
+    voxelGrid = generatePlanet();
+    voxelMesh = generateMesh(voxelGrid);
+    printf("%s %d\n", "VoxelMesh Tri Count:", length(voxelMesh.inds) / 3);
 
     voxelMesh_circle = genCircle(360, 40);
 }
@@ -176,6 +182,7 @@ VoxelGrid generatePlanet() {
     return grid;
 }
 
+VoxelGrid voxelGrid;
 VoxelMesh voxelMesh;
 Mesh voxelMesh_circle;
 
@@ -253,13 +260,38 @@ int32 main() {
             i++;
         }
 
-        glUniform2f(glGetUniformLocation(shader, "entity_pos"), 0, 0);
-        drawMesh(voxelMesh.mesh);
-        glBindVertexArray(voxelMesh.mesh.vao);
-        glDrawArrays(GL_POINTS, 0, voxelMesh.numVerts as int32);
-        glBindVertexArray(0);
-        glUniform2f(glGetUniformLocation(shader, "entity_pos"), 50, 50);
-        // drawMesh(voxelMesh_circle);
+        { // voxels
+
+            if mouse(Left_Mouse) {
+                uint32 x = (player.pos.x + 0.5) as uint32;
+                uint32 y = (player.pos.y + 0.5) as uint32;
+                if x < voxelGrid.res and y < voxelGrid.res {
+                    voxelGrid.data[x * voxelGrid.res + y] = 0.5;
+                    updateGridMesh(voxelGrid, *voxelMesh);
+                }
+            } else if mouse(Right_Mouse) {
+                uint32 x = (player.pos.x + 0.5) as uint32;
+                uint32 y = (player.pos.y + 0.5) as uint32;
+                if x < voxelGrid.res and y < voxelGrid.res {
+                    voxelGrid.data[x * voxelGrid.res + y] = 0;
+                    updateGridMesh(voxelGrid, *voxelMesh);
+                }
+            }
+
+            if key('T') {
+                VoxelGrid_addCircle(voxelGrid, 3, player.pos.x, player.pos.y);
+                updateGridMesh(voxelGrid, *voxelMesh);
+            }
+
+            glUniform2f(glGetUniformLocation(shader, "entity_pos"), 0, 0);
+            drawMesh(voxelMesh.mesh);
+            glBindVertexArray(voxelMesh.mesh.vao);
+            glDrawArrays(GL_POINTS, 0, voxelMesh.numVerts as int32);
+            glBindVertexArray(0);
+            glUniform2f(glGetUniformLocation(shader, "entity_pos"), 50, 50);
+            // drawMesh(voxelMesh_circle);
+            // if point_intersects(player.pos, voxelGrid) { }
+        }
 
         glfwSwapBuffers(window);
         glfwPollEvents();

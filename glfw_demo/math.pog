@@ -24,6 +24,9 @@ float32 clamp(float32 t, float32 min, float32 max) {
     return t < min ? min : t > max ? max : t;
 }
 
+int32 clamp(int32 t, int32 min, int32 max) {
+    return t < min ? min : t > max ? max : t;
+}
 
 struct vec2 {
     float32 x;

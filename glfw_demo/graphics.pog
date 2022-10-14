@@ -1,5 +1,5 @@
 
-int32 shaderInfoLogSize = 1024;
+const shaderInfoLogSize = 1024;
 char* shaderInfoLog = null;
 
 GLFWwindow* window;
@@ -27,6 +27,25 @@ void drawMesh(Mesh mesh) {
     drawMesh(mesh.vao, mesh.elementsCount);
 }
 
+Mesh createMesh() {
+    Mesh mesh;
+    mesh.elementsCount = 0;
+    glGenVertexArrays(1, *mesh.vao);
+    glBindVertexArray(mesh.vao);
+
+    glGenBuffers(1, *mesh.vbo);
+    glBindBuffer(GL_ARRAY_BUFFER , mesh.vbo);
+    glGenBuffers(1, *mesh.ebo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh.ebo);
+
+    glEnableVertexAttribArray(0u);
+    glVertexAttribPointer(0u, 2, GL_FLOAT, false as uint8, 8, null);
+
+    glBindVertexArray(0u);
+
+    return mesh;
+}
+
 Mesh createMesh(vec2* verts, uint32 vertsCount, uint32* inds, uint32 indsCount) {
     Mesh mesh;
     mesh.elementsCount = indsCount as int32;
@@ -50,11 +69,24 @@ Mesh createMesh(vec2* verts, uint32 vertsCount, uint32* inds, uint32 indsCount) 
     return mesh;
 }
 
+void updateMeshData(Mesh* mesh, vec2* verts, uint32 vertsCount, uint32* inds, uint32 indsCount) {
+    mesh.elementsCount = indsCount as int32;
+
+    glBindBuffer(GL_ARRAY_BUFFER , mesh.vbo);
+    glBufferData(GL_ARRAY_BUFFER, (sizeof(vec2) * vertsCount) as int64, verts, GL_STATIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh.ebo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, (sizeof(uint32) * indsCount) as int64, inds, GL_STATIC_DRAW);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+}
+
 void loadGL() {
 
     load_opengl(glfwGetProcAddress);
 
-    shaderInfoLog = malloc(shaderInfoLogSize as uint64);
+    shaderInfoLog = malloc(shaderInfoLogSize);
 
     glfwSetFramebufferSizeCallback(window, GLFWframebuffersizefunCallback);
     glfwSetScrollCallback(window, GLFWscrollfunCallback);
@@ -65,15 +97,31 @@ void loadGL() {
     glPointSize(1.0);
     // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
+    glEnable(GL_DEBUG_OUTPUT);
+    glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+
+    glDebugMessageCallback(opengl_debug_callback, null);
 }
 
+void opengl_debug_callback(GLenum source, GLenum _type, GLuint id, GLenum severity, GLsizei length, /*const*/ GLchar* message, /*const*/ void* userParam) {
+
+    switch (_type) {
+        case GL_DEBUG_TYPE_ERROR: println("ERROR"); break;
+        case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR: println("DEPRECATED BEHAVIOR"); break;
+        case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR: println("UDEFINED BEHAVIOR"); break;
+        case GL_DEBUG_TYPE_PORTABILITY: println("PORTABILITY"); break;
+        case GL_DEBUG_TYPE_PERFORMANCE: println("PERFORMANCE"); break;
+        // case GL_DEBUG_TYPE_OTHER: println("OTHER"); break;
+        case GL_DEBUG_TYPE_MARKER: println("MARKER"); break;
+    }
+}
 
 void GLFWframebuffersizefunCallback(GLFWwindow* window, int32 w, int32 h) {
     let aspect = h as float32 / w;
     glUniform1f(glGetUniformLocation(shader, "aspect"), aspect);
 }
 
-
+// TODO: make this a local func
 uint32 makeShader(uint32 program, uint32 _type, char* code) {
     let s = glCreateShader(_type);
     glShaderSource(s, 1, *code, null); // null assumes null-terminated string

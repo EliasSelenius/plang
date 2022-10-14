@@ -72,19 +72,24 @@ uint32 getIndex(uint32 res, uint32 x, uint32 y) {
 }
 
 VoxelMesh generateMesh(VoxelGrid grid) {
-
     VoxelMesh vmesh;
     vmesh.verts = initVertexBuffer(grid, *vmesh.numVerts);
-    uint32* inds = createList(sizeof uint32);
+    vmesh.inds = createList(sizeof uint32);
+    vmesh.mesh = createMesh();
+    updateGridMesh(grid, *vmesh);
+    return vmesh;
+}
+
+void updateGridMesh(VoxelGrid grid, VoxelMesh* vmesh) {
+
+    listClear(vmesh.inds);
 
     uint32 size = grid.res - 1;
     let g1_size = grid.res * grid.res;
     let g2_size = grid.res * size;
 
-    uint32 x = -1;
-    while ++x < size {
-        uint32 y = -1;
-        while ++y < size {
+    uint32 x = -1; while ++x < size {
+        uint32 y = -1; while ++y < size {
 
             /*
                 *--------1--------*
@@ -122,76 +127,74 @@ VoxelMesh generateMesh(VoxelGrid grid) {
             switch (mask) {
 
                 // corners
-                case TopLeftBit: addTri(*inds, i1, e2, e1); break;
-                case TopRightBit: addTri(*inds, i2, e1, e3); break;
-                case BottomRightBit: addTri(*inds, i4, e3, e4); break;
-                case BottomLeftBit: addTri(*inds, i3, e4, e2); break;
+                case TopLeftBit: addTri(*vmesh.inds, i1, e2, e1); break;
+                case TopRightBit: addTri(*vmesh.inds, i2, e1, e3); break;
+                case BottomRightBit: addTri(*vmesh.inds, i4, e3, e4); break;
+                case BottomLeftBit: addTri(*vmesh.inds, i3, e4, e2); break;
 
                 // inverted corners
                 case 0x0F & ~TopLeftBit:
-                    addTri(*inds, i4, e1, e2);
-                    addTri(*inds, i4, i2, e1);
-                    addTri(*inds, i4, e2, i3);
+                    addTri(*vmesh.inds, i4, e1, e2);
+                    addTri(*vmesh.inds, i4, i2, e1);
+                    addTri(*vmesh.inds, i4, e2, i3);
                     break;
                 case 0x0F & ~TopRightBit:
-                    addTri(*inds, i3, e3, e1);
-                    addTri(*inds, i3, i4, e3);
-                    addTri(*inds, i3, e1, i1);
+                    addTri(*vmesh.inds, i3, e3, e1);
+                    addTri(*vmesh.inds, i3, i4, e3);
+                    addTri(*vmesh.inds, i3, e1, i1);
                     break;
                 case 0x0F & ~BottomRightBit:
-                    addTri(*inds, i1, e3, e4);
-                    addTri(*inds, i1, e3, i2);
-                    addTri(*inds, i1, e4, i3);
+                    addTri(*vmesh.inds, i1, e3, e4);
+                    addTri(*vmesh.inds, i1, e3, i2);
+                    addTri(*vmesh.inds, i1, e4, i3);
                     break;
                 case 0x0F & ~BottomLeftBit:
-                    addTri(*inds, i2, e2, e4);
-                    addTri(*inds, i2, i1, e2);
-                    addTri(*inds, i2, e4, i4);
+                    addTri(*vmesh.inds, i2, e2, e4);
+                    addTri(*vmesh.inds, i2, i1, e2);
+                    addTri(*vmesh.inds, i2, e4, i4);
                     break;
 
                 // horizontal 'walls'
                 case TopLeftBit | TopRightBit:
-                    addTri(*inds, i1, e2, i2);
-                    addTri(*inds, i2, e2, e3);
+                    addTri(*vmesh.inds, i1, e2, i2);
+                    addTri(*vmesh.inds, i2, e2, e3);
                     break;
                 case BottomLeftBit | BottomRightBit:
-                    addTri(*inds, i3, e3, e2);
-                    addTri(*inds, i4, e3, i3);
+                    addTri(*vmesh.inds, i3, e3, e2);
+                    addTri(*vmesh.inds, i4, e3, i3);
                     break;
                 // vertical 'walls'
                 case TopLeftBit | BottomLeftBit:
-                    addTri(*inds, i1, i3, e1);
-                    addTri(*inds, i3, e4, e1);
+                    addTri(*vmesh.inds, i1, i3, e1);
+                    addTri(*vmesh.inds, i3, e4, e1);
                     break;
                 case TopRightBit | BottomRightBit:
-                    addTri(*inds, i2, e1, i4);
-                    addTri(*inds, i4, e1, e4);
+                    addTri(*vmesh.inds, i2, e1, i4);
+                    addTri(*vmesh.inds, i4, e1, e4);
                     break;
 
                 // diagonals
                 case TopLeftBit | BottomRightBit:
-                    addTri(*inds, i1, e2, e1);
-                    addTri(*inds, i4, e3, e4);
+                    addTri(*vmesh.inds, i1, e2, e1);
+                    addTri(*vmesh.inds, i4, e3, e4);
                     break;
                 case TopRightBit | BottomLeftBit:
-                    addTri(*inds, i2, e1, e3);
-                    addTri(*inds, i3, e4, e2);
+                    addTri(*vmesh.inds, i2, e1, e3);
+                    addTri(*vmesh.inds, i3, e4, e2);
                     break;
 
                 // solid block
                 case 0x0F:
-                    addTri(*inds, i1, i3, i2);
-                    addTri(*inds, i2, i3, i4);
+                    addTri(*vmesh.inds, i1, i3, i2);
+                    addTri(*vmesh.inds, i2, i3, i4);
                     break;
             }
         }
     }
 
     if true { // smoothing
-        x = -1;
-        while ++x < grid.res {
-            uint32 y = -1;
-            while ++y < size {
+        x = -1; while ++x < grid.res {
+            uint32 y = -1; while ++y < size {
 
                 let p1 = grid.data[getIndex(grid.res, x, y)];
                 let p2 = grid.data[getIndex(grid.res, x, y + 1)];
@@ -210,10 +213,8 @@ VoxelMesh generateMesh(VoxelGrid grid) {
             }
         }
 
-        x = -1;
-        while ++x < size {
-            uint32 y = -1;
-            while ++y < grid.res {
+        x = -1; while ++x < size {
+            uint32 y = -1; while ++y < grid.res {
 
                 let p1 = grid.data[getIndex(grid.res, x, y)];
                 let p2 = grid.data[getIndex(grid.res, x + 1, y)];
@@ -233,8 +234,52 @@ VoxelMesh generateMesh(VoxelGrid grid) {
         }
     }
 
-    vmesh.inds = inds;
-    vmesh.mesh = createMesh(vmesh.verts, vmesh.numVerts, inds, length(inds));
-    return vmesh;
+    updateMeshData(*vmesh.mesh, vmesh.verts, vmesh.numVerts, vmesh.inds, length(vmesh.inds));
 }
 
+void VoxelGrid_addCircle(VoxelGrid grid, float32 radius, float32 x, float32 y) {
+
+    int32 iradius = (radius + 1) as int32;
+    uint32 x_min = clamp((x + 0.5) as int32 - iradius, 0, grid.res as int32) as uint32;
+    uint32 x_max = clamp((x + 0.5) as int32 + iradius, 0, grid.res as int32) as uint32;
+    uint32 y_min = clamp((y + 0.5) as int32 - iradius, 0, grid.res as int32) as uint32;
+    uint32 y_max = clamp((y + 0.5) as int32 + iradius, 0, grid.res as int32) as uint32;
+
+    uint32 ix = x_min-1; while ++ix < x_max {
+        uint32 iy = y_min-1; while ++iy < y_max {
+            float32 xf = ix as float32 - x;
+            float32 yf = iy as float32 - y;
+            float32 len = sqrtf(xf*xf + yf*yf);
+
+            uint32 i = ix * grid.res + iy;
+            grid.data[i] = clamp(radius - len, 0, 1);
+        }
+    }
+}
+
+int32 point_intersects(vec2 point, VoxelGrid grid) {
+    uint32 x = point.x as uint32;
+    uint32 y = point.y as uint32;
+
+    let i1 = getIndex(grid.res, x, y + 1);
+    let i2 = getIndex(grid.res, x + 1, y + 1);
+    let i3 = getIndex(grid.res, x, y);
+    let i4 = getIndex(grid.res, x + 1, y);
+
+    let p1 = grid.data[i1];
+    let p2 = grid.data[i2];
+    let p3 = grid.data[i3];
+    let p4 = grid.data[i4];
+
+    uint8 mask = 0;
+    if p1 > PointOnThreshold mask |= TopLeftBit;
+    if p2 > PointOnThreshold mask |= TopRightBit;
+    if p3 > PointOnThreshold mask |= BottomLeftBit;
+    if p4 > PointOnThreshold mask |= BottomRightBit;
+
+    switch mask {
+        case 0x0F: return true;
+    }
+
+    return false;
+}
