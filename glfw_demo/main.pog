@@ -1,6 +1,26 @@
 
-vec2 cam_pos;
-float32 cam_zoom = 40f;
+struct Camera {
+    vec2 pos;
+    float32 rot;
+    float32 zoom;
+}
+Camera camera;
+
+void applyCamera() {
+    glUniform1f(glGetUniformLocation(shader, "zoom"), camera.zoom);
+    glUniform2f(glGetUniformLocation(shader, "cam_pos"), camera.pos.x, camera.pos.y);
+    glUniform1f(glGetUniformLocation(shader, "cam_rot"), camera.rot);
+}
+
+struct Transform {
+    vec2 pos;
+    float32 rot;
+    float32 scale;
+}
+
+vec2 up(Transform t) {
+    return vec(-sinf(t.rot), cosf(t.rot));
+}
 
 const entitiesCapacity = 256;
 int32 entitiesLength = 0;
@@ -21,11 +41,6 @@ Entity* appendEntity(Entity e) {
     return res;
 }
 
-
-void GLFWscrollfunCallback(GLFWwindow* window, float64 x, float64 y) {
-    cam_zoom -= cam_zoom * (y as float32) * 0.1;
-    cam_zoom = clamp(cam_zoom, 1.0, 10000.0);
-}
 
 Mesh genCircle(int32 res, float32 radius) {
     uint32 vertsCount = res as uint32 + 1u;
@@ -71,6 +86,7 @@ Planet genPlanet(float32 radius, float32 dist, float32 year) {
 
 void drawPlanet(Planet* planet) {
     glUniform2f(glGetUniformLocation(shader, "entity_pos"), planet.pos.x, planet.pos.y);
+    glUniform1f(glGetUniformLocation(shader, "entity_rot"), planet.rot);
     drawMesh(planet.mesh);
 }
 
@@ -89,16 +105,6 @@ struct Planet {
     float32 dist;
     float32 yearDuration;
     float32 orbitOffset;
-}
-
-int32 key(char c) {
-    return glfwGetKey(window, c as int32);
-}
-
-const Left_Mouse = 0;
-const Right_Mouse = 1;
-int32 mouse(int32 btn) {
-    return glfwGetMouseButton(window, btn);
 }
 
 void updateEntity(Entity* entity) {
@@ -127,12 +133,15 @@ void updateEntity(Entity* entity) {
             entity.vel = add(entity.vel, mul(normal, -dot(entity.vel, normal))); // cancel velocity in direction of surface
         }
     }
-
-    cam_pos = player.pos;
-    glUniform2f(glGetUniformLocation(shader, "cam_pos"), cam_pos.x, cam_pos.y);
 }
 
 void load() {
+
+    camera.rot = 0;
+    camera.zoom = 40;
+
+    glfwSetScrollCallback(window, mouse_scrollCallback);
+
     entities = malloc(sizeof(Entity) * entitiesCapacity);
     planets = malloc(sizeof(Planet) * planetsCount);
 
@@ -148,7 +157,8 @@ void load() {
 
     Entity entity;
     entity.mesh = genCircle(4, 0.1f);
-
+    entity.pos.x = 0;
+    entity.pos.y = 0;
     player = appendEntity(entity);
 
     voxelGrid = generatePlanet();
@@ -187,7 +197,6 @@ VoxelMesh voxelMesh;
 Mesh voxelMesh_circle;
 
 int32 main() {
-
     if !glfwInit() return -1;
 
     let width = 1600;
@@ -227,10 +236,6 @@ int32 main() {
 
         player.vel = add(player.vel, mul(wasd, 0.01));
 
-        // cam_pos.x += wasd.x * 0.05 * cam_zoom;
-        // cam_pos.y += wasd.y * 0.05 * cam_zoom;
-
-        glUniform1f(glGetUniformLocation(shader, "zoom"), cam_zoom);
 
         int32 w;
         int32 h;
@@ -253,20 +258,35 @@ int32 main() {
 
         i = 0;
         while i < entitiesLength {
-            let e = *entities[i];
+            let e = *entities[i++];
             updateEntity(e);
-            glUniform2f(glGetUniformLocation(shader, "entity_pos"), e.pos.x, e.pos.y);
-            drawMesh(e.mesh);
-            i++;
         }
+
+        if key('Q') camera.rot += 0.05;
+        if key('E') camera.rot -= 0.05;
+
+        camera.pos = player.pos;
+        applyCamera();
+
+        i = 0;
+        while i < entitiesLength {
+            let e = *entities[i++];
+            glUniform2f(glGetUniformLocation(shader, "entity_pos"), e.pos.x, e.pos.y);
+            glUniform1f(glGetUniformLocation(shader, "entity_rot"), e.rot);
+            drawMesh(e.mesh);
+        }
+
 
         { // voxels
 
+            let mouseCoord = getMouseWorldCoord();
+
             if mouse(Left_Mouse) {
-                uint32 x = (player.pos.x + 0.5) as uint32;
-                uint32 y = (player.pos.y + 0.5) as uint32;
+                uint32 x = (mouseCoord.x + 0.5) as uint32;
+                uint32 y = (mouseCoord.y + 0.5) as uint32;
                 if x < voxelGrid.res and y < voxelGrid.res {
-                    voxelGrid.data[x * voxelGrid.res + y] = 0.5;
+                    // voxelGrid.data[x * voxelGrid.res + y] = 0.5;
+                    VoxelGrid_addCircle(voxelGrid, 3, mouseCoord.x, mouseCoord.y);
                     updateGridMesh(voxelGrid, *voxelMesh);
                 }
             } else if mouse(Right_Mouse) {

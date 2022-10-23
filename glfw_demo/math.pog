@@ -33,6 +33,13 @@ struct vec2 {
     float32 y;
 }
 
+vec2 vec(float32 x, float32 y) {
+    vec2 res;
+    res.x = x;
+    res.y = y;
+    return res;
+}
+
 vec2 sub(vec2 a, vec2 b) {
     vec2 r;
     r.x = a.x - b.x;

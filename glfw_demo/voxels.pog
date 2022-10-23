@@ -241,18 +241,19 @@ void VoxelGrid_addCircle(VoxelGrid grid, float32 radius, float32 x, float32 y) {
 
     int32 iradius = (radius + 1) as int32;
     uint32 x_min = clamp((x + 0.5) as int32 - iradius, 0, grid.res as int32) as uint32;
-    uint32 x_max = clamp((x + 0.5) as int32 + iradius, 0, grid.res as int32) as uint32;
+    uint32 x_max = clamp((x + 0.5) as int32 + iradius, 0, grid.res as int32 - 1) as uint32;
     uint32 y_min = clamp((y + 0.5) as int32 - iradius, 0, grid.res as int32) as uint32;
-    uint32 y_max = clamp((y + 0.5) as int32 + iradius, 0, grid.res as int32) as uint32;
+    uint32 y_max = clamp((y + 0.5) as int32 + iradius, 0, grid.res as int32 - 1) as uint32;
 
-    uint32 ix = x_min-1; while ++ix < x_max {
-        uint32 iy = y_min-1; while ++iy < y_max {
+    uint32 ix = x_min-1; while ++ix <= x_max {
+        uint32 iy = y_min-1; while ++iy <= y_max {
             float32 xf = ix as float32 - x;
             float32 yf = iy as float32 - y;
             float32 len = sqrtf(xf*xf + yf*yf);
 
             uint32 i = ix * grid.res + iy;
-            grid.data[i] = clamp(radius - len, 0, 1);
+            float32 addition = clamp(radius - len, 0, 1);
+            if grid.data[i] < addition grid.data[i] = addition;
         }
     }
 }

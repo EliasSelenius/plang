@@ -89,7 +89,6 @@ void loadGL() {
     shaderInfoLog = malloc(shaderInfoLogSize);
 
     glfwSetFramebufferSizeCallback(window, GLFWframebuffersizefunCallback);
-    glfwSetScrollCallback(window, GLFWscrollfunCallback);
 
     shader = createShader();
     glUseProgram(shader);
