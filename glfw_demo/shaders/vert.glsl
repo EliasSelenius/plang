@@ -12,6 +12,7 @@ uniform float zoom = 1.0;
 
 uniform vec2 entity_pos;
 uniform float entity_rot = 0;
+uniform float entity_scale = 1;
 
 mat3 createMatrix(vec2 pos, float rot, float scale) {
     float c = cos(rot) * scale;
@@ -37,7 +38,7 @@ void main() {
 
     vec3 v = vec3(aPos, 1);
 
-    v *= createMatrix(entity_pos, entity_rot, 1);
+    v *= createMatrix(entity_pos, entity_rot, entity_scale);
     v *= createMatrixInv(cam_pos, cam_rot, zoom);
 
     v.x *= aspect;

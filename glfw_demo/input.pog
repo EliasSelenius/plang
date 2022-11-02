@@ -21,18 +21,19 @@ vec2 getMouseWorldCoord() {
     float32 x = cx as float32 / w * 2 - 1;
     float32 y = -(cy as float32 / h * 2 - 1);
 
-    x *= 16.0 / 9.0;
+    x *= w as float32 / h;  // 16.0 / 9.0;
 
-    float32 c = cosf(camera.rot) * camera.zoom;
-    float32 s = sinf(camera.rot) * camera.zoom;
-    vec2 res;
-    res.x = c*x + s*y + camera.pos.x;
-    res.y = -s*x + c*y + camera.pos.y;
+    // float32 c = cosf(camera.rot) * camera.zoom;
+    // float32 s = sinf(camera.rot) * camera.zoom;
+    // vec2 res;
+    // res.x = c*x + s*y + camera.pos.x;
+    // res.y = -s*x + c*y + camera.pos.y;
+    let res = local2world(camera, x, y);
     return res;
 }
 
 void mouse_scrollCallback(GLFWwindow* w, float64 x, float64 y) {
-    camera.zoom -= camera.zoom * (y as float32) * 0.1;
-    camera.zoom = clamp(camera.zoom, 1.0, 10000.0);
+    camera.scale -= camera.scale * (y as float32) * 0.1;
+    camera.scale = clamp(camera.scale, 1.0, 10000.0);
 
 }

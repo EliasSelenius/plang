@@ -28,10 +28,10 @@ int32 clamp(int32 t, int32 min, int32 max) {
     return t < min ? min : t > max ? max : t;
 }
 
-struct vec2 {
-    float32 x;
-    float32 y;
-}
+int32 round2int(float32 x) { return (x + 0.5) as int32; }
+
+struct vec2 { float32 x, y; }
+struct ivec2 { int32 x, y; }
 
 vec2 vec(float32 x, float32 y) {
     vec2 res;
@@ -40,51 +40,13 @@ vec2 vec(float32 x, float32 y) {
     return res;
 }
 
-vec2 sub(vec2 a, vec2 b) {
-    vec2 r;
-    r.x = a.x - b.x;
-    r.y = a.y - b.y;
-    return r;
-}
+vec2 sub(vec2 a, vec2 b) { return vec(a.x - b.x, a.y - b.y); }
+vec2 add(vec2 a, vec2 b) { return vec(a.x + b.x, a.y + b.y); }
+vec2 mul(vec2 a, vec2 b) { return vec(a.x * b.x, a.y * b.y); }
+vec2 mul(vec2 a, float32 s) { return vec(a.x * s, a.y * s); }
 
-vec2 add(vec2 a, vec2 b) {
-    vec2 r;
-    r.x = a.x + b.x;
-    r.y = a.y + b.y;
-    return r;
-}
-
-vec2 mul(vec2 a, vec2 b) {
-    vec2 r;
-    r.x = a.x * b.x;
-    r.y = a.y * b.y;
-    return r;
-}
-
-vec2 mul(vec2 a, float32 s) {
-    vec2 r = a;
-    r.x *= s;
-    r.y *= s;
-    return r;
-}
-
-
-float32 dot(vec2 a, vec2 b) {
-    return a.x * b.x + a.y * b.y;
-}
-
-float32 sqlength(vec2 a) {
-    return dot(a, a);
-}
-
-float32 length(vec2 a) {
-    return sqrtf(dot(a, a));
-}
-
-vec2 normalize(vec2 a) {
-    return mul(a, 1.0 / length(a));
-}
-
-vec2 reflect(vec2 a, vec2 normal) {
-    return add(a, mul(normal, dot(a, normal) * -2.0));
-}
+float32 dot(vec2 a, vec2 b) { return a.x * b.x + a.y * b.y; }
+float32 sqlength(vec2 a) { return dot(a, a); }
+float32 length(vec2 a) { return sqrtf(dot(a, a)); }
+vec2 normalize(vec2 a) { return mul(a, 1.0 / length(a)); }
+vec2 reflect(vec2 a, vec2 normal) { return add(a, mul(normal, dot(a, normal) * -2.0)); }

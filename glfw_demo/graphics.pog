@@ -4,15 +4,9 @@ char* shaderInfoLog = null;
 
 GLFWwindow* window;
 uint32 shader;
-uint32 vbo;
-uint32 ebo;
-uint32 vao;
-
 
 struct Mesh {
-    uint32 vao;
-    uint32 vbo;
-    uint32 ebo;
+    uint32 vao, vbo, ebo;
 
     int32 elementsCount;
 }

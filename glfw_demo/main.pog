@@ -1,13 +1,16 @@
 
-struct Camera {
-    vec2 pos;
-    float32 rot;
-    float32 zoom;
-}
-Camera camera;
+/*
+    TODO:
+        - 2d noise function
+        - basic planet generation, using noise
+        - point to voxelgrid intersection func
+        - player controller (gravity, collision, jump, jetpack)
+*/
+
+Transform camera;
 
 void applyCamera() {
-    glUniform1f(glGetUniformLocation(shader, "zoom"), camera.zoom);
+    glUniform1f(glGetUniformLocation(shader, "zoom"), camera.scale);
     glUniform2f(glGetUniformLocation(shader, "cam_pos"), camera.pos.x, camera.pos.y);
     glUniform1f(glGetUniformLocation(shader, "cam_rot"), camera.rot);
 }
@@ -18,8 +21,38 @@ struct Transform {
     float32 scale;
 }
 
-vec2 up(Transform t) {
-    return vec(-sinf(t.rot), cosf(t.rot));
+void applyTransform(Transform t) {
+    glUniform2f(glGetUniformLocation(shader, "entity_pos"), t.pos.x, t.pos.y);
+    glUniform1f(glGetUniformLocation(shader, "entity_rot"), t.rot);
+    glUniform1f(glGetUniformLocation(shader, "entity_scale"), t.scale);
+}
+
+vec2 right(Transform t) { return vec(cosf(t.rot), sinf(t.rot)); }
+vec2 up(Transform t) { return vec(-sinf(t.rot), cosf(t.rot)); }
+
+vec2 local2world(Transform t, vec2 p) { return local2world(t, p.x, p.y); }
+vec2 local2world(Transform t, float32 x, float32 y) {
+    float32 c = cosf(t.rot) * t.scale;
+    float32 s = sinf(t.rot) * t.scale;
+
+    vec2 res;
+    res.x = c*x + s*y + t.pos.x;
+    res.y = -s*x + c*y + t.pos.y;
+    return res;
+}
+
+vec2 world2local(Transform t, vec2 p) { return world2local(t, p.x, p.y); }
+vec2 world2local(Transform t, float32 x, float32 y) {
+    float32 c = cosf(t.rot) / t.scale;
+    float32 s = sinf(t.rot) / t.scale;
+
+    float32 px = x - t.pos.x;
+    float32 py = y - t.pos.y;
+
+    vec2 res;
+    res.x = c*px - s*py;
+    res.y = c*py + s*px;
+    return res;
 }
 
 const entitiesCapacity = 256;
@@ -27,17 +60,27 @@ int32 entitiesLength = 0;
 Entity* entities;
 Entity* player;
 
+struct Entity {
+    Transform transform;
+    Mesh mesh;
+    vec2 vel;
+}
+
 const planetsCount = 16;
 Planet* planets;
 
-Entity* appendEntity(Entity e) {
+Entity* appendEntity(Mesh mesh) {
     if entitiesLength >= entitiesCapacity {
         println("Failed to append entity. Max limit reached.");
         return null;
     }
 
     let res = *entities[entitiesLength++];
-    @res = e;
+    res.transform.pos = vec(0, 0);
+    res.transform.scale = 1;
+    res.transform.rot = 0;
+    res.mesh = mesh;
+    res.vel = vec(0, 0);
     return res;
 }
 
@@ -90,13 +133,6 @@ void drawPlanet(Planet* planet) {
     drawMesh(planet.mesh);
 }
 
-struct Entity {
-    Mesh mesh;
-    vec2 pos;
-    float32 rot;
-    vec2 vel;
-}
-
 struct Planet {
     Mesh mesh;
     vec2 pos;
@@ -108,13 +144,13 @@ struct Planet {
 }
 
 void updateEntity(Entity* entity) {
-    entity.pos = add(entity.pos, entity.vel);
+    entity.transform.pos = add(entity.transform.pos, entity.vel);
 
     uint32 i = 0u;
     while i < planetsCount {
         Planet* planet = *planets[i++];
 
-        vec2 diff = sub(entity.pos, planet.pos);
+        vec2 diff = sub(entity.transform.pos, planet.pos);
         vec2 normal = normalize(diff);
 
         float32 intersection = length(diff) - planet.radius; // NOTE: we can neglect the entitys radius because its always 1.0
@@ -127,7 +163,7 @@ void updateEntity(Entity* entity) {
         if (intersection <= 0.0) {
 
             vec2 correction = mul(normal, -intersection);
-            entity.pos = add(entity.pos, correction);
+            entity.transform.pos = add(entity.transform.pos, correction);
 
             // entity.vel = reflect(entity.vel, normal); // bounce
             entity.vel = add(entity.vel, mul(normal, -dot(entity.vel, normal))); // cancel velocity in direction of surface
@@ -138,7 +174,7 @@ void updateEntity(Entity* entity) {
 void load() {
 
     camera.rot = 0;
-    camera.zoom = 40;
+    camera.scale = 40;
 
     glfwSetScrollCallback(window, mouse_scrollCallback);
 
@@ -155,23 +191,19 @@ void load() {
     }
 
 
-    Entity entity;
-    entity.mesh = genCircle(4, 0.1f);
-    entity.pos.x = 0;
-    entity.pos.y = 0;
-    player = appendEntity(entity);
+    player = appendEntity(genCircle(4, 0.1f));
 
     voxelGrid = generatePlanet();
-    voxelMesh = generateMesh(voxelGrid);
-    printf("%s %d\n", "VoxelMesh Tri Count:", length(voxelMesh.inds) / 3);
+    voxelGrid.transform.pos = vec(-20, 30);
+    voxelGrid.transform.rot = Pi / 4;
+    printf("%s %d\n", "Voxelgrid Tri Count:", length(voxelGrid.inds) / 3);
 
     voxelMesh_circle = genCircle(360, 40);
 }
 
 VoxelGrid generatePlanet() {
-    VoxelGrid grid;
-    grid.res = 100;
-    grid.data = alloc float32[grid.res * grid.res];
+    VoxelGrid grid = createVoxelGrid(100);
+    grid.transform.scale = 1;
 
     float32 half = grid.res as float32 / 2;
 
@@ -189,11 +221,11 @@ VoxelGrid generatePlanet() {
         }
     }
 
+    updateGridMesh(*grid);
     return grid;
 }
 
 VoxelGrid voxelGrid;
-VoxelMesh voxelMesh;
 Mesh voxelMesh_circle;
 
 int32 main() {
@@ -234,7 +266,11 @@ int32 main() {
 
         if key('F') { player.vel.x = 0.0; player.vel.y = 0.0; }
 
-        player.vel = add(player.vel, mul(wasd, 0.01));
+        float32 c = cosf(player.transform.rot);
+        float32 s = sinf(player.transform.rot);
+        vec2 dir = vec(dot(vec(c, s), wasd), dot(vec(-s, c), wasd));
+
+        player.vel = add(player.vel, mul(dir, 0.01));
 
 
         int32 w;
@@ -262,55 +298,48 @@ int32 main() {
             updateEntity(e);
         }
 
-        if key('Q') camera.rot += 0.05;
-        if key('E') camera.rot -= 0.05;
+        if key('Q') camera.rot -= 0.05;
+        if key('E') camera.rot += 0.05;
 
-        camera.pos = player.pos;
+        camera.pos = player.transform.pos;
+        player.transform.rot = camera.rot;
         applyCamera();
 
         i = 0;
         while i < entitiesLength {
             let e = *entities[i++];
-            glUniform2f(glGetUniformLocation(shader, "entity_pos"), e.pos.x, e.pos.y);
-            glUniform1f(glGetUniformLocation(shader, "entity_rot"), e.rot);
+            applyTransform(e.transform);
             drawMesh(e.mesh);
         }
 
 
         { // voxels
 
+            voxelGrid.transform.rot += 0.001;
+
             let mouseCoord = getMouseWorldCoord();
 
+            // if point_intersects(mouseCoord, *voxelGrid) {
+            //     let center = calcCenterOfMass(*voxelGrid);
+            //     glUniform2f(glGetUniformLocation(shader, "entity_pos"), center.x, center.y);
+            //     drawMesh(voxelMesh_circle);
+            // }
+
             if mouse(Left_Mouse) {
-                uint32 x = (mouseCoord.x + 0.5) as uint32;
-                uint32 y = (mouseCoord.y + 0.5) as uint32;
-                if x < voxelGrid.res and y < voxelGrid.res {
-                    // voxelGrid.data[x * voxelGrid.res + y] = 0.5;
-                    VoxelGrid_addCircle(voxelGrid, 3, mouseCoord.x, mouseCoord.y);
-                    updateGridMesh(voxelGrid, *voxelMesh);
-                }
+                VoxelGrid_addCircle(*voxelGrid, 3, mouseCoord.x, mouseCoord.y);
+                updateGridMesh(*voxelGrid);
             } else if mouse(Right_Mouse) {
-                uint32 x = (player.pos.x + 0.5) as uint32;
-                uint32 y = (player.pos.y + 0.5) as uint32;
-                if x < voxelGrid.res and y < voxelGrid.res {
-                    voxelGrid.data[x * voxelGrid.res + y] = 0;
-                    updateGridMesh(voxelGrid, *voxelMesh);
-                }
+                VoxelGrid_removeCircle(*voxelGrid, 3, mouseCoord.x, mouseCoord.y);
+                updateGridMesh(*voxelGrid);
             }
 
-            if key('T') {
-                VoxelGrid_addCircle(voxelGrid, 3, player.pos.x, player.pos.y);
-                updateGridMesh(voxelGrid, *voxelMesh);
-            }
-
-            glUniform2f(glGetUniformLocation(shader, "entity_pos"), 0, 0);
-            drawMesh(voxelMesh.mesh);
-            glBindVertexArray(voxelMesh.mesh.vao);
-            glDrawArrays(GL_POINTS, 0, voxelMesh.numVerts as int32);
+            // glUniform2f(glGetUniformLocation(shader, "entity_pos"), 0, 0);
+            applyTransform(voxelGrid.transform);
+            drawMesh(voxelGrid.mesh);
+            // Draw vertices as points
+            glBindVertexArray(voxelGrid.mesh.vao);
+            glDrawArrays(GL_POINTS, 0, voxelGrid.numVerts as int32);
             glBindVertexArray(0);
-            glUniform2f(glGetUniformLocation(shader, "entity_pos"), 50, 50);
-            // drawMesh(voxelMesh_circle);
-            // if point_intersects(player.pos, voxelGrid) { }
         }
 
         glfwSwapBuffers(window);
