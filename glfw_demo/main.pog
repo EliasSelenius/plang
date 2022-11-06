@@ -93,7 +93,7 @@ Mesh genCircle(int32 res, float32 radius) {
 
     int32 i = 1;
     while i < res + 1 {
-        float32 angle = (i as float32) * Tau / res;
+        float32 angle = i * Tau / res;
         verts[i].x = cosf(angle) * radius;
         verts[i].y = sinf(angle) * radius;
         ++i;

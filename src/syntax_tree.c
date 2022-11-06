@@ -70,6 +70,50 @@ static inline Datatype resolveTypeAmbiguity(Datatype type) {
     return type;
 }
 
+typedef struct { i32 min, max; } range;
+static bool range_overlap(range a, range b) {
+    return a.max >= b.min && a.min <= b.max;
+}
+static bool rangein(range this, range other) {
+    return this.min >= other.min && this.max <= other.max;
+}
+
+static range getNumericDomain(Datatype type) {
+
+    switch (type.kind) {
+        case Typekind_uint8:  return (range){ 0, 2 };
+        case Typekind_uint16: return (range){ 0, 4 };
+        case Typekind_uint32: return (range){ 0, 8 };
+        case Typekind_uint64: return (range){ 0, 16 };
+
+        case Typekind_int8:  return (range){ -1, 1 };
+        case Typekind_int16: return (range){ -2, 2 };
+        case Typekind_int32: return (range){ -4, 4 };
+        case Typekind_int64: return (range){ -8, 8 };
+
+        default: break;
+    }
+
+    return (range){ 0, 0 };
+}
+
+static bool isIntegralType(Datatype type) {
+    switch (type.kind) {
+        case Typekind_uint8:  return true;
+        case Typekind_uint16: return true;
+        case Typekind_uint32: return true;
+        case Typekind_uint64: return true;
+
+        case Typekind_int8:  return true;
+        case Typekind_int16: return true;
+        case Typekind_int32: return true;
+        case Typekind_int64: return true;
+
+        default: break;
+    }
+
+    return false;
+}
 
 
 typedef struct Node {

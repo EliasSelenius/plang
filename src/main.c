@@ -22,7 +22,6 @@
         - unions
         *- fixed sized arrays as struct fields
         - local consts
-        *- implicit casts of numeric types
 
     InProgress:
         - "plang build" CLI. build all .pog files in directory. let output exe be named the name of the directory
@@ -32,6 +31,7 @@
 
 
     DONE list:
+        *- implicit casts of numeric types
         *- built-in print() function
         *- switch statements
         *- bitwise assignments

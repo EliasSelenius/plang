@@ -222,10 +222,19 @@ static bool typeAssignable(Datatype toType, Datatype fromType) {
         default: return false;
     }
 
-    // TODO: complete all numeric casts
-    if (toType.kind == Typekind_uint64) {
-        if (fromType.kind == Typekind_uint32) return true;
+    if (isIntegralType(fromType)) {
+
+        if (toType.kind == Typekind_float32 ||
+            toType.kind == Typekind_float64) return true;
+
+        if (isIntegralType(toType))
+            if (rangein(getNumericDomain(fromType), getNumericDomain(toType)))
+                return true;
+
+        return false;
     }
+
+    if (fromType.kind == Typekind_float32 && toType.kind == Typekind_float64) return true; else return false;
 
     return false;
 }

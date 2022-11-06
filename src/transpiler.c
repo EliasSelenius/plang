@@ -96,7 +96,9 @@ static void transpileFuncCall(FuncCall* call) {
     sbAppend(sb, ")");
 }
 
-static char* getFormatTypeSpecifier(Datatype datatype) {
+static char* getFormatTypeSpecifier(Datatype type) {
+    Datatype datatype = dealiasType(type);
+
     if (datatype.numPointers == 1) if (datatype.kind == Typekind_char) return "%s";
 
     if (datatype.numPointers == 0) {

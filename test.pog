@@ -1,6 +1,4 @@
 
-declare void printf(char* format);
-
 OpaqueType* ot;
 
 type OpaqueType;
@@ -9,11 +7,12 @@ type func = void(OpaqueType*);
 const Foo = 0x1FFaBC09;
 
 void take_opaque(OpaqueType* ot) {
-    printf("Hello, Opaque\n");
+    print("Hello, Opaque\n");
 }
 
 void reg(func f) {
-    printf("reg\n");
+    print("reg\n");
+    f(null);
 }
 
 int32 main() {
@@ -26,7 +25,19 @@ int32 main() {
     reg(take_opaque);
 
 
-    printf("Hello, Sailor!\n");
+    print("Hello, Sailor!\n");
+
+    Test t;
+    t.x = 543.32;
+
+    print("Hello ", f, 5, " ", t.x, "yes");
+
 
     return 0;
+}
+
+struct Test {
+    float32 x, y, z, w;
+    float64 i, j, k;
+    OpaqueType* o1, o2;
 }

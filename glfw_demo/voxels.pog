@@ -314,7 +314,7 @@ vec2 calcCenterOfMass(VoxelGrid* grid) {
             float32 value = grid.data[i];
             if value > PointOnThreshold {
                 total += value;
-                res = add(res, mul(vec(x as float32, y as float32), value));
+                res = add(res, mul(vec(x, y), value));
             }
         }
     }

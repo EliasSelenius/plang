@@ -49,11 +49,11 @@ Mesh createMesh(vec2* verts, uint32 vertsCount, uint32* inds, uint32 indsCount) 
 
     glGenBuffers(1, *mesh.vbo);
     glBindBuffer(GL_ARRAY_BUFFER , mesh.vbo);
-    glBufferData(GL_ARRAY_BUFFER, (sizeof(vec2) * vertsCount) as int64, verts, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vec2) * vertsCount, verts, GL_STATIC_DRAW);
 
     glGenBuffers(1, *mesh.ebo);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh.ebo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, (sizeof(uint32) * indsCount) as int64, inds, GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint32) * indsCount, inds, GL_STATIC_DRAW);
 
     glEnableVertexAttribArray(0u);
     glVertexAttribPointer(0u, 2, GL_FLOAT, false as uint8, 8, null);
@@ -67,11 +67,11 @@ void updateMeshData(Mesh* mesh, vec2* verts, uint32 vertsCount, uint32* inds, ui
     mesh.elementsCount = indsCount as int32;
 
     glBindBuffer(GL_ARRAY_BUFFER , mesh.vbo);
-    glBufferData(GL_ARRAY_BUFFER, (sizeof(vec2) * vertsCount) as int64, verts, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vec2) * vertsCount, verts, GL_STATIC_DRAW);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh.ebo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, (sizeof(uint32) * indsCount) as int64, inds, GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint32) * indsCount, inds, GL_STATIC_DRAW);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
 }
