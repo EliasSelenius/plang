@@ -8,24 +8,15 @@ declare uint64 ftell(void* stream);
 declare void rewind(void* stream);
 declare uint64 fread(void* buffer, uint64 elementSize, uint64 elementCount, void* stream);
 
-declare void printf(char* format, char* arg1, uint32 arg2);
 declare void* calloc(uint64 count, uint64 size);
 declare void* malloc(uint64 size);
 declare void* realloc(void* buffer, uint64 size);
 declare void* memcpy(void* dst, void* src, uint64 size);
 
-void println(char* str) {
-    printf("%s\n", str, 0u);
-}
-
-void printNum(uint32 num) {
-    printf("%s%d", "", num);
-}
-
 char* fileread(char* filename) {
     void* stream;
     if (fopen_s(*stream, filename, "r")) {
-        println("Could not open file");
+        print("Could not open file");
         return null;
     }
 

@@ -96,6 +96,50 @@ static void transpileFuncCall(FuncCall* call) {
     sbAppend(sb, ")");
 }
 
+static char* getFormatTypeSpecifier(Datatype datatype) {
+    if (datatype.numPointers == 1) if (datatype.kind == Typekind_char) return "%s";
+
+    if (datatype.numPointers == 0) {
+        switch (datatype.kind) {
+            case Typekind_AmbiguousDecimal: return "%f";
+            case Typekind_AmbiguousInteger: return "%d";
+
+            case Typekind_uint16: return "%hu";
+            case Typekind_uint32: return "%u";
+            case Typekind_uint64: return "%llu";
+            case Typekind_int16: return "%hd";
+            case Typekind_int32: return "%d";
+            case Typekind_int64: return "%lld";
+
+            case Typekind_float32: return "%f";
+            case Typekind_float64: return "%Lf";
+
+            case Typekind_char: return "%c";
+
+            default: break;
+        }
+    }
+
+    return "<print_error>";
+}
+
+static void transpilePrint(Expression** args) {
+    sbAppend(sb, "printf(\"");
+
+    foreach (item, args) {
+        Expression* arg = *item;
+        sbAppend(sb, getFormatTypeSpecifier(arg->datatype));
+    }
+    sbAppend(sb, "\"");
+
+    foreach (arg, args) {
+        sbAppend(sb, ", ");
+        transpileExpression(*arg);
+    }
+
+    sbAppend(sb, ")");
+}
+
 static void transpileExpression(Expression* expr) {
 
     switch (expr->expressionType) {
@@ -257,6 +301,15 @@ static void transpileExpression(Expression* expr) {
         case ExprType_FuncPointerCall:
         case ExprType_FuncCall: {
             FuncCall* fc = (FuncCall*)expr;
+
+            if (fc->funcExpr->expressionType == ExprType_Variable) {
+                Identifier name = ((VariableExpression*)fc->funcExpr)->name;
+                if (name == builtin_print_name) {
+                    transpilePrint(fc->args);
+                    break;
+                }
+            }
+
             transpileFuncCall(fc);
         } break;
 
@@ -275,7 +328,7 @@ static void transpileExpression(Expression* expr) {
 }
 
 static void transpileCondition(Expression* cond) {
-    if (isBinaryExpression(cond)) {
+    if (cond->expressionType == ExprType_Parenthesized || isBinaryExpression(cond)) {
         transpileExpression(cond);
     } else {
         sbAppend(sb, "(");
@@ -368,7 +421,7 @@ static void transpileStatement(Statement* statement) {
         case Statement_Switch: {
             SwitchStatement* switchSta = (SwitchStatement*)statement;
             sbAppend(sb, "switch ");
-            transpileExpression(switchSta->expr);
+            transpileCondition(switchSta->expr);
             sbAppend(sb, " ");
             transpileBlock(&switchSta->scope);
         } break;

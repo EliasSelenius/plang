@@ -1,4 +1,5 @@
 
+static u32 appendStringToStringtable(StrSpan word);
 
 static char* g_Filename;
 static Token* tokens; // darray
@@ -17,6 +18,9 @@ static u32 type_name_float64 = 0;
 static u32 type_name_char = 0;
 static u32 type_name_void = 0;
 
+
+static u32 builtin_print_name = 0;
+
 static void initTypenames() {
     type_name_int8    = appendStringToStringtable(spFrom("int8"));
     type_name_uint8   = appendStringToStringtable(spFrom("uint8"));
@@ -30,4 +34,6 @@ static void initTypenames() {
     type_name_float64 = appendStringToStringtable(spFrom("float64"));
     type_name_char    = appendStringToStringtable(spFrom("char"));
     type_name_void    = appendStringToStringtable(spFrom("void"));
+
+    builtin_print_name = appendStringToStringtable(spFrom("print"));
 }

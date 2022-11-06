@@ -6,12 +6,11 @@
     TODO list:
         - localy defined structs
         *- clasic for loop: for (int i = 0; i < 10; i++)
-        - for in range loop: for (i in 0..10)
+        *- for in range loop: for (i in 0..10)
         - for int loop: for (12) { }
         - loop block: loop { } == while (true) { }
         - modules or namespaces ?
         - allow underscores in number literals
-        *- switch statements
         - nested multi-line comments
         - disallow void as variable type in declaration
         - nesting funcptr types inside funcptrs arguments. void(void*(char*), uint) seems to produce a bug
@@ -23,6 +22,7 @@
         - unions
         *- fixed sized arrays as struct fields
         - local consts
+        *- implicit casts of numeric types
 
     InProgress:
         - "plang build" CLI. build all .pog files in directory. let output exe be named the name of the directory
@@ -32,6 +32,8 @@
 
 
     DONE list:
+        *- built-in print() function
+        *- switch statements
         *- bitwise assignments
         *- transpile decimal literals
         *- parse hex literals

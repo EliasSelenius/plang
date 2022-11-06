@@ -71,7 +71,7 @@ Planet* planets;
 
 Entity* appendEntity(Mesh mesh) {
     if entitiesLength >= entitiesCapacity {
-        println("Failed to append entity. Max limit reached.");
+        print("Failed to append entity. Max limit reached.");
         return null;
     }
 
@@ -196,7 +196,7 @@ void load() {
     voxelGrid = generatePlanet();
     voxelGrid.transform.pos = vec(-20, 30);
     voxelGrid.transform.rot = Pi / 4;
-    printf("%s %d\n", "Voxelgrid Tri Count:", length(voxelGrid.inds) / 3);
+    print("Voxelgrid Tri Count: ", length(voxelGrid.inds) / 3, "\n");
 
     voxelMesh_circle = genCircle(360, 40);
 }
@@ -249,7 +249,7 @@ int32 main() {
     load();
 
     let error = glGetError();
-    if error printf("%s %d\n", "OpenGL error.", error);
+    if error print("OpenGL error. ", error, "\n");
 
     while !glfwWindowShouldClose(window) {
 
@@ -315,7 +315,7 @@ int32 main() {
 
         { // voxels
 
-            voxelGrid.transform.rot += 0.001;
+            voxelGrid.transform.rot += 0.01;
 
             let mouseCoord = getMouseWorldCoord();
 

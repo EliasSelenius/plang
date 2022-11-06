@@ -230,8 +230,8 @@ vec2 getLocalCoords(VoxelGrid* grid, float32 x, float32 y) {
 void VoxelGrid_addCircle(VoxelGrid* grid, float32 radius, float32 x, float32 y) {
 
     let p = getLocalCoords(grid, x, y);
-    int32 rx = round2int(x);
-    int32 ry = round2int(y);
+    int32 rx = round2int(p.x);
+    int32 ry = round2int(p.y);
 
     int32 iradius = (radius + 1) as int32;
     uint32 x_min = clamp(rx - iradius, 0, grid.res as int32) as uint32;
@@ -255,8 +255,8 @@ void VoxelGrid_addCircle(VoxelGrid* grid, float32 radius, float32 x, float32 y) 
 void VoxelGrid_removeCircle(VoxelGrid* grid, float32 radius, float32 x, float32 y) {
 
     let p = getLocalCoords(grid, x, y);
-    int32 rx = round2int(x);
-    int32 ry = round2int(y);
+    int32 rx = round2int(p.x);
+    int32 ry = round2int(p.y);
 
     int32 iradius = (radius + 1) as int32;
     uint32 x_min = clamp(rx - iradius, 0, grid.res as int32) as uint32;

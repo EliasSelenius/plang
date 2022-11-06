@@ -280,13 +280,14 @@ static Datatype validateFuncCall(FuncCall* call) {
 
     // validate passed arguments
     u32 passedArgumentsLength = call->args ? darrayLength(call->args) : 0;
-    Datatype passedArguments[passedArgumentsLength];
+    Datatype passedArguments[passedArgumentsLength]; // TODO: we store the datatype in Expression now, so we can change this code.
     for (u32 i = 0; i < passedArgumentsLength; i++) passedArguments[i] = validateExpression(call->args[i]);
 
 
     if (call->funcExpr->expressionType != ExprType_Variable) goto funcptrPart;
     Identifier name = ((VariableExpression*)call->funcExpr)->name;
 
+    if (name == builtin_print_name) return type_void;
 
     // look for function with possible overloads
     u32 len = darrayLength(g_Unit->functions);
@@ -362,7 +363,7 @@ static Datatype validateFuncCall(FuncCall* call) {
     return type_invalid;
 }
 
-static Datatype validateExpression(Expression* expr) {
+static Datatype _validateExpression(Expression* expr) {
     switch (expr->expressionType) {
         case ExprType_Constant:
         case ExprType_Variable: {
@@ -556,6 +557,11 @@ static Datatype validateExpression(Expression* expr) {
     // this should never happen
     error_node(expr, "Unknown expression type. This is a bug!");
     return type_invalid;
+}
+
+static Datatype validateExpression(Expression* expr) {
+    expr->datatype = _validateExpression(expr);
+    return expr->datatype;
 }
 
 static void validateStatement(Statement* sta) {

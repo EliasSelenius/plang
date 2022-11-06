@@ -99,13 +99,13 @@ void loadGL() {
 void opengl_debug_callback(GLenum source, GLenum _type, GLuint id, GLenum severity, GLsizei length, /*const*/ GLchar* message, /*const*/ void* userParam) {
 
     switch (_type) {
-        case GL_DEBUG_TYPE_ERROR: println("ERROR"); break;
-        case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR: println("DEPRECATED BEHAVIOR"); break;
-        case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR: println("UDEFINED BEHAVIOR"); break;
-        case GL_DEBUG_TYPE_PORTABILITY: println("PORTABILITY"); break;
-        case GL_DEBUG_TYPE_PERFORMANCE: println("PERFORMANCE"); break;
-        // case GL_DEBUG_TYPE_OTHER: println("OTHER"); break;
-        case GL_DEBUG_TYPE_MARKER: println("MARKER"); break;
+        case GL_DEBUG_TYPE_ERROR: print("ERROR"); break;
+        case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR: print("DEPRECATED BEHAVIOR"); break;
+        case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR: print("UDEFINED BEHAVIOR"); break;
+        case GL_DEBUG_TYPE_PORTABILITY: print("PORTABILITY"); break;
+        case GL_DEBUG_TYPE_PERFORMANCE: print("PERFORMANCE"); break;
+        // case GL_DEBUG_TYPE_OTHER: print("OTHER"); break;
+        case GL_DEBUG_TYPE_MARKER: print("MARKER"); break;
     }
 }
 
@@ -146,7 +146,7 @@ uint32 createShader() {
         if status == 0 {
             int32 len;
             glGetProgramInfoLog(program, shaderInfoLogSize, *len, shaderInfoLog);
-            println(shaderInfoLog);
+            print(shaderInfoLog);
         }
     }
 

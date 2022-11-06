@@ -331,58 +331,30 @@ static void expectFuncCallArgs(FuncCall* func, Expression* funcExpr) {
 }
 
 
-
-static Expression* basicLiteral(ExprType type) {
-    LiteralExpression* lit = malloc(sizeof(LiteralExpression));
-    lit->base.expressionType = type;
-    lit->base.nodebase.lineNumber = tokens[token_index++].line;
-    return (Expression*)lit;
-}
-
-static LiteralExpression* createLiteral(ExprType type) {
-    LiteralExpression* lit = malloc(sizeof(LiteralExpression));
-    lit->base.nodebase.filepath = g_Filename;
-    lit->base.expressionType = type;
-    lit->base.nodebase.lineNumber = tokens[token_index].line;
-    return lit;
-}
-
-static UnaryExpression* createUnaryExpr(ExprType type) {
-    UnaryExpression* unary = malloc(sizeof(UnaryExpression));
-    unary->base.expressionType = type;
-    unary->base.nodebase.lineNumber = tokens[token_index++].line;
-    return unary;
-}
-
 static Expression* parseLeafExpression() {
     Expression* res = null;
 
     UnaryExpression* unary = null;
     switch (tokens[token_index].type) {
-        case Tok_Mul: unary = createUnaryExpr(ExprType_Unary_AddressOf); break;
-        case Tok_At: unary = createUnaryExpr(ExprType_Unary_ValueOf); break;
-        case Tok_ExclamationMark: unary = createUnaryExpr(ExprType_Unary_Not); break;
-        case Tok_PlusPlus: unary = createUnaryExpr(ExprType_Unary_PreIncrement); break;
-        case Tok_MinusMinus: unary = createUnaryExpr(ExprType_Unary_PreDecrement); break;
-        case Tok_Minus: unary = createUnaryExpr(ExprType_Unary_Negate); break;
-        case Tok_Tilde: unary = createUnaryExpr(ExprType_Unary_BitwiseNot); break;
+        case Tok_Mul: unary = allocExpr(ExprType_Unary_AddressOf); token_index++; break;
+        case Tok_At: unary = allocExpr(ExprType_Unary_ValueOf); token_index++; break;
+        case Tok_ExclamationMark: unary = allocExpr(ExprType_Unary_Not); token_index++; break;
+        case Tok_PlusPlus: unary = allocExpr(ExprType_Unary_PreIncrement); token_index++; break;
+        case Tok_MinusMinus: unary = allocExpr(ExprType_Unary_PreDecrement); token_index++; break;
+        case Tok_Minus: unary = allocExpr(ExprType_Unary_Negate); token_index++; break;
+        case Tok_Tilde: unary = allocExpr(ExprType_Unary_BitwiseNot); token_index++; break;
         default: break;
     }
 
     switch (tokens[token_index].type) {
         case Tok_Word: {
-            VariableExpression* ve = malloc(sizeof(VariableExpression));
-            ve->base.expressionType = ExprType_Variable;
-            ve->base.nodebase.lineNumber = tokens[token_index].line;
+            VariableExpression* ve = allocExpr(ExprType_Variable);
             ve->name = identifier();
             res = (Expression*)ve;
         } break;
 
         case Tok_Keyword_Alloc: {
-            AllocExpression* alloc = malloc(sizeof(AllocExpression));
-            alloc->base.expressionType = ExprType_Alloc;
-            alloc->base.nodebase.lineNumber = tokens[token_index].line;
-
+            AllocExpression* alloc = allocExpr(ExprType_Alloc);
             token_index++;
             alloc->type = expectType();
             alloc->sizeExpr = null;
@@ -395,9 +367,7 @@ static Expression* parseLeafExpression() {
         } break;
 
         case Tok_Keyword_Sizeof: {
-            SizeofExpression* sof = malloc(sizeof(SizeofExpression));
-            sof->base.expressionType = ExprType_Sizeof;
-            sof->base.nodebase.lineNumber = tokens[token_index].line;
+            SizeofExpression* sof = allocExpr(ExprType_Sizeof);
             token_index++;
 
             bool mustClose = false;
@@ -409,9 +379,8 @@ static Expression* parseLeafExpression() {
         } break;
 
         case Tok_OpenParen: {
-            ParenthesizedExpression* p = malloc(sizeof(ParenthesizedExpression));
-            p->base.expressionType = ExprType_Parenthesized;
-            p->base.nodebase.lineNumber = tokens[token_index++].line;
+            ParenthesizedExpression* p = allocExpr(ExprType_Parenthesized);
+            token_index++;
             p->innerExpr = expectExpression();
             expect(Tok_CloseParen);
 
@@ -420,59 +389,66 @@ static Expression* parseLeafExpression() {
 
 
         case Tok_Integer: {
-            LiteralExpression* lit = createLiteral(ExprType_Literal_Integer);
+            LiteralExpression* lit = allocExpr(ExprType_Literal_Integer);
             lit->integer = tokens[token_index++].integer;
             res = (Expression*)lit;
         } break;
         case Tok_Decimal: {
-            LiteralExpression* lit = createLiteral(ExprType_Literal_Decimal);
+            LiteralExpression* lit = allocExpr(ExprType_Literal_Decimal);
             lit->decimal = tokens[token_index++].decimal;
             res = (Expression*)lit;
         } break;
         case Tok_String: {
-            LiteralExpression* lit = createLiteral(ExprType_Literal_String);
+            LiteralExpression* lit = allocExpr(ExprType_Literal_String);
             lit->string = tokens[token_index++].stringTableByteOffset;
             res = (Expression*)lit;
         } break;
         case Tok_Char: {
-            LiteralExpression* lit = createLiteral(ExprType_Literal_Char);
+            LiteralExpression* lit = allocExpr(ExprType_Literal_Char);
             lit->character = tokens[token_index++].character;
             res = (Expression*)lit;
         } break;
 
-        case Tok_Keyword_True:  res = basicLiteral(ExprType_Literal_True); break;
-        case Tok_Keyword_False: res = basicLiteral(ExprType_Literal_False); break;
-        case Tok_Keyword_Null:  res = basicLiteral(ExprType_Literal_Null); break;
+        case Tok_Keyword_True:  res = allocExpr(ExprType_Literal_True); token_index++; break;
+        case Tok_Keyword_False: res = allocExpr(ExprType_Literal_False); token_index++; break;
+        case Tok_Keyword_Null:  res = allocExpr(ExprType_Literal_Null); token_index++; break;
 
         default: return null;
     }
 
     while (true) {
-        if (tok(Tok_Period)) {
-            DerefOperator* deref = malloc(sizeof(DerefOperator));
-            deref->base.expressionType = ExprType_Deref;
-            deref->base.nodebase.lineNumber = tokens[token_index - 1].line;
-            deref->expr = res;
-            deref->derefOp = null;
-            deref->name = identifier();
-            res = (Expression*)deref;
-        } else if (tok(Tok_OpenSquare)) {
-            IndexingExpression* ind = malloc(sizeof(IndexingExpression));
-            ind->base.expressionType = ExprType_Indexing;
-            ind->base.nodebase.lineNumber = tokens[token_index - 1].line;
-            ind->indexed = res;
-            ind->index = expectExpression();
-            expect(Tok_CloseSquare);
-            res = (Expression*)ind;
-        } else if (tok(Tok_OpenParen)) {
-            FuncCall* call = malloc(sizeof(FuncCall));
-            call->base.nodebase.filepath = g_Filename;
-            call->base.expressionType = ExprType_FuncCall;
-            expectFuncCallArgs(call, res);
-            res = (Expression*)call;
-        } else {
-            break;
+        switch (tokens[token_index].type) {
+            case Tok_Period: {
+                DerefOperator* deref = allocExpr(ExprType_Deref);
+                token_index++;
+
+                deref->expr = res;
+                deref->derefOp = null;
+                deref->name = identifier();
+                res = (Expression*)deref;
+            } continue;
+
+            case Tok_OpenSquare: {
+                IndexingExpression* ind = allocExpr(ExprType_Indexing);
+                token_index++;
+
+                ind->indexed = res;
+                ind->index = expectExpression();
+                expect(Tok_CloseSquare);
+                res = (Expression*)ind;
+            } continue;
+
+            case Tok_OpenParen: {
+                FuncCall* call = allocExpr(ExprType_FuncCall);
+                token_index++;
+
+                expectFuncCallArgs(call, res);
+                res = (Expression*)call;
+            } continue;
+
+            default: break;
         }
+        break;
     }
 
     if (unary) {
@@ -480,25 +456,27 @@ static Expression* parseLeafExpression() {
         res = (Expression*)unary;
     }
 
-    if (tok(Tok_PlusPlus)) {
-        UnaryExpression* unary = malloc(sizeof(UnaryExpression));
-        unary->base.expressionType = ExprType_Unary_PostIncrement;
-        unary->base.nodebase.lineNumber = tokens[token_index-1].line;
-        unary->expr = res;
-        res = (Expression*)unary;
-    } else if (tok(Tok_MinusMinus)) {
-        UnaryExpression* unary = malloc(sizeof(UnaryExpression));
-        unary->base.expressionType = ExprType_Unary_PostDecrement;
-        unary->base.nodebase.lineNumber = tokens[token_index-1].line;
-        unary->expr = res;
-        res = (Expression*)unary;
+    switch (tokens[token_index].type) {
+        case Tok_PlusPlus: {
+            UnaryExpression* postInc = allocExpr(ExprType_Unary_PostIncrement);
+            token_index++;
+            postInc->expr = res;
+            res = (Expression*)postInc;
+        } break;
+
+        case Tok_MinusMinus: {
+            UnaryExpression* postDec = allocExpr(ExprType_Unary_PostDecrement);
+            token_index++;
+            postDec->expr = res;
+            res = (Expression*)postDec;
+        } break;
+
+        default: break;
     }
 
-    if (tok(Tok_Keyword_As)) {
-        CastExpression* cast = malloc(sizeof(CastExpression));
-        cast->base.expressionType = ExprType_Cast;
-        cast->base.nodebase.lineNumber = tokens[token_index - 1].line;
-
+    if (tokens[token_index].type == Tok_Keyword_As) {
+        CastExpression* cast = allocExpr(ExprType_Cast);
+        token_index++;
         cast->expr = res;
         cast->castToType = expectType();
         res = (Expression*)cast;
@@ -952,10 +930,15 @@ static PlangStruct expectStruct() {
         field.nodebase.lineNumber = tokens[token_index].line;
         field.type = expectType();
         field.name = identifier();
-        semicolon();
-
         darrayAdd(stru.fields, field);
 
+        while (tok(Tok_Comma)) {
+            field.nodebase.lineNumber = tokens[token_index].line;
+            field.name = identifier();
+            darrayAdd(stru.fields, field);
+        }
+
+        semicolon();
     } while (tokens[token_index].type != Tok_CloseCurl);
 
     token_index++;
