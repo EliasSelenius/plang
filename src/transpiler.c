@@ -1,6 +1,6 @@
 
 
-static void transpileBlock(Codeblock* scope);
+static void transpileScope(Scope* scope);
 static void transpileExpression(Expression* expr);
 static void transpileStatement(Statement* statement);
 
@@ -407,7 +407,7 @@ static void transpileStatement(Statement* statement) {
         } break;
 
         case Statement_Scope: {
-            transpileBlock(&((Scope*)statement)->codeblock);
+            transpileScope((Scope*)statement);
         } break;
         case Statement_If: {
             transpileIfStatement((IfStatement*)statement);
@@ -419,13 +419,35 @@ static void transpileStatement(Statement* statement) {
             sbAppend(sb, " ");
             transpileStatement(sta->statement);
         } break;
+        case Statement_ForIn: {
+            ForInStatement* forin = (ForInStatement*)statement;
+            char* name = getIdentifierStringValue(forin->index_name);
+
+            sbAppend(sb, "for (");
+            transpileType(forin->index_type);
+            sbAppend(sb, " ");
+            sbAppend(sb, name);
+            sbAppend(sb, " = ");
+            transpileExpression(forin->min_expr);
+            sbAppend(sb, "; ");
+
+            sbAppend(sb, name);
+            sbAppend(sb, " < ");
+            transpileExpression(forin->max_expr);
+            sbAppend(sb, "; ");
+
+            sbAppend(sb, name);
+            sbAppend(sb, "++) ");
+
+            transpileStatement(forin->statement);
+        } break;
 
         case Statement_Switch: {
             SwitchStatement* switchSta = (SwitchStatement*)statement;
             sbAppend(sb, "switch ");
             transpileCondition(switchSta->expr);
             sbAppend(sb, " ");
-            transpileBlock(&switchSta->scope);
+            transpileScope(switchSta->scope);
         } break;
 
         case Statement_Break: sbAppend(sb, "break;"); break;
@@ -472,7 +494,7 @@ static void transpileStatement(Statement* statement) {
     }
 }
 
-static void transpileBlock(Codeblock* scope) {
+static void transpileScope(Scope* scope) {
     sbAppend(sb, "{");
     tabing++;
 
@@ -488,24 +510,24 @@ static void transpileBlock(Codeblock* scope) {
     sbAppend(sb, "}");
 }
 
-static void transpileFunctionSignature(FuncDeclaration* func, u32 overload) {
-    transpileType(func->returnType);
+static void transpileFunctionSignature(Procedure* proc) {
+    transpileType(proc->returnType);
     sbAppend(sb, " ");
-    sbAppend(sb, getIdentifierStringValue(func->name));
-    if (overload) sbAppendChar(sb, getCharFromU32(overload));
+    sbAppend(sb, getIdentifierStringValue(proc->name));
+    if (proc->overload) sbAppendChar(sb, getCharFromU32(proc->overload));
     sbAppend(sb, "(");
-    if (func->arguments) {
+    if (proc->arguments) {
 
-        FuncArg arg = func->arguments[0];
+        FuncArg arg = proc->arguments[0];
         transpileType(arg.type);
         sbAppend(sb, " ");
         sbAppend(sb, getIdentifierStringValue(arg.name));
 
-        u32 len = darrayLength(func->arguments);
+        u32 len = darrayLength(proc->arguments);
         for (u32 i = 1; i < len; i++) {
             sbAppend(sb, ", ");
 
-            arg = func->arguments[i];
+            arg = proc->arguments[i];
             transpileType(arg.type);
             sbAppend(sb, " ");
             sbAppend(sb, getIdentifierStringValue(arg.name));
@@ -514,10 +536,10 @@ static void transpileFunctionSignature(FuncDeclaration* func, u32 overload) {
     sbAppend(sb, ")");
 }
 
-static void transpileFunction(PlangFunction* func) {
-    transpileFunctionSignature(&func->decl, func->overload);
+static void transpileProcedure(Procedure* proc) {
+    transpileFunctionSignature(proc);
     sbAppend(sb, " ");
-    transpileBlock(&func->scope);
+    transpileScope(proc->scope);
     newline();
 }
 
@@ -743,20 +765,13 @@ static void transpile() {
     }
 
     sbAppend(sb, "\n// Forward declarations\n");
-    u32 functionsLen = darrayLength(g_Unit->functions);
+    u32 functionsLen = darrayLength(g_Unit->procedures);
     for (u32 i = 0; i < functionsLen; i++) {
-        PlangFunction* func = &g_Unit->functions[i];
+        Procedure* proc = &g_Unit->procedures[i];
 
-        transpileFunctionSignature(&func->decl, func->overload);
+        transpileFunctionSignature(proc);
         sbAppend(sb, ";\n");
     }
-
-    u32 declsLength = darrayLength(g_Unit->functionDeclarations);
-    for (u32 i = 0; i < declsLength; i++) {
-        transpileFunctionSignature(&g_Unit->functionDeclarations[i], 0);
-        sbAppend(sb, ";\n");
-    }
-
 
     sbAppend(sb, "\n// Globals\n");
     u32 globLen = darrayLength(g_Unit->globalVariables);
@@ -768,8 +783,9 @@ static void transpile() {
     sbAppend(sb, "\n// Implementations\n");
 
     for (u32 i = 0; i < functionsLen; i++) {
-        PlangFunction* func = &g_Unit->functions[i];
-        transpileFunction(func);
+        Procedure* proc = &g_Unit->procedures[i];
+        if (!proc->scope) continue;
+        transpileProcedure(proc);
     }
 
 

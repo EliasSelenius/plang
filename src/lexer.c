@@ -122,6 +122,7 @@ static void lex(char* input) {
             else if (spanEquals(word, "as")) tokType = Tok_Keyword_As;
             else if (spanEquals(word, "const")) tokType = Tok_Keyword_Const;
             else if (spanEquals(word, "for")) tokType = Tok_Keyword_For;
+            else if (spanEquals(word, "in")) tokType = Tok_Keyword_In;
             else if (spanEquals(word, "switch")) tokType = Tok_Keyword_Switch;
             else if (spanEquals(word, "default")) tokType = Tok_Keyword_Default;
             else if (spanEquals(word, "case")) tokType = Tok_Keyword_Case;
@@ -270,7 +271,12 @@ static void lex(char* input) {
         switch (*cursor) {
 
             case ',': appendToken(Tok_Comma); continue;
-            case '.': appendToken(Tok_Period); continue;
+
+            case '.': switch (*(cursor + 1)) {
+                case '.': appendToken(Tok_Dotdot); cursor++; continue;
+                default: appendToken(Tok_Period); continue;
+            }
+
             case ';': appendToken(Tok_Semicolon); continue;
             case ':': appendToken(Tok_Colon); continue;
             case '?': appendToken(Tok_QuestionMark); continue;

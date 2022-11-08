@@ -12,7 +12,7 @@ static void error_v(u32 line, char* filename, char* format, va_list args) {
 static void error_temp(char* format, ...) {
     va_list args;
     va_start(args, format);
-    error_v(0, "", format, args);
+    error_v(0, "error_temp", format, args);
     va_end(args);
 }
 
@@ -44,7 +44,7 @@ static void error_node(void* node, char* format, ...) {
 
     va_list args;
     va_start(args, format);
-    // error_v(n->lineNumber, n->filepath, format, args);
-    error_v(0, "", format, args); // TODO: ...
+    error_v(n->lineNumber, n->filepath, format, args);
+    // error_v(0, "", format, args); // TODO: ...
     va_end(args);
 }

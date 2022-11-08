@@ -14,6 +14,7 @@ typedef enum TokenType {
     Tok_Keyword_Else,
     Tok_Keyword_While,
     Tok_Keyword_For,
+    Tok_Keyword_In,
     Tok_Keyword_Switch,
     Tok_Keyword_Case,
     Tok_Keyword_Default,
@@ -43,6 +44,7 @@ typedef enum TokenType {
 
     Tok_Comma,
     Tok_Period,
+    Tok_Dotdot,
     Tok_Semicolon,
     Tok_Colon,
     Tok_QuestionMark,

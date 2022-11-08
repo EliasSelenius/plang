@@ -229,7 +229,8 @@ typedef struct AllocExpression {
 typedef struct DerefOperator {
     Expression base;
     Expression* expr;
-    // I feel this is a little bit of a hack. We may have to remove this
+    // I feel this is a little bit of a hack. We may have to remove this.
+    // TODO: we can now remove this, since datatype is stored in Expression
     char* derefOp;
     Identifier name;
 } DerefOperator;
@@ -274,6 +275,8 @@ typedef enum StatementType {
     Statement_Scope,
     Statement_If,
     Statement_While,
+    Statement_ForIn,
+    Statement_For,
     Statement_Switch,
 
     Statement_Continue,
@@ -309,15 +312,10 @@ typedef struct Assignement {
     Expression* expr;
 } Assignement;
 
-// TODO: is it necessary to have both Codeblock and Scope?
-typedef struct Codeblock {
-    struct Codeblock* parentScope;
-    Statement** statements; // darray
-} Codeblock;
-
 typedef struct Scope {
     Statement base;
-    Codeblock codeblock;
+    struct Scope* parentScope;
+    Statement** statements; // darray
 } Scope;
 
 typedef struct WhileStatement {
@@ -325,6 +323,27 @@ typedef struct WhileStatement {
     Expression* condition;
     Statement* statement;
 } WhileStatement;
+
+typedef struct ForInStatement {
+    Statement base;
+    Datatype index_type;
+    Identifier index_name;
+    Expression* min_expr;
+    Expression* max_expr;
+    Statement* statement;
+} ForInStatement;
+
+typedef struct ForStatement {
+    Statement base;
+
+    union {
+        VarDecl* decl;
+        Expression* expr;
+    } init;
+
+    Expression* test_expression;
+    Expression* update_expression;
+} ForStatement;
 
 typedef struct IfStatement {
     Statement base;
@@ -336,7 +355,7 @@ typedef struct IfStatement {
 typedef struct SwitchStatement {
     Statement base;
     Expression* expr;
-    Codeblock scope;
+    Scope* scope;
 } SwitchStatement;
 
 typedef struct ReturnStatement {
@@ -366,14 +385,10 @@ typedef struct FuncArg {
     Identifier name;
 } FuncArg;
 
-typedef struct FuncDeclaration {
+typedef struct Procedure {
     Identifier name;
     Datatype returnType;
     FuncArg* arguments; // darray
-} FuncDeclaration;
-
-typedef struct PlangFunction {
-    FuncDeclaration decl;
 
     /* overload
         value of zero means this function is not overloaded.
@@ -381,8 +396,10 @@ typedef struct PlangFunction {
     */
     u32 overload;
 
-    Codeblock scope;
-} PlangFunction;
+    Scope* scope; // scope can be null
+
+    // FuncPtr* ptr_type;
+} Procedure;
 
 typedef struct FuncCall {
     Expression base;
@@ -471,6 +488,8 @@ u32 StatementType_Bytesizes[] = {
     [Statement_Scope] = sizeof(Scope),
     [Statement_If] = sizeof(IfStatement),
     [Statement_While] = sizeof(WhileStatement),
+    [Statement_ForIn] = sizeof(ForInStatement),
+    [Statement_For] = sizeof(ForStatement),
     [Statement_Switch] = sizeof(SwitchStatement),
     [Statement_Continue] = sizeof(Statement),
     [Statement_Break] = sizeof(Statement),

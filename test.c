@@ -12,10 +12,10 @@
 
 int main() {
 
-    int i = 5;
-    char name[i];
+    int a, b, c;
 
-    name[5] = 'F';
+    // a = 1 + b = c = 1;
+    a = 1 + (b = c = 1);
 
     return 0;
 }

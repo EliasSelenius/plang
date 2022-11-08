@@ -5,9 +5,8 @@
 
     TODO list:
         - localy defined structs
-        *- clasic for loop: for (int i = 0; i < 10; i++)
-        *- for in range loop: for (i in 0..10)
-        - for int loop: for (12) { }
+        *- clasic for loop: for uint32 i = 0, i < 10, i++ { }
+        - for int loop: for 12 { }
         - loop block: loop { } == while (true) { }
         - modules or namespaces ?
         - allow underscores in number literals
@@ -22,6 +21,7 @@
         - unions
         *- fixed sized arrays as struct fields
         - local consts
+        - multi-declare e.g: int i, j = 1, k;
 
     InProgress:
         - "plang build" CLI. build all .pog files in directory. let output exe be named the name of the directory
@@ -31,6 +31,7 @@
 
 
     DONE list:
+        *- for in range loop: for i in 0..10 { }
         *- implicit casts of numeric types
         *- built-in print() function
         *- switch statements
@@ -122,8 +123,7 @@ int main(int argc, char* argv[]) {
 
 
     TranslationUnit unit;
-    unit.functions = darrayCreate(PlangFunction);
-    unit.functionDeclarations = darrayCreate(FuncDeclaration);
+    unit.procedures = darrayCreate(Procedure);
     unit.structs = darrayCreate(PlangStruct);
     unit.globalVariables = darrayCreate(VarDecl);
     unit.constants = darrayCreate(Constant);

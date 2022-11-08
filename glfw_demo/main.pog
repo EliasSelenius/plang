@@ -86,31 +86,29 @@ Entity* appendEntity(Mesh mesh) {
 
 
 Mesh genCircle(int32 res, float32 radius) {
-    uint32 vertsCount = res as uint32 + 1u;
+    uint32 vertsCount = res as uint32 + 1;
     vec2 verts[vertsCount];
-    verts[0].x = 0f;
-    verts[0].y = 0f;
+    verts[0].x = 0;
+    verts[0].y = 0;
 
-    int32 i = 1;
-    while i < res + 1 {
+    for i in 1 .. res + 1 {
         float32 angle = i * Tau / res;
         verts[i].x = cosf(angle) * radius;
         verts[i].y = sinf(angle) * radius;
-        ++i;
     }
 
-    uint32 indsCount = (res as uint32) * 3u;
+    uint32 indsCount = (res as uint32) * 3;
     uint32 inds[indsCount];
-    i = 0;
-    uint32 v = 1u;
+    uint32 i = 0;
+    uint32 v = 1;
     while i < indsCount {
-        inds[i] = 0u;
+        inds[i] = 0;
         inds[i+1] = v++;
         inds[i+2] = v;
         i += 3;
     }
 
-    inds[i - 1] = 1u;
+    inds[i - 1] = 1;
 
     return createMesh(verts, vertsCount, inds, indsCount);
 }
@@ -146,9 +144,8 @@ struct Planet {
 void updateEntity(Entity* entity) {
     entity.transform.pos = add(entity.transform.pos, entity.vel);
 
-    uint32 i = 0u;
-    while i < planetsCount {
-        Planet* planet = *planets[i++];
+    for i in 0 .. planetsCount {
+        Planet* planet = *planets[i];
 
         vec2 diff = sub(entity.transform.pos, planet.pos);
         vec2 normal = normalize(diff);
@@ -181,13 +178,12 @@ void load() {
     entities = malloc(sizeof(Entity) * entitiesCapacity);
     planets = malloc(sizeof(Planet) * planetsCount);
 
-    uint32 i = 0u;
-    while i < planetsCount {
+    for i in 0 .. planetsCount {
         float32 r = 20.0 + random(i as int32);
         Planet p = genPlanet(r,
                             70.0 + r * 30.0 * i,
                             100.0 + 20.0 * random(2 * i + 100));
-        planets[i++] = p;
+        planets[i] = p;
     }
 
 
@@ -207,8 +203,8 @@ VoxelGrid generatePlanet() {
 
     float32 half = grid.res as float32 / 2;
 
-    uint32 x = -1; while ++x < grid.res {
-        uint32 y = -1; while ++y < grid.res {
+    for uint32 x in 0 .. grid.res {
+        for uint32 y in 0 .. grid.res {
             float32 xf = x as float32 - half;
             float32 yf = y as float32 - half;
             float32 len = sqrtf(xf*xf + yf*yf);
@@ -282,9 +278,8 @@ int32 main() {
 
         float32 time = glfwGetTime() as float32;
         time = 0.0;
-        int32 i = 0;
-        while i < planetsCount {
-            Planet* planet = *planets[i++];
+        for i in 0 .. planetsCount {
+            Planet* planet = *planets[i];
             float32 t = Pi * 2.0;
             planet.pos.x = cosf(planet.orbitOffset + t * time / planet.yearDuration) * planet.dist;
             planet.pos.y = sinf(planet.orbitOffset + t * time / planet.yearDuration) * planet.dist;
@@ -292,9 +287,8 @@ int32 main() {
         }
 
 
-        i = 0;
-        while i < entitiesLength {
-            let e = *entities[i++];
+        for i in 0 .. entitiesLength {
+            let e = *entities[i];
             updateEntity(e);
         }
 
@@ -305,9 +299,8 @@ int32 main() {
         player.transform.rot = camera.rot;
         applyCamera();
 
-        i = 0;
-        while i < entitiesLength {
-            let e = *entities[i++];
+        for i in 0 .. entitiesLength {
+            let e = *entities[i];
             applyTransform(e.transform);
             drawMesh(e.mesh);
         }
@@ -315,7 +308,7 @@ int32 main() {
 
         { // voxels
 
-            voxelGrid.transform.rot += 0.01;
+            voxelGrid.transform.rot += 0.0002;
 
             let mouseCoord = getMouseWorldCoord();
 

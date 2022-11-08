@@ -43,10 +43,8 @@ VoxelGrid createVoxelGrid(uint32 res) {
 
     float32 half = grid.res as float32 / 2.0;
 
-    uint32 x = -1;
-    while ++x < grid.res {
-        uint32 y = -1;
-        while ++y < grid.res {
+    for uint32 x in 0 .. grid.res {
+        for uint32 y in 0 .. grid.res {
             let i = getIndex(grid.res, x, y);
             grid.verts[i].x = x as float32 - half;
             grid.verts[i].y = y as float32 - half;
@@ -67,8 +65,8 @@ void updateGridMesh(VoxelGrid* grid) {
     let g1_size = grid.res * grid.res;
     let g2_size = grid.res * size;
 
-    uint32 x = -1; while ++x < size {
-        uint32 y = -1; while ++y < size {
+    for uint32 x in 0 .. size {
+        for uint32 y in 0 .. size {
 
             /*
                 *--------1--------*
@@ -175,8 +173,8 @@ void updateGridMesh(VoxelGrid* grid) {
 
         float32 half = grid.res as float32 / 2.0;
 
-        x = -1; while ++x < grid.res {
-            uint32 y = -1; while ++y < size {
+        for uint32 x in 0 .. grid.res {
+            for uint32 y in 0 .. size {
 
                 let p1 = grid.data[getIndex(grid.res, x, y)];
                 let p2 = grid.data[getIndex(grid.res, x, y + 1)];
@@ -195,8 +193,8 @@ void updateGridMesh(VoxelGrid* grid) {
             }
         }
 
-        x = -1; while ++x < size {
-            uint32 y = -1; while ++y < grid.res {
+        for uint32 x in 0 .. size {
+            for uint32 y in 0 .. grid.res {
 
                 let p1 = grid.data[getIndex(grid.res, x, y)];
                 let p2 = grid.data[getIndex(grid.res, x + 1, y)];
@@ -234,18 +232,18 @@ void VoxelGrid_addCircle(VoxelGrid* grid, float32 radius, float32 x, float32 y) 
     int32 ry = round2int(p.y);
 
     int32 iradius = (radius + 1) as int32;
-    uint32 x_min = clamp(rx - iradius, 0, grid.res as int32) as uint32;
-    uint32 x_max = clamp(rx + iradius, 0, grid.res as int32 - 1) as uint32;
-    uint32 y_min = clamp(ry - iradius, 0, grid.res as int32) as uint32;
-    uint32 y_max = clamp(ry + iradius, 0, grid.res as int32 - 1) as uint32;
+    int32 x_min = clamp(rx - iradius, 0, grid.res as int32);
+    int32 x_max = clamp(rx + iradius, 0, grid.res as int32);
+    int32 y_min = clamp(ry - iradius, 0, grid.res as int32);
+    int32 y_max = clamp(ry + iradius, 0, grid.res as int32);
 
-    uint32 ix = x_min-1; while ++ix <= x_max {
-        uint32 iy = y_min-1; while ++iy <= y_max {
+    for ix in x_min .. x_max {
+        for iy in y_min .. y_max {
             float32 xf = ix as float32 - p.x;
             float32 yf = iy as float32 - p.y;
             float32 len = sqrtf(xf*xf + yf*yf);
 
-            uint32 i = ix * grid.res + iy;
+            int32 i = ix * grid.res + iy;
             float32 addition = clamp(radius - len, 0, 1);
             if grid.data[i] < addition grid.data[i] = addition;
         }
@@ -259,18 +257,18 @@ void VoxelGrid_removeCircle(VoxelGrid* grid, float32 radius, float32 x, float32 
     int32 ry = round2int(p.y);
 
     int32 iradius = (radius + 1) as int32;
-    uint32 x_min = clamp(rx - iradius, 0, grid.res as int32) as uint32;
-    uint32 x_max = clamp(rx + iradius, 0, grid.res as int32 - 1) as uint32;
-    uint32 y_min = clamp(ry - iradius, 0, grid.res as int32) as uint32;
-    uint32 y_max = clamp(ry + iradius, 0, grid.res as int32 - 1) as uint32;
+    int32 x_min = clamp(rx - iradius, 0, grid.res as int32);
+    int32 x_max = clamp(rx + iradius, 0, grid.res as int32);
+    int32 y_min = clamp(ry - iradius, 0, grid.res as int32);
+    int32 y_max = clamp(ry + iradius, 0, grid.res as int32);
 
-    uint32 ix = x_min-1; while ++ix <= x_max {
-        uint32 iy = y_min-1; while ++iy <= y_max {
+    for ix in x_min .. x_max {
+        for iy in y_min .. y_max {
             float32 xf = ix as float32 - p.x;
             float32 yf = iy as float32 - p.y;
             float32 len = sqrtf(xf*xf + yf*yf);
 
-            uint32 i = ix * grid.res + iy;
+            int32 i = ix * grid.res + iy;
             float32 newValue = clamp(len - radius, 0, 1);
             if grid.data[i] > newValue grid.data[i] = newValue;
         }

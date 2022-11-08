@@ -32,6 +32,12 @@ int32 main() {
 
     print("Hello ", f, 5, " ", t.x, "yes");
 
+    {
+        print("\n\n");
+        for (uint32 i in 0 .. 10) {
+            print(i, "\n");
+        }
+    }
 
     return 0;
 }

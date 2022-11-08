@@ -1,5 +1,10 @@
 
-static void expectBlock(Codeblock* scope);
+
+static Scope* g_CurrentScope;
+
+
+
+static Scope* expectScope();
 static Expression* parseExpression();
 static Expression* expectExpression();
 static bool parseType(Datatype* type);
@@ -90,19 +95,19 @@ static Identifier constructNameForFuncPtr(FuncPtr* funcPtr) {
 */
 
 
-static Datatype ensureFuncPtrExistsFromFuncDeclaration(FuncDeclaration* decl) {
+static Datatype ensureFuncPtrExistsFromProcedure(Procedure* proc) {
 
     u32 oldLength = g_Unit->funcPtrTypes->length; // remember the old length in case we have a duplicate
     u32 fpRef = dyReserve(&g_Unit->funcPtrTypes, sizeof(FuncPtr));
 
-    u32 argCount = decl->arguments ? darrayLength(decl->arguments) : 0;
+    u32 argCount = proc->arguments ? darrayLength(proc->arguments) : 0;
     for (u32 i = 0; i < argCount; i++) {
         u32 argRef = dyReserve(&g_Unit->funcPtrTypes, sizeof(Datatype));
-        *(Datatype*)(&g_Unit->funcPtrTypes->bytes[argRef]) = decl->arguments[i].type;
+        *(Datatype*)(&g_Unit->funcPtrTypes->bytes[argRef]) = proc->arguments[i].type;
     }
 
     FuncPtr* funcPtr = getFuncPtr(fpRef);
-    funcPtr->returnType = decl->returnType;
+    funcPtr->returnType = proc->returnType;
     funcPtr->argCount = argCount;
 
     Datatype funcType;
@@ -721,12 +726,9 @@ static Statement* expectStatement() {
     switch (tokens[token_index].type) {
 
         case Tok_OpenCurl: {
-            Scope* scope = malloc(sizeof(Scope));
-            scope->base.statementType = Statement_Scope;
-            expectBlock(&scope->codeblock);
-
-            res = (Statement*)scope;
+            res = (Statement*)expectScope();
         } break;
+
         case Tok_Keyword_While: {
             token_index++;
 
@@ -741,14 +743,38 @@ static Statement* expectStatement() {
             token_index++;
             res = (Statement*)expectIfStatement();
         } break;
-
-        case Tok_Keyword_Switch: {
+        case Tok_Keyword_For: {
+            ForInStatement* forin = allocStatement(Statement_ForIn);
             token_index++;
 
-            SwitchStatement* switchStatement = malloc(sizeof(SwitchStatement));
-            switchStatement->base.statementType = Statement_Switch;
+            bool mustClose = tok(Tok_OpenParen);
+
+            if (tokens[token_index + 1].type == Tok_Keyword_In) {
+                forin->index_type = type_int32;
+                forin->index_name = identifier();
+                token_index++;
+            } else {
+                forin->index_type = expectType();
+                forin->index_name = identifier();
+                expect(Tok_Keyword_In);
+            }
+
+            forin->min_expr = expectExpression();
+            expect(Tok_Dotdot);
+            forin->max_expr = expectExpression();
+
+            if (mustClose) expect(Tok_CloseParen);
+
+            forin->statement = expectStatement();
+            res = (Statement*)forin;
+        } break;
+
+        case Tok_Keyword_Switch: {
+            SwitchStatement* switchStatement = allocStatement(Statement_Switch);
+            token_index++;
+
             switchStatement->expr = expectExpression();
-            expectBlock(&switchStatement->scope);
+            switchStatement->scope = expectScope();
 
             res = (Statement*)switchStatement;
         } break;
@@ -903,10 +929,15 @@ static Statement* expectStatement() {
     return res;
 }
 
-static void expectBlock(Codeblock* scope) {
+static Scope* expectScope() {
+
+    Scope* scope = allocStatement(Statement_Scope);
+    scope->parentScope = g_CurrentScope;
+    scope->statements = darrayCreate(Statement*);
+
     expect(Tok_OpenCurl);
 
-    scope->statements = darrayCreate(Statement*);
+    g_CurrentScope = scope;
 
     while (!tok(Tok_CloseCurl)) {
         Statement* statement = expectStatement();
@@ -916,6 +947,9 @@ static void expectBlock(Codeblock* scope) {
             // there must have been an error.
         }
     }
+
+    g_CurrentScope = scope->parentScope;
+    return scope;
 }
 
 static PlangStruct expectStruct() {
@@ -975,14 +1009,16 @@ static void funcOrGlobal() {
     if (tok(Tok_OpenParen)) {
         // function
 
-        PlangFunction func;
-        func.overload = 0;
-        func.decl.returnType = type;
-        func.decl.name = name;
-        func.decl.arguments = expectFuncArgList();
+        Procedure proc;
+        proc.overload = 0;
+        proc.returnType = type;
+        proc.name = name;
+        proc.arguments = expectFuncArgList();
 
-        expectBlock(&func.scope);
-        darrayAdd(g_Unit->functions, func);
+        g_CurrentScope = null;
+        proc.scope = expectScope();
+
+        darrayAdd(g_Unit->procedures, proc);
 
     } else {
         // global variable
@@ -1066,15 +1102,19 @@ static void parse() {
 
             case Tok_Keyword_Declare: {
                 // function declaration
+
                 token_index++;
-                FuncDeclaration funcDecl;
-                funcDecl.returnType = expectType();
-                funcDecl.name = identifier();
+
+                Procedure proc;
+                proc.overload = 0;
+                proc.scope = null;
+                proc.returnType = expectType();
+                proc.name = identifier();
                 expect(Tok_OpenParen);
-                funcDecl.arguments = expectFuncArgList();
+                proc.arguments = expectFuncArgList();
                 semicolon();
 
-                darrayAdd(g_Unit->functionDeclarations, funcDecl);
+                darrayAdd(g_Unit->procedures, proc);
             } break;
 
             default: {

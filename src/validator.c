@@ -1,19 +1,17 @@
 
 typedef struct Variable {
     Identifier name;
-    Datatype* type;
+    Datatype type;
 } Variable;
 
-static PlangFunction* function;
+static Procedure* procedure;
 static Variable* variables;
-static Codeblock* currentScope;
-static Statement* currentStatement;
 
 
 static Datatype validateExpression(Expression* expr);
 static Datatype getDeclaredVariable(Identifier name);
 static bool typeAssignable(Datatype toType, Datatype fromType);
-static void validateScope(Codeblock* scope);
+static void validateScope(Scope* scope);
 
 
 static Field* getField(PlangStruct* stru, Identifier name) {
@@ -34,22 +32,10 @@ static PlangStruct* getStructByName(Identifier name) {
     return null;
 }
 
-static PlangFunction* getFunctionByName(Identifier name) {
-    u32 len = darrayLength(g_Unit->functions);
+static Procedure* getProcedureByName(Identifier name) {
+    u32 len = darrayLength(g_Unit->procedures);
     for (u32 i = 0; i < len; i++) {
-        if (name == g_Unit->functions[i].decl.name) return &g_Unit->functions[i];
-    }
-
-    return null;
-}
-
-static FuncDeclaration* getFuncDecl(Identifier name) {
-    PlangFunction* func = getFunctionByName(name);
-    if (func) return &func->decl;
-
-    u32 len = darrayLength(g_Unit->functionDeclarations);
-    for (u32 i = 0; i < len; i++) {
-        if (name == g_Unit->functionDeclarations[i].name) return &g_Unit->functionDeclarations[i];
+        if (name == g_Unit->procedures[i].name) return &g_Unit->procedures[i];
     }
 
     return null;
@@ -62,17 +48,17 @@ static Datatype getDeclaredVariable(Identifier name) {
         u32 len = darrayLength(variables);
         for (u32 i = 0; i < len; i++) {
             if (name == variables[i].name) {
-                return *variables[i].type;
+                return variables[i].type;
             }
         }
     }
 
     // look for func argument
-    if (function) {
-        if (function->decl.arguments) {
-            u32 len = darrayLength(function->decl.arguments);
+    if (procedure) {
+        if (procedure->arguments) {
+            u32 len = darrayLength(procedure->arguments);
             for (u32 i = 0; i < len; i++) {
-                FuncArg* arg = &function->decl.arguments[i];
+                FuncArg* arg = &procedure->arguments[i];
                 if (name == arg->name) {
                     return arg->type;
                 }
@@ -95,8 +81,9 @@ static Datatype validateVariable(VariableExpression* var) {
     Datatype type = getDeclaredVariable(var->name);
     if (type.kind != Typekind_Invalid) return type;
 
-    FuncDeclaration* decl = getFuncDecl(var->name);
-    if (decl) return ensureFuncPtrExistsFromFuncDeclaration(decl);
+    // TODO: remove this by placing the FuncPtr in Procedure
+    Procedure* proc = getProcedureByName(var->name);
+    if (proc) return ensureFuncPtrExistsFromProcedure(proc);
 
     // look for constants
     u32 len = darrayLength(g_Unit->constants);
@@ -234,7 +221,7 @@ static bool typeAssignable(Datatype toType, Datatype fromType) {
         return false;
     }
 
-    if (fromType.kind == Typekind_float32 && toType.kind == Typekind_float64) return true; else return false;
+    if (fromType.kind == Typekind_float32 && toType.kind == Typekind_float64) return true;
 
     return false;
 }
@@ -299,56 +286,34 @@ static Datatype validateFuncCall(FuncCall* call) {
     if (name == builtin_print_name) return type_void;
 
     // look for function with possible overloads
-    u32 len = darrayLength(g_Unit->functions);
+    u32 len = darrayLength(g_Unit->procedures);
     for (u32 i = 0; i < len; i++) {
-        PlangFunction* func = &g_Unit->functions[i];
-        if (name != func->decl.name) continue;
+        Procedure* proc = &g_Unit->procedures[i];
+        if (name != proc->name) continue;
 
-        u32 expectedArgumentLength = func->decl.arguments ? darrayLength(func->decl.arguments) : 0;
+        u32 expectedArgumentLength = proc->arguments ? darrayLength(proc->arguments) : 0;
 
-        if (func->overload) {
+        if (proc->overload) {
             if (passedArgumentsLength != expectedArgumentLength) continue;
 
             bool compat = true;
             for (u32 i = 0; i < passedArgumentsLength; i++) {
-                if (!typeAssignable(func->decl.arguments[i].type, passedArguments[i])) {compat = false; break;}
+                if (!typeAssignable(proc->arguments[i].type, passedArguments[i])) {compat = false; break;}
             }
 
-            if (compat) {
-                call->overload = func->overload;
-                return func->decl.returnType;
-            } else continue;
-
+            if (!compat) continue;
+            call->overload = proc->overload;
         } else {
             if (passedArgumentsLength != expectedArgumentLength) {
                 error_temp("Unexpected number of arguments passed to \"%s\", expected %d, but got %d.",
                     getIdentifierStringValue(name),
                     expectedArgumentLength, passedArgumentsLength);
-                return func->decl.returnType;
+            } else {
+                for (u32 i = 0; i < passedArgumentsLength; i++) assertAssignability(proc->arguments[i].type, passedArguments[i]);
             }
-
-            for (u32 i = 0; i < passedArgumentsLength; i++) assertAssignability(func->decl.arguments[i].type, passedArguments[i]);
-            return func->decl.returnType;
-        }
-    }
-
-    // function declarations
-    len = darrayLength(g_Unit->functionDeclarations);
-    for (u32 i = 0; i < len; i++) {
-        FuncDeclaration* decl = &g_Unit->functionDeclarations[i];
-        if (name != decl->name) continue;
-
-        u32 expectedArgumentLength = decl->arguments ? darrayLength(decl->arguments) : 0;
-
-        if (passedArgumentsLength != expectedArgumentLength) {
-            error_temp("Unexpected number of arguments passed to \"%s\", expected %d, but got %d.",
-                getIdentifierStringValue(name),
-                expectedArgumentLength, passedArgumentsLength);
-            return decl->returnType;
         }
 
-        for (u32 i = 0; i < passedArgumentsLength; i++) assertAssignability(decl->arguments[i].type, passedArguments[i]);
-        return decl->returnType;
+        return proc->returnType;
     }
 
     funcptrPart:
@@ -573,6 +538,13 @@ static Datatype validateExpression(Expression* expr) {
     return expr->datatype;
 }
 
+static void registerVariable(Identifier name, Datatype type) {
+    Variable var;
+    var.name = name;
+    var.type = type;
+    darrayAdd(variables, var);
+}
+
 static void validateStatement(Statement* sta) {
     switch (sta->statementType) {
         case Statement_FixedArray_Declaration: {
@@ -589,11 +561,8 @@ static void validateStatement(Statement* sta) {
             Datatype sizetype = validateExpression(decl->assignmentOrNull);
             // TODO: is asstype a valid integer expression?
 
-            Variable var;
-            var.name = decl->name;
-            var.type = &decl->type;
+            registerVariable(decl->name, decl->type);
 
-            darrayAdd(variables, var);
         } break;
         case Statement_Declaration: {
             VarDecl* decl = (VarDecl*)sta;
@@ -608,18 +577,14 @@ static void validateStatement(Statement* sta) {
             if (decl->assignmentOrNull) {
                 Datatype assType = validateExpression(decl->assignmentOrNull);
 
-                if (assType.kind == Typekind_Invalid) break; // if type could not be determined then we should not continue, act as if this statement does not exist 
+                if (assType.kind == Typekind_Invalid) break; // if type could not be determined then we should not continue, act as if this statement does not exist
 
                 if (decl->type.kind == Typekind_MustBeInfered)
                     decl->type = resolveTypeAmbiguity(assType);
                 else assertAssignability(decl->type, assType);
             }
 
-            Variable var;
-            var.name = decl->name;
-            var.type = &decl->type;
-
-            darrayAdd(variables, var);
+            registerVariable(decl->name, decl->type);
 
         } break;
         case Statement_Assignment: {
@@ -631,10 +596,11 @@ static void validateStatement(Statement* sta) {
             assertAssignability(toType, fromType);
         } break;
 
-
         case Statement_Scope: {
-            validateScope(&((Scope*)sta)->codeblock);
+            Scope* scope = (Scope*)sta;
+            validateScope(scope);
         } break;
+
         case Statement_If: {
             IfStatement* ifsta = (IfStatement*)sta;
 
@@ -656,12 +622,28 @@ static void validateStatement(Statement* sta) {
             validateExpression(whileSta->condition);
             validateStatement(whileSta->statement);
         } break;
+        case Statement_ForIn: {
+            ForInStatement* forin = (ForInStatement*)sta;
+
+            validateExpression(forin->min_expr);
+            validateExpression(forin->max_expr);
+
+            // Check wheter there already is a variable with this name
+            if (getDeclaredVariable(forin->index_name).kind != Typekind_Invalid) {
+                error_node(sta, "Variable \"%s\" is already declared.", getIdentifierStringValue(forin->index_name));
+            }
+
+            registerVariable(forin->index_name, forin->index_type);
+            validateStatement(forin->statement);
+            darrayHead(variables)->length--;
+
+        } break;
 
         case Statement_Switch: {
             SwitchStatement* switchSta = (SwitchStatement*)sta;
             // TODO: check if expr is a valid type to switch on
             validateExpression(switchSta->expr);
-            validateScope(&switchSta->scope);
+            validateScope(switchSta->scope);
         } break;
 
         case Statement_Break: {
@@ -678,11 +660,11 @@ static void validateStatement(Statement* sta) {
 
             if (type.kind == Typekind_Invalid) break;
 
-            if (function->decl.returnType.kind == Typekind_MustBeInfered) {
-                function->decl.returnType = resolveTypeAmbiguity(type);
+            if (procedure->returnType.kind == Typekind_MustBeInfered) {
+                procedure->returnType = resolveTypeAmbiguity(type);
             } else {
-                if (!typeAssignable(function->decl.returnType, type)) {
-                    error_node(sta, "Return type missmatch in function \"%s\".", getIdentifierStringValue(function->decl.name));
+                if (!typeAssignable(procedure->returnType, type)) {
+                    error_node(sta, "Return type missmatch in function \"%s\".", getIdentifierStringValue(procedure->name));
                 }
             }
         } break;
@@ -710,44 +692,22 @@ static void validateStatement(Statement* sta) {
     }
 }
 
-static void validateScope(Codeblock* scope) {
-    Codeblock* parentScope = currentScope;
-    scope->parentScope = parentScope;
-    currentScope = scope;
-
+static void validateScope(Scope* scope) {
     u32 vars_start_index = darrayLength(variables);
-
     for (u32 i = 0; i < darrayLength(scope->statements); i++) {
         Statement* sta = scope->statements[i];
-        currentStatement = sta;
         validateStatement(sta);
     }
-
-    currentStatement = null;
     darrayHead(variables)->length = vars_start_index;
-    currentScope = parentScope;
 }
 
-static void validateFunctionDeclaration(FuncDeclaration* decl) {
+static void validateProcedure(Procedure* proc) {
+    procedure = proc;
 
-    validateType(&decl->returnType);
+    if (proc->scope) validateScope(proc->scope);
 
-    if (decl->arguments) {
-        u32 len = darrayLength(decl->arguments);
-        for (u32 i = 0; i < len; i++) validateType(&decl->arguments[i].type);
-    }
-}
-
-static void validateFunction(PlangFunction* func) {
-    function = func;
-
-    // validateFunctionDeclaration(&func->decl);
-
-    currentScope = null;
-    validateScope(&func->scope);
-
-    if (func->decl.returnType.kind == Typekind_MustBeInfered) {
-        func->decl.returnType = type_void;
+    if (proc->returnType.kind == Typekind_MustBeInfered) {
+        proc->returnType = type_void;
     }
 }
 
@@ -823,25 +783,19 @@ static void validate() {
         }
     }
 
-    // validate func declarations
-    u32 funcDeclLen = darrayLength(g_Unit->functionDeclarations);
-    for (u32 i = 0; i < funcDeclLen; i++) {
-        validateFunctionDeclaration(&g_Unit->functionDeclarations[i]);
-    }
-
     // check for function overloads
-    u32 funcLen = darrayLength(g_Unit->functions);
+    u32 funcLen = darrayLength(g_Unit->procedures);
     for (u32 i = 0; i < funcLen; i++) {
-        PlangFunction* f1 = &g_Unit->functions[i];
+        Procedure* f1 = &g_Unit->procedures[i];
         if (f1->overload) continue;
 
         u32 overloadCount = 1;
 
         // for each subsequent function
         for (u32 j = i + 1; j < funcLen; j++) {
-            PlangFunction* f2 = &g_Unit->functions[j];
+            Procedure* f2 = &g_Unit->procedures[j];
 
-            if (f1->decl.name != f2->decl.name) continue;
+            if (f1->name != f2->name) continue;
             // function overload detected
 
             f2->overload = ++overloadCount;
@@ -857,23 +811,23 @@ static void validate() {
 
     // validate the types of all function signatures (return types and argument types) before we validate the function scopes
     for (u32 i = 0; i < funcLen; i++) {
-        PlangFunction* func = &g_Unit->functions[i];
-        if (func->decl.arguments) {
-            foreach (arg, func->decl.arguments) validateType(&arg->type);
+        Procedure* proc = &g_Unit->procedures[i];
+        if (proc->arguments) {
+            foreach (arg, proc->arguments) validateType(&arg->type);
         }
 
-        if (func->decl.returnType.kind == Typekind_MustBeInfered) {
+        if (proc->returnType.kind == Typekind_MustBeInfered) {
             error_temp("Return type inference not implemmented.");
-            func->decl.returnType = type_void;
+            proc->returnType = type_void;
         } else {
-            validateType(&func->decl.returnType);
+            validateType(&proc->returnType);
         }
     }
 
     // validate functions
     variables = darrayCreate(Variable);
     for (u32 i = 0; i < funcLen; i++) {
-        validateFunction(&g_Unit->functions[i]);
+        validateProcedure(&g_Unit->procedures[i]);
     }
     darrayDelete(variables);
 }

@@ -20,13 +20,13 @@ float32 random(int32 seed) {
 //     return random(seed_x + seed_y * 57);
 // }
 
+int32 clamp(int32 t, int32 min, int32 max) {
+    return t < min ? min : t > max ? max : t;
+}
 float32 clamp(float32 t, float32 min, float32 max) {
     return t < min ? min : t > max ? max : t;
 }
 
-int32 clamp(int32 t, int32 min, int32 max) {
-    return t < min ? min : t > max ? max : t;
-}
 
 int32 round2int(float32 x) { return (x + 0.5) as int32; }
 

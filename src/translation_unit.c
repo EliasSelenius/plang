@@ -12,8 +12,7 @@ typedef struct FuncPtr {
 } FuncPtr;
 
 typedef struct TranslationUnit {
-    PlangFunction* functions; // darray
-    FuncDeclaration* functionDeclarations; // darray
+    Procedure* procedures; // darray
     PlangStruct* structs; // darray
     VarDecl* globalVariables; // darray
     Constant* constants; // darray
