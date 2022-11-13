@@ -53,7 +53,7 @@ static inline bool tok(TokenType type) {
 }
 
 
-static inline bool funcPtrEquivalence(FuncPtr* a, FuncPtr* b) {
+static inline bool funcPtrEquivalence(ProcPtr* a, ProcPtr* b) {
     if (a->argCount != b->argCount) return false;
     if (!typeEquals(a->returnType, b->returnType)) return false;
     for (u32 i = 0; i < a->argCount; i++) {
@@ -95,92 +95,53 @@ static Identifier constructNameForFuncPtr(FuncPtr* funcPtr) {
 */
 
 
-static Datatype ensureFuncPtrExistsFromProcedure(Procedure* proc) {
-
-    u32 oldLength = g_Unit->funcPtrTypes->length; // remember the old length in case we have a duplicate
-    u32 fpRef = dyReserve(&g_Unit->funcPtrTypes, sizeof(FuncPtr));
-
-    u32 argCount = proc->arguments ? darrayLength(proc->arguments) : 0;
-    for (u32 i = 0; i < argCount; i++) {
-        u32 argRef = dyReserve(&g_Unit->funcPtrTypes, sizeof(Datatype));
-        *(Datatype*)(&g_Unit->funcPtrTypes->bytes[argRef]) = proc->arguments[i].type;
-    }
-
-    FuncPtr* funcPtr = getFuncPtr(fpRef);
-    funcPtr->returnType = proc->returnType;
-    funcPtr->argCount = argCount;
-
-    Datatype funcType;
-    funcType.kind = Typekind_FuncPtr;
-    funcType.ref = fpRef;
-    funcType.numPointers = 1;
-
-    // look if the function pointer is a duplicate
-    u32 i = 0;
-    while (i < oldLength) {
-        FuncPtr* f = getFuncPtr(i);
-
-        if (funcPtrEquivalence(f, funcPtr)) {
-            // is duplicate
-            g_Unit->funcPtrTypes->length = oldLength; // reset
-            funcType.ref = i;
-            return funcType;
-        }
-
-        i += sizeof(FuncPtr) + sizeof(Datatype) * f->argCount;
-    }
-
-    return funcType;
-}
-
-
-static Datatype parseFuncPtrArgs(Datatype retType) {
+static Datatype parseProcPtrArgs(Datatype retType) {
     if (!tok(Tok_OpenParen)) return retType;
 
     // construct a new function pointer by reserving memory for it
-    u32 oldLength = g_Unit->funcPtrTypes->length; // remember the old length in case we have a duplicate
-    u32 fpRef = dyReserve(&g_Unit->funcPtrTypes, sizeof(FuncPtr));
+    u32 oldLength = g_Unit->procPtrTypes->length; // remember the old length in case we have a duplicate
+    u32 fpRef = dyReserve(&g_Unit->procPtrTypes, sizeof(ProcPtr));
 
     // arguments
     u32 argCount = 0;
     Datatype argType;
     if (parseType(&argType)) {
         argCount++;
-        u32 argRef = dyReserve(&g_Unit->funcPtrTypes, sizeof(Datatype));
-        *(Datatype*)(&g_Unit->funcPtrTypes->bytes[argRef]) = argType;
+        u32 argRef = dyReserve(&g_Unit->procPtrTypes, sizeof(Datatype));
+        *(Datatype*)(&g_Unit->procPtrTypes->bytes[argRef]) = argType;
 
         while (tok(Tok_Comma)) {
             argCount++;
             argType = expectType();
-            argRef = dyReserve(&g_Unit->funcPtrTypes, sizeof(Datatype));
-            *(Datatype*)(&g_Unit->funcPtrTypes->bytes[argRef]) = argType;
+            argRef = dyReserve(&g_Unit->procPtrTypes, sizeof(Datatype));
+            *(Datatype*)(&g_Unit->procPtrTypes->bytes[argRef]) = argType;
         }
     }
 
-    FuncPtr* funcPtr = getFuncPtr(fpRef);
+    ProcPtr* funcPtr = getProcPtr(fpRef);
     funcPtr->returnType = retType;
     funcPtr->argCount = argCount;
 
     expect(Tok_CloseParen);
 
     Datatype funcType;
-    funcType.kind = Typekind_FuncPtr;
+    funcType.kind = Typekind_ProcPtr;
     funcType.ref = fpRef;
     funcType.numPointers = 1;
 
     // look if the function pointer is a duplicate
     u32 i = 0;
     while (i < oldLength) {
-        FuncPtr* f = getFuncPtr(i);
+        ProcPtr* f = getProcPtr(i);
 
         if (funcPtrEquivalence(f, funcPtr)) {
             // is duplicate
-            g_Unit->funcPtrTypes->length = oldLength; // reset
+            g_Unit->procPtrTypes->length = oldLength; // reset
             funcType.ref = i;
             return funcType;
         }
 
-        i += sizeof(FuncPtr) + sizeof(Datatype) * f->argCount;
+        i += sizeof(ProcPtr) + sizeof(Datatype) * f->argCount;
     }
 
     return funcType;
@@ -219,7 +180,7 @@ static bool parseInferableType(Datatype* type) {
         type->numPointers = 0;
         while (tok(Tok_Mul)) type->numPointers++;
 
-        *type = parseFuncPtrArgs(*type);
+        *type = parseProcPtrArgs(*type);
 
         return true;
     }
@@ -316,7 +277,7 @@ static bool tok_scan(char* format, ...) {
     return false;
 }
 
-static void expectFuncCallArgs(FuncCall* func, Expression* funcExpr) {
+static void expectFuncCallArgs(ProcCall* func, Expression* funcExpr) {
     func->funcExpr = funcExpr;
 
     Expression* expr = parseExpression();
@@ -444,7 +405,7 @@ static Expression* parseLeafExpression() {
             } continue;
 
             case Tok_OpenParen: {
-                FuncCall* call = allocExpr(ExprType_FuncCall);
+                ProcCall* call = allocExpr(ExprType_ProcCall);
                 token_index++;
 
                 expectFuncCallArgs(call, res);
@@ -491,11 +452,10 @@ static Expression* parseLeafExpression() {
 }
 
 static Expression* testForTernary(Expression* expr) {
-    if (!tok(Tok_QuestionMark)) return expr;
+    if (tokens[token_index].type != Tok_QuestionMark) return expr;
 
-    TernaryExpression* ter = malloc(sizeof(TernaryExpression));
-    ter->base.expressionType = ExprType_Ternary;
-    ter->base.nodebase.lineNumber = expr->nodebase.lineNumber;
+    TernaryExpression* ter = allocExpr(ExprType_Ternary);
+    token_index++;
 
     ter->condition = expr;
     ter->thenExpr = expectExpression();
@@ -617,19 +577,17 @@ static Expression* parseExpression() {
     TokenType tokentype = tokens[token_index].type;
     ExprType exprType = getExprTypeForBinaryOperator(tokentype);
     if (!exprType) return testForTernary(a);
-    token_index++;
 
-    BinaryExpression* root = malloc(sizeof(BinaryExpression));
-    root->base.expressionType = exprType;
+    BinaryExpression* root = allocExpr(exprType);
+    token_index++;
     root->left = a;
     root->right = expectLeafExpression();
 
     tokentype = tokens[token_index].type;
     while ( (exprType = getExprTypeForBinaryOperator(tokentype)) ) {
-        token_index++;
 
-        BinaryExpression* op = malloc(sizeof(BinaryExpression));
-        op->base.expressionType = exprType;
+        BinaryExpression* op = allocExpr(exprType);
+        token_index++;
         op->right = expectLeafExpression();
 
         root = appendBinaryExpression(root, op);
@@ -880,7 +838,7 @@ static Statement* expectStatement() {
                     case ExprType_Unary_PostIncrement:
                     case ExprType_Unary_PreDecrement:
                     case ExprType_Unary_PostDecrement:
-                    case ExprType_FuncCall: {
+                    case ExprType_ProcCall: {
                         StatementExpression* staExpr = malloc(sizeof(StatementExpression));
                         staExpr->base.statementType = Statement_Expression;
                         staExpr->base.nodebase.lineNumber = expr->nodebase.lineNumber;
@@ -980,14 +938,14 @@ static PlangStruct expectStruct() {
     return stru;
 }
 
-static FuncArg* expectFuncArgList() {
-    FuncArg* res = null;
+static ProcArg* expectFuncArgList() {
+    ProcArg* res = null;
 
-    FuncArg arg;
+    ProcArg arg;
     if (parseType(&arg.type)) {
         arg.name = identifier();
 
-        res = darrayCreate(FuncArg);
+        res = darrayCreate(ProcArg);
         darrayAdd(res, arg);
 
         while (tok(Tok_Comma)) {

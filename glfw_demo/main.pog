@@ -118,7 +118,7 @@ Planet genPlanet(float32 radius, float32 dist, float32 year) {
     p.radius = radius;
     p.dist = dist;
     p.yearDuration = year;
-    p.mesh = genCircle(36 * radius, radius);
+    p.mesh = genCircle(round2int(36 * radius), radius);
     p.rot = 0.0;
     p.orbitOffset = Pi * random(dist as int32);
 

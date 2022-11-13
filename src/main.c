@@ -22,15 +22,17 @@
         *- fixed sized arrays as struct fields
         - local consts
         - multi-declare e.g: int i, j = 1, k;
+        - localy defined functions
+        - let output exe be named the name of the directory
+        - it keyword
 
     InProgress:
-        - "plang build" CLI. build all .pog files in directory. let output exe be named the name of the directory
         *- file name in errors
         *- line numbers in validation errors
-        - localy defined functions
 
 
     DONE list:
+        - "plang build" CLI. build all .pog files in directory.
         *- for in range loop: for i in 0..10 { }
         *- implicit casts of numeric types
         *- built-in print() function
@@ -127,7 +129,7 @@ int main(int argc, char* argv[]) {
     unit.structs = darrayCreate(PlangStruct);
     unit.globalVariables = darrayCreate(VarDecl);
     unit.constants = darrayCreate(Constant);
-    unit.funcPtrTypes = dyCreate();
+    unit.procPtrTypes = dyCreate();
     unit.aliases = darrayCreate(AliasType);
     unit.opaqueTypes = darrayCreate(Identifier);
     unit.stringTable = dyCreate();

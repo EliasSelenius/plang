@@ -59,7 +59,7 @@ static char* getTypeCname(Datatype type) {
         case Typekind_Enum: return null;
         case Typekind_Alias: return getIdentifierStringValue(g_Unit->aliases[type.ref].name);
         case Typekind_Opaque: return getIdentifierStringValue(type.ref);
-        case Typekind_FuncPtr: return "SomeFuncPtr";
+        case Typekind_ProcPtr: return "SomeFuncPtr";
 
     }
     return null;
@@ -67,7 +67,7 @@ static char* getTypeCname(Datatype type) {
 
 static void transpileType(Datatype type) {
 
-    if (type.kind == Typekind_FuncPtr) {
+    if (type.kind == Typekind_ProcPtr) {
         sbAppend(sb, "proc_");
         sbAppendSpan(sb, numberToString(type.ref));
     } else {
@@ -80,7 +80,7 @@ static void transpileType(Datatype type) {
     }
 }
 
-static void transpileFuncCall(FuncCall* call) {
+static void transpileFuncCall(ProcCall* call) {
     transpileExpression(call->funcExpr);
     if (call->overload) sbAppendChar(sb, getCharFromU32(call->overload));
     sbAppend(sb, "(");
@@ -300,9 +300,9 @@ static void transpileExpression(Expression* expr) {
             transpileExpression(ter->elseExpr);
         } break;
 
-        case ExprType_FuncPointerCall:
-        case ExprType_FuncCall: {
-            FuncCall* fc = (FuncCall*)expr;
+        case ExprType_ProcPtrCall:
+        case ExprType_ProcCall: {
+            ProcCall* fc = (ProcCall*)expr;
 
             if (fc->funcExpr->expressionType == ExprType_Variable) {
                 Identifier name = ((VariableExpression*)fc->funcExpr)->name;
@@ -518,7 +518,7 @@ static void transpileFunctionSignature(Procedure* proc) {
     sbAppend(sb, "(");
     if (proc->arguments) {
 
-        FuncArg arg = proc->arguments[0];
+        ProcArg arg = proc->arguments[0];
         transpileType(arg.type);
         sbAppend(sb, " ");
         sbAppend(sb, getIdentifierStringValue(arg.name));
@@ -585,7 +585,7 @@ static u32 countStructDependencies(PlangStruct* stru) {
 static void transpileFuncptrType(Datatype type) {
     if (type.kind == Typekind_Alias) {
         Datatype dealiased = dealiasType(type);
-        if (dealiased.kind == Typekind_FuncPtr) {
+        if (dealiased.kind == Typekind_ProcPtr) {
             transpileType(dealiased);
             return;
         }
@@ -685,10 +685,22 @@ static void transpile() {
         }
     }
 
+    { // struct typedefs
+        sbAppend(sb, "\n// Structs forward declarations\n");
+        foreach (stru, g_Unit->structs) {
+            char* name = getIdentifierStringValue(stru->name);
+            sbAppend(sb, "typedef struct ");
+            sbAppend(sb, name);
+            sbAppend(sb, " ");
+            sbAppend(sb, name);
+            sbAppend(sb, ";\n");
+        }
+    }
+
     { // type aliases (except funcptrs)
         sbAppend(sb, "\n// Type aliases\n");
         foreach (alias, g_Unit->aliases) {
-            if (alias->aliasedType.kind == Typekind_FuncPtr) continue;
+            if (alias->aliasedType.kind == Typekind_ProcPtr) continue;
             char* typename = getIdentifierStringValue(alias->name);
             sbAppend(sb, "typedef ");
             transpileType(alias->aliasedType);
@@ -701,8 +713,8 @@ static void transpile() {
     { // Func ptrs
         sbAppend(sb, "\n// Function pointers\n");
         u32 i = 0;
-        while (i < g_Unit->funcPtrTypes->length) {
-            FuncPtr* f = getFuncPtr(i);
+        while (i < g_Unit->procPtrTypes->length) {
+            ProcPtr* f = getProcPtr(i);
             sbAppend(sb, "typedef ");
             transpileFuncptrType(f->returnType);
             sbAppend(sb, " ");
@@ -717,14 +729,14 @@ static void transpile() {
                 }
             }
             sbAppend(sb, ");\n");
-            i += sizeof(FuncPtr) + sizeof(Datatype) * f->argCount;
+            i += sizeof(ProcPtr) + sizeof(Datatype) * f->argCount;
         }
     }
 
     { // type aliases (funcptrs only)
         sbAppend(sb, "\n// Function pointer aliases\n");
         foreach (alias, g_Unit->aliases) {
-            if (alias->aliasedType.kind != Typekind_FuncPtr) continue;
+            if (alias->aliasedType.kind != Typekind_ProcPtr) continue;
             char* typename = getIdentifierStringValue(alias->name);
             sbAppend(sb, "typedef ");
             transpileType(alias->aliasedType);

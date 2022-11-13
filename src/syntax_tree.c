@@ -30,7 +30,7 @@ typedef enum Typekind {
     Typekind_Enum,
     Typekind_Alias,
     Typekind_Opaque,
-    Typekind_FuncPtr
+    Typekind_ProcPtr
 } Typekind;
 
 typedef struct Datatype {
@@ -115,6 +115,78 @@ static bool isIntegralType(Datatype type) {
     return false;
 }
 
+typedef struct NumberInfo {
+    i32 bit_depth;
+    bool is_signed;
+    bool is_decimal;
+} NumberInfo;
+
+static NumberInfo getNumberInfo(Typekind type) {
+    switch (type) {
+        case Typekind_uint8:  return (NumberInfo) { .bit_depth = 8, .is_signed = false, .is_decimal = false };
+        case Typekind_uint16: return (NumberInfo) { .bit_depth = 16, .is_signed = false, .is_decimal = false };
+        case Typekind_uint32: return (NumberInfo) { .bit_depth = 32, .is_signed = false, .is_decimal = false };
+        case Typekind_uint64: return (NumberInfo) { .bit_depth = 64, .is_signed = false, .is_decimal = false };
+        case Typekind_int8:   return (NumberInfo) { .bit_depth = 8, .is_signed = true, .is_decimal = false };
+        case Typekind_int16:  return (NumberInfo) { .bit_depth = 16, .is_signed = true, .is_decimal = false };
+        case Typekind_int32:  return (NumberInfo) { .bit_depth = 32, .is_signed = true, .is_decimal = false };
+        case Typekind_int64:  return (NumberInfo) { .bit_depth = 64, .is_signed = true, .is_decimal = false };
+
+        case Typekind_float32: return (NumberInfo) { .bit_depth = 32, .is_signed = true, .is_decimal = true };
+        case Typekind_float64: return (NumberInfo) { .bit_depth = 64, .is_signed = true, .is_decimal = true };
+
+        case Typekind_AmbiguousInteger: return (NumberInfo) { .bit_depth = -1, .is_signed = false, .is_decimal = false };
+        case Typekind_AmbiguousDecimal: return (NumberInfo) { .bit_depth = -1, .is_signed = true, .is_decimal = true };
+
+        default: break;
+    }
+
+    return (NumberInfo) {0};
+}
+
+static NumberInfo mergeNumberInfos(NumberInfo a, NumberInfo b) {
+    return (NumberInfo) {
+        .bit_depth = a.bit_depth < b.bit_depth ? b.bit_depth : a.bit_depth,
+        .is_signed = a.is_signed || b.is_signed,
+        .is_decimal = a.is_decimal || b.is_decimal
+    };
+}
+
+static Typekind getTypekindOfNumberInfo(NumberInfo info) {
+
+    if (info.is_decimal) switch (info.bit_depth) {
+        case -1: return Typekind_AmbiguousDecimal;
+        case 32: return Typekind_float32;
+        case 64: return Typekind_float64;
+    }
+
+    if (info.is_signed) switch (info.bit_depth) {
+        case -1: return Typekind_AmbiguousInteger;
+        case 8: return Typekind_int8;
+        case 16: return Typekind_int16;
+        case 32: return Typekind_int32;
+        case 64: return Typekind_int64;
+    } else switch (info.bit_depth) {
+        case -1: return Typekind_AmbiguousInteger;
+        case 8: return Typekind_uint8;
+        case 16: return Typekind_uint16;
+        case 32: return Typekind_uint32;
+        case 64: return Typekind_uint64;
+    }
+
+    return Typekind_Invalid;
+}
+
+static Datatype mergeNumberTypes(Datatype a, Datatype b) {
+    return (Datatype) {
+        .kind = getTypekindOfNumberInfo(mergeNumberInfos(getNumberInfo(a.kind), getNumberInfo(b.kind))),
+        .ref = 0,
+        .numPointers = 0
+    };
+}
+
+
+
 
 typedef struct Node {
     u32 lineNumber;
@@ -171,8 +243,8 @@ typedef enum ExprType {
     ExprType_Constant, // TODO: is this even used for anything important?
     ExprType_Alloc,
     ExprType_Ternary,
-    ExprType_FuncCall,
-    ExprType_FuncPointerCall,
+    ExprType_ProcCall,
+    ExprType_ProcPtrCall,
     ExprType_Deref,
     ExprType_Indexing,
     ExprType_Cast,
@@ -378,17 +450,23 @@ typedef struct CaseLabelStatement {
     Expression* expr;
 } CaseLabelStatement;
 
-// ----Functions----------------------------------------------
+// ----Procedures----------------------------------------------
 
-typedef struct FuncArg {
+typedef struct ProcPtr {
+    Datatype returnType;
+    u32 argCount;
+    Datatype argTypes[];
+} ProcPtr;
+
+typedef struct ProcArg {
     Datatype type;
     Identifier name;
-} FuncArg;
+} ProcArg;
 
 typedef struct Procedure {
     Identifier name;
     Datatype returnType;
-    FuncArg* arguments; // darray
+    ProcArg* arguments; // darray
 
     /* overload
         value of zero means this function is not overloaded.
@@ -398,15 +476,15 @@ typedef struct Procedure {
 
     Scope* scope; // scope can be null
 
-    // FuncPtr* ptr_type;
+    Datatype ptr_type;
 } Procedure;
 
-typedef struct FuncCall {
+typedef struct ProcCall {
     Expression base;
     Expression* funcExpr;
     Expression** args; // darray of Expression pointers
     u32 overload;
-} FuncCall;
+} ProcCall;
 
 // ----Struct----------------------------------------------
 
@@ -471,8 +549,8 @@ u32 ExpressionType_Bytesizes[] = {
     [ExprType_Constant] = sizeof(VariableExpression),
     [ExprType_Alloc] = sizeof(AllocExpression),
     [ExprType_Ternary] = sizeof(TernaryExpression),
-    [ExprType_FuncCall] = sizeof(FuncCall),
-    [ExprType_FuncPointerCall] = sizeof(FuncCall),
+    [ExprType_ProcCall] = sizeof(ProcCall),
+    [ExprType_ProcPtrCall] = sizeof(ProcCall),
     [ExprType_Deref] = sizeof(DerefOperator),
     [ExprType_Indexing] = sizeof(IndexingExpression),
     [ExprType_Cast] = sizeof(CastExpression),

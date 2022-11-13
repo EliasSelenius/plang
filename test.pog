@@ -47,3 +47,17 @@ struct Test {
     float64 i, j, k;
     OpaqueType* o1, o2;
 }
+
+Test modifyTest(Test test) {
+    test.x = 1;
+    return test;
+}
+
+Test modifyTest(Test test, Test test2) {
+    test.x = test2.x;
+    return test;
+}
+
+Test other(Test test) {
+    return test;
+}

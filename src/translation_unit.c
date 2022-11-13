@@ -5,11 +5,6 @@ typedef struct AliasType {
     Datatype aliasedType;
 } AliasType;
 
-typedef struct FuncPtr {
-    Datatype returnType;
-    u32 argCount;
-    Datatype argTypes[];
-} FuncPtr;
 
 typedef struct TranslationUnit {
     Procedure* procedures; // darray
@@ -17,7 +12,7 @@ typedef struct TranslationUnit {
     VarDecl* globalVariables; // darray
     Constant* constants; // darray
 
-    DynamicBuffer* funcPtrTypes;
+    DynamicBuffer* procPtrTypes;
 
     AliasType* aliases; // darray
     Identifier* opaqueTypes; // darray
@@ -30,7 +25,7 @@ typedef struct TranslationUnit {
 static TranslationUnit* g_Unit;
 
 static inline char* getIdentifierStringValue(Identifier id) { return (char*)(&g_Unit->stringTable->bytes[id]); }
-static inline FuncPtr* getFuncPtr(u32 id) { return (FuncPtr*)&g_Unit->funcPtrTypes->bytes[id]; }
+static inline ProcPtr* getProcPtr(u32 id) { return (ProcPtr*)&g_Unit->procPtrTypes->bytes[id]; }
 
 static u32 appendStringToStringtable(StrSpan word) {
     u32 len = darrayLength(g_Unit->stringTableByteOffsets);
@@ -56,4 +51,45 @@ static Datatype dealiasType(Datatype type) {
         return dealiasType(newType);
     }
     return type;
+}
+
+
+static Datatype ensureProcPtr(Procedure* proc) {
+
+    u32 argCount = proc->arguments ? darrayLength(proc->arguments) : 0;
+
+    u32 length = g_Unit->procPtrTypes->length;
+    u32 procId = 0;
+    while (procId < length) {
+        ProcPtr* ptr = getProcPtr(procId);
+
+        if (ptr->argCount == argCount && typeEquals(proc->returnType, ptr->returnType)) {
+            for (u32 i = 0; i < argCount; i++)
+                if (!typeEquals(proc->arguments[i].type, ptr->argTypes[i])) goto skip;
+            return (Datatype) {
+                .kind = Typekind_ProcPtr,
+                .ref = procId,
+                .numPointers = 1
+            };
+        }
+
+        skip: procId += sizeof(ProcPtr) + sizeof(Datatype) * ptr->argCount;
+    }
+
+
+    procId = dyReserve(&g_Unit->procPtrTypes, sizeof(ProcPtr));
+    ProcPtr* ptr = getProcPtr(procId);
+    ptr->returnType = proc->returnType;
+    ptr->argCount = argCount;
+    for (u32 i = 0; i < argCount; i++) {
+        u32 argRef = dyReserve(&g_Unit->procPtrTypes, sizeof(Datatype));
+        *(Datatype*)(&g_Unit->procPtrTypes->bytes[argRef]) = proc->arguments[i].type;
+    }
+
+
+    return (Datatype) {
+        .kind = Typekind_ProcPtr,
+        .ref = procId,
+        .numPointers = 1
+    };
 }

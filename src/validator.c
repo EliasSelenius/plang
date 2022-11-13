@@ -58,7 +58,7 @@ static Datatype getDeclaredVariable(Identifier name) {
         if (procedure->arguments) {
             u32 len = darrayLength(procedure->arguments);
             for (u32 i = 0; i < len; i++) {
-                FuncArg* arg = &procedure->arguments[i];
+                ProcArg* arg = &procedure->arguments[i];
                 if (name == arg->name) {
                     return arg->type;
                 }
@@ -81,9 +81,8 @@ static Datatype validateVariable(VariableExpression* var) {
     Datatype type = getDeclaredVariable(var->name);
     if (type.kind != Typekind_Invalid) return type;
 
-    // TODO: remove this by placing the FuncPtr in Procedure
     Procedure* proc = getProcedureByName(var->name);
-    if (proc) return ensureFuncPtrExistsFromProcedure(proc);
+    if (proc) return proc->ptr_type; // ensureProcPtr(proc); // TODO: I dont like that I have to call ensureProcPtr here.
 
     // look for constants
     u32 len = darrayLength(g_Unit->constants);
@@ -145,7 +144,7 @@ static void validateType(Datatype* type) {
     error_temp("Type not recognized.");
 }
 
-static bool funcPtrAssignable(FuncPtr* to, FuncPtr* from) {
+static bool funcPtrAssignable(ProcPtr* to, ProcPtr* from) {
     if (to->argCount != from->argCount) return false;
 
     if (!typeAssignable(to->returnType, from->returnType)) return false;
@@ -180,9 +179,9 @@ static bool typeAssignable(Datatype toType, Datatype fromType) {
 
         if (toType.kind == Typekind_void || fromType.kind == Typekind_void) return true;
 
-        if (toType.kind == Typekind_FuncPtr && fromType.kind == Typekind_FuncPtr) {
-            FuncPtr* toPtr = getFuncPtr(toType.ref);
-            FuncPtr* fromPtr = getFuncPtr(fromType.ref);
+        if (toType.kind == Typekind_ProcPtr && fromType.kind == Typekind_ProcPtr) {
+            ProcPtr* toPtr = getProcPtr(toType.ref);
+            ProcPtr* fromPtr = getProcPtr(fromType.ref);
             if (funcPtrAssignable(toPtr, fromPtr)) return true;
         }
 
@@ -200,6 +199,7 @@ static bool typeAssignable(Datatype toType, Datatype fromType) {
         case Typekind_int16:
         case Typekind_int32:
         case Typekind_int64:
+        case Typekind_AmbiguousDecimal:
         case Typekind_float32:
         case Typekind_float64: return true;
         default: return false;
@@ -212,7 +212,8 @@ static bool typeAssignable(Datatype toType, Datatype fromType) {
     if (isIntegralType(fromType)) {
 
         if (toType.kind == Typekind_float32 ||
-            toType.kind == Typekind_float64) return true;
+            toType.kind == Typekind_float64 ||
+            toType.kind == Typekind_AmbiguousDecimal) return true;
 
         if (isIntegralType(toType))
             if (rangein(getNumericDomain(fromType), getNumericDomain(toType)))
@@ -252,14 +253,14 @@ static void constructTypename(char* buffer, u32 size, Datatype type) {
         case Typekind_Enum: typename = null; break;
         case Typekind_Alias: typename = getIdentifierStringValue(g_Unit->aliases[type.ref].name); break;
         case Typekind_Opaque: typename = getIdentifierStringValue(type.ref); break;
-        case Typekind_FuncPtr: typename = "SomeFuncPtr"; break;
+        case Typekind_ProcPtr: typename = "SomeFuncPtr"; break;
 
     }
 
     snprintf(buffer, size, "%s%.*s", typename, type.numPointers, "**********");
 }
 
-static void assertAssignability(Datatype toType, Datatype fromType) {
+static void assertAssignability(Datatype toType, Datatype fromType, void* node) {
     if (!typeAssignable(toType, fromType)) {
 
         char toTypeName[50];
@@ -267,11 +268,15 @@ static void assertAssignability(Datatype toType, Datatype fromType) {
         constructTypename(toTypeName, sizeof(toTypeName), toType);
         constructTypename(fromTypeName, sizeof(fromTypeName), fromType);
 
-        error_temp("Type missmatch. \"%s\" is not assignable to \"%s\".", fromTypeName, toTypeName);
+        if (node) {
+            error_node(node, "Type missmatch. \"%s\" is not assignable to \"%s\".", fromTypeName, toTypeName);
+        } else {
+            error_temp("Type missmatch. \"%s\" is not assignable to \"%s\".", fromTypeName, toTypeName);
+        }
     }
 }
 
-static Datatype validateFuncCall(FuncCall* call) {
+static Datatype validateFuncCall(ProcCall* call) {
     call->overload = 0;
 
     // validate passed arguments
@@ -309,7 +314,7 @@ static Datatype validateFuncCall(FuncCall* call) {
                     getIdentifierStringValue(name),
                     expectedArgumentLength, passedArgumentsLength);
             } else {
-                for (u32 i = 0; i < passedArgumentsLength; i++) assertAssignability(proc->arguments[i].type, passedArguments[i]);
+                for (u32 i = 0; i < passedArgumentsLength; i++) assertAssignability(proc->arguments[i].type, passedArguments[i], call->args[i]);
             }
         }
 
@@ -318,9 +323,9 @@ static Datatype validateFuncCall(FuncCall* call) {
 
     funcptrPart:
     Datatype calleeType = dealiasType(validateExpression(call->funcExpr));
-    if (calleeType.kind == Typekind_FuncPtr) { // what if it is a double pointer? Then this shouldnt work.
-        call->base.expressionType = ExprType_FuncPointerCall;
-        FuncPtr* funcptr = getFuncPtr(calleeType.ref);
+    if (calleeType.kind == Typekind_ProcPtr) { // what if it is a double pointer? Then this shouldnt work.
+        call->base.expressionType = ExprType_ProcPtrCall;
+        ProcPtr* funcptr = getProcPtr(calleeType.ref);
 
         if (passedArgumentsLength != funcptr->argCount) {
             error_temp("Unexpected number of arguments passed to function pointer, expected %d, but got %d.",
@@ -328,7 +333,7 @@ static Datatype validateFuncCall(FuncCall* call) {
             return funcptr->returnType;
         }
 
-        for (u32 i = 0; i < passedArgumentsLength; i++) assertAssignability(funcptr->argTypes[i], passedArguments[i]);
+        for (u32 i = 0; i < passedArgumentsLength; i++) assertAssignability(funcptr->argTypes[i], passedArguments[i], call->args[i]);
         return funcptr->returnType;
     }
 
@@ -459,7 +464,23 @@ static Datatype _validateExpression(Expression* expr) {
 
             // TODO: is a valid operator operands pair?
 
-            return leftType;
+
+            if (typeEquals(leftType, rightType)) return leftType;
+
+
+            Datatype numberType = mergeNumberTypes(leftType, rightType);
+            if (numberType.kind != Typekind_Invalid) return numberType;
+
+
+            bool isLeftAssignable = typeAssignable(leftType, rightType);
+            if (isLeftAssignable) return leftType;
+            else {
+                bool isRightAssignable = typeAssignable(rightType, leftType);
+                if (isRightAssignable) return rightType;
+            }
+
+            error_node(expr, "Invalid binary expression.");
+            return type_invalid;
         } break;
 
         case ExprType_Alloc: {
@@ -495,9 +516,9 @@ static Datatype _validateExpression(Expression* expr) {
             return thenType;
         } break;
 
-        case ExprType_FuncPointerCall:
-        case ExprType_FuncCall: {
-            FuncCall* fc = (FuncCall*)expr;
+        case ExprType_ProcPtrCall:
+        case ExprType_ProcCall: {
+            ProcCall* fc = (ProcCall*)expr;
             return validateFuncCall(fc);
         } break;
 
@@ -581,7 +602,7 @@ static void validateStatement(Statement* sta) {
 
                 if (decl->type.kind == Typekind_MustBeInfered)
                     decl->type = resolveTypeAmbiguity(assType);
-                else assertAssignability(decl->type, assType);
+                else assertAssignability(decl->type, assType, decl->assignmentOrNull);
             }
 
             registerVariable(decl->name, decl->type);
@@ -593,7 +614,7 @@ static void validateStatement(Statement* sta) {
             Datatype toType = validateExpression(ass->assigneeExpr);
             Datatype fromType = validateExpression(ass->expr);
 
-            assertAssignability(toType, fromType);
+            assertAssignability(toType, fromType, ass->expr);
         } break;
 
         case Statement_Scope: {
@@ -735,7 +756,7 @@ static void validateGlobalVar(VarDecl* decl) {
             decl->type = resolveTypeAmbiguity(assType);
         } else {
             validateType(&decl->type);
-            assertAssignability(decl->type, assType);
+            assertAssignability(decl->type, assType, decl->assignmentOrNull);
         }
 
     } else {
@@ -747,18 +768,18 @@ static void validate() {
 
     // validate funcptrs
     u32 i = 0;
-    while (i < g_Unit->funcPtrTypes->length) {
-        FuncPtr* f = getFuncPtr(i);
+    while (i < g_Unit->procPtrTypes->length) {
+        ProcPtr* f = getProcPtr(i);
         validateType(&f->returnType);
         if (f->argCount) {
             for (u32 i = 0; i < f->argCount; i++) validateType(&f->argTypes[i]);
         }
-        i += sizeof(FuncPtr) + sizeof(Datatype) * f->argCount;
+        i += sizeof(ProcPtr) + sizeof(Datatype) * f->argCount;
     }
 
     { // validate type aliases (except funcptrs)
         foreach (alias, g_Unit->aliases) {
-            if (alias->aliasedType.kind == Typekind_FuncPtr) continue;
+            if (alias->aliasedType.kind == Typekind_ProcPtr) continue;
             validateType(&alias->aliasedType);
         }
     }
@@ -822,6 +843,8 @@ static void validate() {
         } else {
             validateType(&proc->returnType);
         }
+
+        proc->ptr_type = ensureProcPtr(proc);
     }
 
     // validate functions
