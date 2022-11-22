@@ -191,7 +191,7 @@ void load() {
 
     voxelGrid = generatePlanet();
     voxelGrid.transform.pos = vec(-20, 30);
-    voxelGrid.transform.rot = Pi / 4;
+    // voxelGrid.transform.rot = Pi / 3;
     print("Voxelgrid Tri Count: ", length(voxelGrid.inds) / 3, "\n");
 
     voxelMesh_circle = genCircle(360, 40);
@@ -308,18 +308,24 @@ int32 main() {
 
         { // voxels
 
-            voxelGrid.transform.rot += 0.0002;
+            // voxelGrid.transform.rot += 0.0002;
 
             let mouseCoord = getMouseWorldCoord();
 
-            // if point_intersects(mouseCoord, *voxelGrid) {
-            //     let center = calcCenterOfMass(*voxelGrid);
-            //     glUniform2f(glGetUniformLocation(shader, "entity_pos"), center.x, center.y);
-            //     drawMesh(voxelMesh_circle);
-            // }
+            if point_intersects(mouseCoord, *voxelGrid) {
+                // let center = calcCenterOfMass(*voxelGrid);
+                // glUniform2f(glGetUniformLocation(shader, "entity_pos"), center.x, center.y);
+                // drawMesh(voxelMesh_circle);
+                print("Intersects\n");
+                glClearColor(0.5, 0.05, 0.05, 1.0);
+            } else {
+                glClearColor(0.05, 0.05, 0.05, 1.0);
+            }
 
             if mouse(Left_Mouse) {
-                VoxelGrid_addCircle(*voxelGrid, 3, mouseCoord.x, mouseCoord.y);
+                // VoxelGrid_addCircle(*voxelGrid, 3, mouseCoord.x, mouseCoord.y);
+                let local = getLocalCoords(*voxelGrid, mouseCoord.x, mouseCoord.y);
+                voxelGrid.data[voxelGrid.res * round2int(local.x) + round2int(local.y)] += 0.01;
                 updateGridMesh(*voxelGrid);
             } else if mouse(Right_Mouse) {
                 VoxelGrid_removeCircle(*voxelGrid, 3, mouseCoord.x, mouseCoord.y);

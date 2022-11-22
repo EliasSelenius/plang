@@ -62,8 +62,8 @@ void updateGridMesh(VoxelGrid* grid) {
     listClear(grid.inds);
 
     uint32 size = grid.res - 1;
-    let g1_size = grid.res * grid.res;
-    let g2_size = grid.res * size;
+    let g1_byteoffset = grid.res * grid.res;
+    let g2_byteoffset = g1_byteoffset + grid.res * size;
 
     for uint32 x in 0 .. size {
         for uint32 y in 0 .. size {
@@ -80,10 +80,10 @@ void updateGridMesh(VoxelGrid* grid) {
                 *--------4--------*
             */
 
-            let e2 = g1_size + x * size + y;
-            let e3 = g1_size + (x + 1) * size + y;
-            let e1 = g1_size + g2_size + x * grid.res + (y + 1);
-            let e4 = g1_size + g2_size + x * grid.res + y;
+            let e2 = g1_byteoffset + x * size + y;
+            let e3 = g1_byteoffset + (x + 1) * size + y;
+            let e1 = g2_byteoffset + x * grid.res + (y + 1);
+            let e4 = g2_byteoffset + x * grid.res + y;
 
             let i1 = getIndex(grid.res, x, y + 1);
             let i2 = getIndex(grid.res, x + 1, y + 1);
@@ -187,9 +187,9 @@ void updateGridMesh(VoxelGrid* grid) {
                 else if b1  ofs = p1;
                 else        ofs = 1.0 - p2;
 
-                let i = g1_size + x * size + y;
-                grid.verts[i].x = x as float32 - half;
-                grid.verts[i].y = y as float32 + ofs - half;
+                let i = g1_byteoffset + x * size + y;
+                grid.verts[i].x = x - half;
+                grid.verts[i].y = y + ofs - half;
             }
         }
 
@@ -207,9 +207,9 @@ void updateGridMesh(VoxelGrid* grid) {
                 else if b1  ofs = p1;
                 else        ofs = 1.0 - p2;
 
-                let i = g1_size + g2_size + x * grid.res + y;
-                grid.verts[i].x = x as float32 + ofs - half;
-                grid.verts[i].y = y as float32 - half;
+                let i = g2_byteoffset + x * grid.res + y;
+                grid.verts[i].x = x + ofs - half;
+                grid.verts[i].y = y - half;
             }
         }
     }
@@ -275,14 +275,24 @@ void VoxelGrid_removeCircle(VoxelGrid* grid, float32 radius, float32 x, float32 
     }
 }
 
-int32 point_intersects(vec2 point, VoxelGrid* grid) {
-    uint32 x = point.x as uint32;
-    uint32 y = point.y as uint32;
+struct Intersection {
+    vec2 surface_normal;
+    vec2 distance;
+}
 
-    let i1 = getIndex(grid.res, x, y + 1);
-    let i2 = getIndex(grid.res, x + 1, y + 1);
-    let i3 = getIndex(grid.res, x, y);
-    let i4 = getIndex(grid.res, x + 1, y);
+int32 point_intersects(vec2 point, VoxelGrid* grid) {
+
+    point = getLocalCoords(grid, point.x, point.y);
+    int32 x = point.x as int32;
+    int32 y = point.y as int32;
+
+    if x < 0 or x >= grid.res return false;
+    if y < 0 or y >= grid.res return false;
+
+    let i1 = grid.res * x + y + 1;
+    let i2 = grid.res * (x + 1) + y + 1;
+    let i3 = grid.res * x + y;
+    let i4 = grid.res * (x + 1) + y;
 
     let p1 = grid.data[i1];
     let p2 = grid.data[i2];
@@ -295,9 +305,98 @@ int32 point_intersects(vec2 point, VoxelGrid* grid) {
     if p3 > PointOnThreshold mask |= BottomLeftBit;
     if p4 > PointOnThreshold mask |= BottomRightBit;
 
-    switch (mask) {
-        case 0x0F: return true;
+    // let size = grid.res - 1;
+    // let g1_byteoffset = grid.res * grid.res;
+    // let g2_byteoffset = g1_byteoffset + grid.res * size;
+    // let e2 = g1_byteoffset + x * size + y;
+    // let e3 = g1_byteoffset + (x + 1) * size + y;
+    // let e1 = g2_byteoffset + x * grid.res + (y + 1);
+    // let e4 = g2_byteoffset + x * grid.res + y;
+
+
+    vec2 rot90deg(vec2 v) {
+        vec2 res = vec(-v.y, v.x); // rotate 90 degrees to the left. (multiplication with imaginary unit)
+        return res;
     }
+
+    vec2 a;
+    vec2 b;
+    switch (mask) {
+        // corners
+        // case TopLeftBit: break;
+        // case TopRightBit: break;
+        // case BottomRightBit: break;
+        // case BottomLeftBit: break;
+
+
+            /*
+                *--------1--------*
+                |                 |
+                |                 |
+                |                 |
+                2                 3
+                |                 |
+                |                 |
+                |                 |
+                *--------4--------*
+            */
+
+
+        // inverted corners
+        case 0x0F & ~TopLeftBit:
+            a = vec(0, p3);
+            b = vec(1 - p2, 1);
+            break;
+        case 0x0F & ~TopRightBit:
+            a = vec(p1, 1);
+            b = vec(1, p4);
+            break;
+        case 0x0F & ~BottomRightBit:
+            a = vec(1, 1 - p2);
+            b = vec(p3, 0);
+            break;
+        case 0x0F & ~BottomLeftBit:
+            a = vec(1 - p4, 0);
+            b = vec(0, 1 - p1);
+            break;
+
+        // horizontal 'walls'
+        case TopLeftBit | TopRightBit:
+            a = vec(1, 1 - p2);
+            b = vec(0, 1 - p1);
+            break;
+        case BottomLeftBit | BottomRightBit:
+            a = vec(0, p3);
+            b = vec(1, p4);
+            break;
+        // vertical 'walls'
+        case TopLeftBit | BottomLeftBit:
+            a = vec(p1, 1);
+            b = vec(p3, 0);
+            break;
+        case TopRightBit | BottomRightBit:
+            a = vec(1 - p4, 0);
+            b = vec(1 - p2, 1);
+            break;
+
+        // // diagonals
+        // case TopLeftBit | BottomRightBit: break;
+        // case TopRightBit | BottomLeftBit: break;
+
+        // solid block
+        case 0x0F: return true;
+        // air
+        case 0x0: return false;
+
+        default: return false;
+    }
+
+    vec2 local = sub(point, vec(x, y));
+    local = sub(local, a);
+
+    vec2 normal = rot90deg(sub(b, a));
+
+    if dot(normal, local) <= 0 return true;
 
     return false;
 }
