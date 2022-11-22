@@ -301,9 +301,6 @@ typedef struct AllocExpression {
 typedef struct DerefOperator {
     Expression base;
     Expression* expr;
-    // I feel this is a little bit of a hack. We may have to remove this.
-    // TODO: we can now remove this, since datatype is stored in Expression
-    char* derefOp;
     Identifier name;
 } DerefOperator;
 
@@ -350,6 +347,7 @@ typedef enum StatementType {
     Statement_ForIn,
     Statement_For,
     Statement_Switch,
+    Statement_LocalProc,
 
     Statement_Continue,
     Statement_Break,
@@ -486,6 +484,17 @@ typedef struct ProcCall {
     u32 overload;
 } ProcCall;
 
+typedef struct CapturedVariable {
+    Identifier name;
+    Datatype type;
+} CapturedVariable;
+
+typedef struct LocalProc {
+    Statement base;
+    Procedure proc;
+    CapturedVariable* captures; // darray
+} LocalProc;
+
 // ----Struct----------------------------------------------
 
 typedef struct Field {
@@ -569,6 +578,7 @@ u32 StatementType_Bytesizes[] = {
     [Statement_ForIn] = sizeof(ForInStatement),
     [Statement_For] = sizeof(ForStatement),
     [Statement_Switch] = sizeof(SwitchStatement),
+    [Statement_LocalProc] = sizeof(LocalProc),
     [Statement_Continue] = sizeof(Statement),
     [Statement_Break] = sizeof(Statement),
     [Statement_Return] = sizeof(ReturnStatement),

@@ -1,5 +1,13 @@
 
+typedef enum Vartype {
+    Vartype_Variable,
+    Vartype_ProcArg,
+    Vartype_Constant,
+    Vartype_Procedure
+} Vartype;
+
 typedef struct Variable {
+    Vartype vartype;
     Identifier name;
     Datatype type;
 } Variable;
@@ -7,12 +15,54 @@ typedef struct Variable {
 static Procedure* procedure;
 static Variable* variables;
 
+static u32 capture_index;
+static LocalProc* current_localproc = null;
+
+static void registerVariable(Identifier name, Datatype type, Vartype vartype) {
+    Variable var;
+    var.vartype = vartype;
+    var.name = name;
+    var.type = type;
+    darrayAdd(variables, var);
+}
+
+static Datatype getVariable(Identifier name) {
+
+    // look for local var
+    if (variables) {
+        u32 len = darrayLength(variables);
+        for (u32 i = 0; i < len; i++) {
+            if (name == variables[i].name) {
+
+                if (current_localproc) {
+                    if (i < capture_index) {
+                        CapturedVariable cvar;
+                        cvar.name = name;
+                        cvar.type = variables[i].type;
+                        darrayAdd(current_localproc->captures, cvar);
+                    }
+                }
+
+                return variables[i].type;
+            }
+        }
+    }
+
+    // look for global var
+    u32 len = darrayLength(g_Unit->globalVariables);
+    for (u32 i = 0; i < len; i++) {
+        if (name == g_Unit->globalVariables[i].name) return g_Unit->globalVariables[i].type;
+    }
+
+    return type_invalid;
+}
 
 static Datatype validateExpression(Expression* expr);
-static Datatype getDeclaredVariable(Identifier name);
+static Datatype getVariable(Identifier name);
 static bool typeAssignable(Datatype toType, Datatype fromType);
 static void validateScope(Scope* scope);
-
+static void validateProcedure(Procedure* proc);
+static void validateLocalProc(LocalProc* localproc);
 
 static Field* getField(PlangStruct* stru, Identifier name) {
     for (u32 i = 0; i < darrayLength(stru->fields); i++) {
@@ -41,48 +91,13 @@ static Procedure* getProcedureByName(Identifier name) {
     return null;
 }
 
-static Datatype getDeclaredVariable(Identifier name) {
-
-    // look for local var
-    if (variables) {
-        u32 len = darrayLength(variables);
-        for (u32 i = 0; i < len; i++) {
-            if (name == variables[i].name) {
-                return variables[i].type;
-            }
-        }
-    }
-
-    // look for func argument
-    if (procedure) {
-        if (procedure->arguments) {
-            u32 len = darrayLength(procedure->arguments);
-            for (u32 i = 0; i < len; i++) {
-                ProcArg* arg = &procedure->arguments[i];
-                if (name == arg->name) {
-                    return arg->type;
-                }
-            }
-        }
-    }
-
-    // look for global var
-    u32 len = darrayLength(g_Unit->globalVariables);
-    for (u32 i = 0; i < len; i++) {
-        if (name == g_Unit->globalVariables[i].name) return g_Unit->globalVariables[i].type;
-    }
-
-
-    return type_invalid;
-}
-
 static Datatype validateVariable(VariableExpression* var) {
 
-    Datatype type = getDeclaredVariable(var->name);
+    Datatype type = getVariable(var->name);
     if (type.kind != Typekind_Invalid) return type;
 
     Procedure* proc = getProcedureByName(var->name);
-    if (proc) return proc->ptr_type; // ensureProcPtr(proc); // TODO: I dont like that I have to call ensureProcPtr here.
+    if (proc) return proc->ptr_type;
 
     // look for constants
     u32 len = darrayLength(g_Unit->constants);
@@ -360,8 +375,6 @@ static Datatype _validateExpression(Expression* expr) {
                 return type_invalid;
             }
 
-            deref->derefOp = datatype.numPointers ? "->" : ".";
-
             if (datatype.kind != Typekind_Struct) {
                 error_node(expr, "Invalid dereferencing.");
                 return type_invalid;
@@ -559,20 +572,13 @@ static Datatype validateExpression(Expression* expr) {
     return expr->datatype;
 }
 
-static void registerVariable(Identifier name, Datatype type) {
-    Variable var;
-    var.name = name;
-    var.type = type;
-    darrayAdd(variables, var);
-}
-
 static void validateStatement(Statement* sta) {
     switch (sta->statementType) {
         case Statement_FixedArray_Declaration: {
             VarDecl* decl = (VarDecl*)sta;
 
             // Check wheter there already is a variable with this name
-            if (getDeclaredVariable(decl->name).kind != Typekind_Invalid) {
+            if (getVariable(decl->name).kind != Typekind_Invalid) {
                 error_node(sta, "Variable \"%s\" is already declared.", getIdentifierStringValue(decl->name));
             }
 
@@ -582,14 +588,14 @@ static void validateStatement(Statement* sta) {
             Datatype sizetype = validateExpression(decl->assignmentOrNull);
             // TODO: is asstype a valid integer expression?
 
-            registerVariable(decl->name, decl->type);
+            registerVariable(decl->name, decl->type, Vartype_Variable);
 
         } break;
         case Statement_Declaration: {
             VarDecl* decl = (VarDecl*)sta;
 
             // Check wheter there already is a variable with this name
-            if (getDeclaredVariable(decl->name).kind != Typekind_Invalid) {
+            if (getVariable(decl->name).kind != Typekind_Invalid) {
                 error_node(sta, "Variable \"%s\" is already declared.", getIdentifierStringValue(decl->name));
             }
 
@@ -605,7 +611,7 @@ static void validateStatement(Statement* sta) {
                 else assertAssignability(decl->type, assType, decl->assignmentOrNull);
             }
 
-            registerVariable(decl->name, decl->type);
+            registerVariable(decl->name, decl->type, Vartype_Variable);
 
         } break;
         case Statement_Assignment: {
@@ -650,11 +656,11 @@ static void validateStatement(Statement* sta) {
             validateExpression(forin->max_expr);
 
             // Check wheter there already is a variable with this name
-            if (getDeclaredVariable(forin->index_name).kind != Typekind_Invalid) {
+            if (getVariable(forin->index_name).kind != Typekind_Invalid) {
                 error_node(sta, "Variable \"%s\" is already declared.", getIdentifierStringValue(forin->index_name));
             }
 
-            registerVariable(forin->index_name, forin->index_type);
+            registerVariable(forin->index_name, forin->index_type, Vartype_Variable);
             validateStatement(forin->statement);
             darrayHead(variables)->length--;
 
@@ -665,6 +671,11 @@ static void validateStatement(Statement* sta) {
             // TODO: check if expr is a valid type to switch on
             validateExpression(switchSta->expr);
             validateScope(switchSta->scope);
+        } break;
+
+        case Statement_LocalProc: {
+            LocalProc* localproc = (LocalProc*)sta;
+            validateLocalProc(localproc);
         } break;
 
         case Statement_Break: {
@@ -722,10 +733,38 @@ static void validateScope(Scope* scope) {
     darrayHead(variables)->length = vars_start_index;
 }
 
-static void validateProcedure(Procedure* proc) {
-    procedure = proc;
+static void validateLocalProc(LocalProc* localproc) {
+    validateType(&localproc->proc.returnType);
+    if (localproc->proc.arguments) {
+        foreach (arg, localproc->proc.arguments) validateType(&arg->type);
+    }
+    localproc->proc.ptr_type = ensureProcPtr(&localproc->proc);
 
-    if (proc->scope) validateScope(proc->scope);
+    registerVariable(localproc->proc.name, localproc->proc.ptr_type, Vartype_Procedure);
+
+    localproc->captures = darrayCreate(CapturedVariable);
+    current_localproc = localproc;
+    capture_index = darrayLength(variables);
+    validateProcedure(&localproc->proc);
+    current_localproc = null;
+}
+
+static void validateProcedure(Procedure* proc) {
+    if (proc->scope) {
+        Procedure* otherproc = procedure;
+        procedure = proc;
+
+        u32 num_args = 0;
+        if (proc->arguments) {
+            foreach (arg, proc->arguments) registerVariable(arg->name, arg->type, Vartype_ProcArg);
+            num_args = arg_count;
+        }
+
+        validateScope(proc->scope);
+        darrayHead(variables)->length -= num_args;
+
+        procedure = otherproc;
+    }
 
     if (proc->returnType.kind == Typekind_MustBeInfered) {
         proc->returnType = type_void;
@@ -849,6 +888,7 @@ static void validate() {
 
     // validate functions
     variables = darrayCreate(Variable);
+    procedure = null;
     for (u32 i = 0; i < funcLen; i++) {
         validateProcedure(&g_Unit->procedures[i]);
     }

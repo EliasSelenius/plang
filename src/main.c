@@ -9,7 +9,6 @@
         - for int loop: for 12 { }
         - loop block: loop { } == while (true) { }
         - modules or namespaces ?
-        - allow underscores in number literals
         - nested multi-line comments
         - disallow void as variable type in declaration
         - nesting funcptr types inside funcptrs arguments. void(void*(char*), uint) seems to produce a bug
@@ -22,9 +21,13 @@
         *- fixed sized arrays as struct fields
         - local consts
         - multi-declare e.g: int i, j = 1, k;
-        - localy defined functions
         - let output exe be named the name of the directory
         - it keyword
+        - labeled break and continue e.g (for i in 0..count { if a break i; else continue i; }) use the index/item name as the for label
+        - global variable runtime expression assignment
+        - localy defined type aliases
+        - operator overload
+        - capturing locals for localy defined procedures
 
     InProgress:
         *- file name in errors
@@ -32,6 +35,8 @@
 
 
     DONE list:
+        - localy defined procedures
+        - allow underscores in number literals
         - "plang build" CLI. build all .pog files in directory.
         *- for in range loop: for i in 0..10 { }
         *- implicit casts of numeric types

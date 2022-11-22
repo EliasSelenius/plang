@@ -210,7 +210,8 @@ static void transpileExpression(Expression* expr) {
         case ExprType_Deref: {
             DerefOperator* deref = (DerefOperator*)expr;
             transpileExpression(deref->expr);
-            sbAppend(sb, deref->derefOp);
+            if (deref->expr->datatype.numPointers) sbAppend(sb, "->");
+            else sbAppend(sb, ".");
             sbAppend(sb, getIdentifierStringValue(deref->name));
         } break;
 
@@ -450,6 +451,10 @@ static void transpileStatement(Statement* statement) {
             transpileScope(switchSta->scope);
         } break;
 
+        case Statement_LocalProc: {
+            sbAppend(sb, "// local procedure");
+        } break;
+
         case Statement_Break: sbAppend(sb, "break;"); break;
         case Statement_Continue: sbAppend(sb, "continue;"); break;
 
@@ -510,6 +515,35 @@ static void transpileScope(Scope* scope) {
     sbAppend(sb, "}");
 }
 
+static void transpileLocalProc(LocalProc* localproc) {
+    transpileType(localproc->proc.returnType);
+    sbAppend(sb, " ");
+    sbAppend(sb, getIdentifierStringValue(localproc->proc.name));
+    sbAppend(sb, "(");
+    foreach (captured, localproc->captures) {
+        Datatype type = captured->type;
+        type.numPointers++;
+        transpileType(type);
+        sbAppend(sb, " ");
+        sbAppend(sb, getIdentifierStringValue(captured->name));
+        sbAppend(sb, ", ");
+    }
+    if (localproc->proc.arguments) {
+        foreach (arg, localproc->proc.arguments) {
+            transpileType(arg->type);
+            sbAppend(sb, " ");
+            sbAppend(sb, getIdentifierStringValue(arg->name));
+            sbAppend(sb, ", ");
+        }
+    }
+
+    sb->length -= 2;
+
+    sbAppend(sb, ") ");
+    transpileScope(localproc->proc.scope);
+    newline();
+}
+
 static void transpileFunctionSignature(Procedure* proc) {
     transpileType(proc->returnType);
     sbAppend(sb, " ");
@@ -537,6 +571,16 @@ static void transpileFunctionSignature(Procedure* proc) {
 }
 
 static void transpileProcedure(Procedure* proc) {
+
+    { // transpile local procs first
+        foreach (sta, proc->scope->statements) {
+            if ((*sta)->statementType == Statement_LocalProc) {
+                LocalProc* localproc = (LocalProc*)(*sta);
+                transpileLocalProc(localproc);
+            }
+        }
+    }
+
     transpileFunctionSignature(proc);
     sbAppend(sb, " ");
     transpileScope(proc->scope);

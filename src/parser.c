@@ -389,7 +389,6 @@ static Expression* parseLeafExpression() {
                 token_index++;
 
                 deref->expr = res;
-                deref->derefOp = null;
                 deref->name = identifier();
                 res = (Expression*)deref;
             } continue;
@@ -676,31 +675,48 @@ static VarDecl* expectVarDecl() {
     return decl;
 }
 
+static ProcArg* expectProcArguments() {
+    ProcArg* res = null;
+
+    ProcArg arg;
+    if (parseType(&arg.type)) {
+        arg.name = identifier();
+
+        res = darrayCreate(ProcArg);
+        darrayAdd(res, arg);
+
+        while (tok(Tok_Comma)) {
+            arg.type = expectType();
+            arg.name = identifier();
+            darrayAdd(res, arg);
+        }
+    }
+
+    expect(Tok_CloseParen);
+
+    return res;
+}
+
 static Statement* expectStatement() {
-    Statement* res = null;
-
-    u32 startingLineNum = tokens[token_index].line;
-
     switch (tokens[token_index].type) {
 
-        case Tok_OpenCurl: {
-            res = (Statement*)expectScope();
-        } break;
+        case Tok_OpenCurl: return (Statement*)expectScope();
 
         case Tok_Keyword_While: {
+            WhileStatement* whileStatement = allocStatement(Statement_While);
             token_index++;
 
-            WhileStatement* whileStatement = malloc(sizeof(WhileStatement));
-            whileStatement->base.statementType = Statement_While;
             whileStatement->condition = expectExpression();
             whileStatement->statement = expectStatement();
 
-            res = (Statement*)whileStatement;
-        } break;
+            return (Statement*)whileStatement;
+        }
+
         case Tok_Keyword_If: {
             token_index++;
-            res = (Statement*)expectIfStatement();
-        } break;
+            return (Statement*)expectIfStatement();
+        }
+
         case Tok_Keyword_For: {
             ForInStatement* forin = allocStatement(Statement_ForIn);
             token_index++;
@@ -724,8 +740,8 @@ static Statement* expectStatement() {
             if (mustClose) expect(Tok_CloseParen);
 
             forin->statement = expectStatement();
-            res = (Statement*)forin;
-        } break;
+            return (Statement*)forin;
+        }
 
         case Tok_Keyword_Switch: {
             SwitchStatement* switchStatement = allocStatement(Statement_Switch);
@@ -734,157 +750,164 @@ static Statement* expectStatement() {
             switchStatement->expr = expectExpression();
             switchStatement->scope = expectScope();
 
-            res = (Statement*)switchStatement;
-        } break;
-        case Tok_Keyword_Case: {
-            token_index++;
+            return (Statement*)switchStatement;
+        }
 
-            CaseLabelStatement* caseLabel = malloc(sizeof(CaseLabelStatement));
-            caseLabel->base.statementType = Statement_CaseLabel;
+        case Tok_Keyword_Case: {
+            CaseLabelStatement* caseLabel = allocStatement(Statement_CaseLabel);
+            token_index++;
             caseLabel->expr = expectExpression();
             expect(Tok_Colon);
+            return (Statement*)caseLabel;
+        }
 
-            res = (Statement*)caseLabel;
-        } break;
         case Tok_Keyword_Default: {
-            res = malloc(sizeof(Statement));
-            res->statementType = Statement_DefaultLabel;
+            Statement* sta = allocStatement(Statement_DefaultLabel);
             token_index++;
             expect(Tok_Colon);
-        } break;
+            return sta;
+        }
 
         case Tok_Keyword_Continue: {
-            res = malloc(sizeof(Statement));
-            res->statementType = Statement_Continue;
+            Statement* sta = allocStatement(Statement_Continue);
             token_index++;
             semicolon();
-        } break;
+            return sta;
+        }
+
         case Tok_Keyword_Break: {
-            res = malloc(sizeof(Statement));
-            res->statementType = Statement_Break;
+            Statement* sta = allocStatement(Statement_Break);
             token_index++;
             semicolon();
-        } break;
+            return sta;
+        }
+
         case Tok_Keyword_Return: {
-            res = malloc(sizeof(ReturnStatement));
-            res->statementType = Statement_Return;
+            ReturnStatement* ret = allocStatement(Statement_Return);
             token_index++;
-            ((ReturnStatement*)res)->returnExpr = parseExpression();
+            ret->returnExpr = parseExpression();
             semicolon();
-        } break;
+            return (Statement*)ret;
+        }
 
         case Tok_Keyword_Goto: {
-            GotoStatement* go = malloc(sizeof(GotoStatement));
-            go->base.statementType = Statement_Goto;
+            GotoStatement* go = allocStatement(Statement_Goto);
             token_index++;
             go->label = identifier();
-            res = (Statement*)go;
             semicolon();
-        } break;
+            return (Statement*)go;
+        }
 
         case Tok_Keyword_Let: {
-            res = (Statement*)expectVarDecl();
+            VarDecl* decl = expectVarDecl();
             semicolon();
-        } break;
+            return (Statement*)decl;
+        }
 
-        default: {
+        default: break;
+    }
 
-            if (tokens[token_index].type == Tok_Word && tokens[token_index + 1].type == Tok_Colon) {
-                LabelStatement* label = malloc(sizeof(LabelStatement));
-                label->base.statementType = Statement_Label;
-                label->label = tokens[token_index++].stringTableByteOffset;
-                token_index++;
-                res = (Statement*)label;
-                break;
+    // label
+    if (tokens[token_index].type == Tok_Word && tokens[token_index + 1].type == Tok_Colon) {
+        LabelStatement* label = allocStatement(Statement_Label);
+        label->label = tokens[token_index++].stringTableByteOffset;
+        token_index++;
+        return (Statement*)label;
+    }
+
+    // declaration
+    u32 postType = peekType();
+    if (postType && tokens[postType].type == Tok_Word) {
+
+        if (tokens[postType + 1].type == Tok_OpenParen) {
+            // confirmed procedure
+
+            LocalProc* localproc = allocStatement(Statement_LocalProc);
+            localproc->proc.overload = 0;
+            localproc->proc.returnType = expectInferableType();
+            localproc->proc.name = identifier();
+            expect(Tok_OpenParen);
+            localproc->proc.arguments = expectProcArguments();
+            localproc->proc.scope = expectScope();
+
+            return (Statement*)localproc;
+        } else {
+            // confirmed declaration
+
+            VarDecl* decl = allocStatement(Statement_Declaration);
+            decl->type = expectInferableType();
+            decl->name = identifier();
+
+            // fixed sized arrays
+            if (tok(Tok_OpenSquare)) {
+                decl->base.statementType = Statement_FixedArray_Declaration;
+                Expression* sizeExpr = expectExpression();
+                expect(Tok_CloseSquare);
+                decl->assignmentOrNull = sizeExpr;
+                decl->type.numPointers++;
+            } else {
+                decl->assignmentOrNull = tok(Tok_Assign) ? expectExpression() : null;
             }
 
-            { // declaration
-                u32 postType = peekType();
-                if (postType && tokens[postType].type == Tok_Word) {
-                    // confirmed declaration
-
-                    VarDecl* decl = malloc(sizeof(VarDecl));
-                    decl->base.statementType = Statement_Declaration;
-                    decl->type = expectInferableType();
-                    decl->name = identifier();
-
-                    // fixed sized arrays
-                    if (tok(Tok_OpenSquare)) {
-                        decl->base.statementType = Statement_FixedArray_Declaration;
-                        Expression* sizeExpr = expectExpression();
-                        expect(Tok_CloseSquare);
-                        decl->assignmentOrNull = sizeExpr;
-                        decl->type.numPointers++;
-                    } else {
-                        decl->assignmentOrNull = tok(Tok_Assign) ? expectExpression() : null;
-                    }
-
-                    semicolon();
-                    res = (Statement*)decl;
-                    break;
-                }
-            }
-
-
-            { // expression statement
-                Expression* expr = parseExpression();
-                if (!expr) {
-                    unexpectedToken();
-                    return null;
-                }
-
-                switch (expr->expressionType) {
-                    case ExprType_Unary_PreIncrement:
-                    case ExprType_Unary_PostIncrement:
-                    case ExprType_Unary_PreDecrement:
-                    case ExprType_Unary_PostDecrement:
-                    case ExprType_ProcCall: {
-                        StatementExpression* staExpr = malloc(sizeof(StatementExpression));
-                        staExpr->base.statementType = Statement_Expression;
-                        staExpr->base.nodebase.lineNumber = expr->nodebase.lineNumber;
-                        staExpr->expr = expr;
-                        res = (Statement*)staExpr;
-                    } break;
-                    case ExprType_Indexing:
-                    case ExprType_Unary_ValueOf:
-                    case ExprType_Variable:
-                    case ExprType_Deref: {
-
-                        Token* token = anyof(8, Tok_Assign,
-                                                Tok_PlusAssign,
-                                                Tok_MinusAssign,
-                                                Tok_MulAssign,
-                                                Tok_DivAssign,
-                                                Tok_BitAndAssign,
-                                                Tok_BitOrAssign,
-                                                Tok_BitXorAssign);
-                        if (token) {
-                            Assignement* ass = malloc(sizeof(Assignement));
-                            ass->base.statementType = Statement_Assignment;
-                            ass->assigneeExpr = expr;
-                            ass->assignmentOper = token->type;
-                            ass->expr = expectExpression();
-                            res = (Statement*)ass;
-                        } else {
-                            error_token("Expected an assignment.");
-                        }
-
-                    } break;
-                    default:
-                        error_token("This expression is all by its lonesome.");
-                        return null;
-                }
-
-                semicolon();
-                break;
-            }
+            semicolon();
+            return (Statement*)decl;
         }
     }
 
-    // res should never be null up to this point
-    res->nodebase.lineNumber = startingLineNum;
 
-    return res;
+    // expression statement
+    Expression* expr = parseExpression();
+    if (!expr) {
+        unexpectedToken();
+        return null;
+    }
+
+    switch (expr->expressionType) {
+        case ExprType_Unary_PreIncrement:
+        case ExprType_Unary_PostIncrement:
+        case ExprType_Unary_PreDecrement:
+        case ExprType_Unary_PostDecrement:
+        case ExprType_ProcCall: {
+            StatementExpression* staExpr = allocStatement(Statement_Expression);
+            staExpr->base.nodebase.lineNumber = expr->nodebase.lineNumber;
+            staExpr->expr = expr;
+            semicolon();
+            return (Statement*)staExpr;
+        }
+
+        case ExprType_Indexing:
+        case ExprType_Unary_ValueOf:
+        case ExprType_Variable:
+        case ExprType_Deref: {
+
+            Token* token = anyof(8, Tok_Assign,
+                                    Tok_PlusAssign,
+                                    Tok_MinusAssign,
+                                    Tok_MulAssign,
+                                    Tok_DivAssign,
+                                    Tok_BitAndAssign,
+                                    Tok_BitOrAssign,
+                                    Tok_BitXorAssign);
+            if (token) {
+                Assignement* ass = allocStatement(Statement_Assignment);
+                ass->base.nodebase.lineNumber = expr->nodebase.lineNumber;
+                ass->assigneeExpr = expr;
+                ass->assignmentOper = token->type;
+                ass->expr = expectExpression();
+                semicolon();
+                return (Statement*)ass;
+            }
+
+            error_token("Expected an assignment.");
+        } break;
+
+
+        default:
+            error_token("This expression is all by its lonesome.");
+            return null;
+    }
+
+    return null;
 }
 
 static Scope* expectScope() {
@@ -938,28 +961,6 @@ static PlangStruct expectStruct() {
     return stru;
 }
 
-static ProcArg* expectFuncArgList() {
-    ProcArg* res = null;
-
-    ProcArg arg;
-    if (parseType(&arg.type)) {
-        arg.name = identifier();
-
-        res = darrayCreate(ProcArg);
-        darrayAdd(res, arg);
-
-        while (tok(Tok_Comma)) {
-            arg.type = expectType();
-            arg.name = identifier();
-            darrayAdd(res, arg);
-        }
-    }
-
-    expect(Tok_CloseParen);
-
-    return res;
-}
-
 static void funcOrGlobal() {
     Datatype type = expectInferableType();
     Identifier name = identifier();
@@ -971,7 +972,7 @@ static void funcOrGlobal() {
         proc.overload = 0;
         proc.returnType = type;
         proc.name = name;
-        proc.arguments = expectFuncArgList();
+        proc.arguments = expectProcArguments();
 
         g_CurrentScope = null;
         proc.scope = expectScope();
@@ -1069,7 +1070,7 @@ static void parse() {
                 proc.returnType = expectType();
                 proc.name = identifier();
                 expect(Tok_OpenParen);
-                proc.arguments = expectFuncArgList();
+                proc.arguments = expectProcArguments();
                 semicolon();
 
                 darrayAdd(g_Unit->procedures, proc);

@@ -21,35 +21,43 @@ static u64 hex_char_to_value(char h) {
 
 static u64 hex_number(u32* numDigits) {
     char* start = cursor;
-    while (isHexDigit(*cursor)) cursor++;
+    while (isHexDigit(*cursor) || *cursor == '_') cursor++;
     u32 len = cursor - start;
+
+    u32 num_underscores = 0;
 
     u64 acc = 0;
     u64 place = 1;
     for (i32 i = len - 1; i >= 0; i--) {
+        if (start[i] == '_') { num_underscores++; continue; }
         u64 d = hex_char_to_value(start[i]);
         acc += place * d;
         place *= 16;
     }
 
-    *numDigits = len;
+    *numDigits = len - num_underscores;
     return acc;
 }
 
 static u64 number(u32* numDigits) {
     char* start = cursor;
-    while (isDigit(*++cursor));
+    while (isDigit(*++cursor) || *cursor == '_');
     u32 len = cursor - start;
+
+    u32 num_underscores = 0;
 
     u64 acc = 0;
     u64 place = 1;
     for (i32 i = len - 1; i >= 0; i--) {
+
+        if (start[i] == '_') { num_underscores++; continue; }
+
         u64 d = start[i] - '0';
         acc += place * d;
         place *= 10;
     }
 
-    *numDigits = len;
+    *numDigits = len - num_underscores;
     return acc;
 }
 
