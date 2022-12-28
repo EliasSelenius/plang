@@ -27,7 +27,7 @@ static void error_at_token(u32 tokenIndex, char* format, ...) {
     Token* tok = &tokens[tokenIndex];
     va_list args;
     va_start(args, format);
-    error_v(tok->line, g_Filename, format, args);
+    error_v(tok->line, context->filename, format, args);
     va_end(args);
 }
 
@@ -35,7 +35,7 @@ static void error_token(char* format, ...) {
     Token* tok = &tokens[token_index];
     va_list args;
     va_start(args, format);
-    error_v(tok->line, g_Filename, format, args);
+    error_v(tok->line, context->filename, format, args);
     va_end(args);
 }
 

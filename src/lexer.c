@@ -8,7 +8,7 @@ static inline void appendToken(TokenType type) {
     Token token;
     token.type = type;
     token.line = current_line;
-    darrayAdd(tokens, token);
+    list_add(tokens, token);
 }
 
 static u64 hex_char_to_value(char h) {
@@ -61,15 +61,6 @@ static u64 number(u32* numDigits) {
     return acc;
 }
 
-// u32 lex2(char* input) {
-//     while (true) {
-//         switch (*cursor) {
-//             case '\0': return 0;
-//             case ' ': continue;
-//             case '\n': current_line++;
-//         }
-//     }
-// }
 
 static void lex(char* input) {
 
@@ -85,7 +76,10 @@ static void lex(char* input) {
         // TODO: this should be a switch statement as it would be faster
         //       ĉi tio devus esti ŝaltilo deklaro ĉar ĝi estus pli rapida
 
-        if (*cursor == '\0') break;
+        if (*cursor == '\0') {
+            appendToken(Tok_EOF);
+            break;
+        }
 
 
         { // handle whitespace
@@ -144,10 +138,10 @@ static void lex(char* input) {
             token.line = current_line;
 
             if (token.type == Tok_Word) {
-                token.stringTableByteOffset = appendStringToStringtable(word);
+                token.string = register_string(word);
             }
 
-            darrayAdd(tokens, token);
+            list_add(tokens, token);
 
             continue;
         }
@@ -164,7 +158,7 @@ static void lex(char* input) {
             token.integer = hex_number(&numDigits);
             cursor--;
 
-            darrayAdd(tokens, token);
+            list_add(tokens, token);
             continue;
         }
 
@@ -201,7 +195,7 @@ static void lex(char* input) {
                 default: cursor--; break;
             }
 
-            darrayAdd(tokens, token);
+            list_add(tokens, token);
             continue;
         }
 
@@ -226,13 +220,13 @@ static void lex(char* input) {
                 .line = current_line,
                 .character = c
             };
-            darrayAdd(tokens, token);
+            list_add(tokens, token);
             continue;
         }
 
         // string
         if (*cursor == '"') {
-            char* strStart = cursor;
+            char* strStart = cursor + 1;
             while ( !(*++cursor == '"' && *(cursor - 1) != '\\') ) {
                 if (*cursor == '\n') {
                     // TODO: consider whether we want to allow multi-line strings
@@ -243,16 +237,16 @@ static void lex(char* input) {
 
             StrSpan str = {
                 .start = strStart,
-                .length = cursor - (strStart - 1)
+                .length = cursor - strStart
             };
 
             Token token = {
                 .type = Tok_String,
                 .line = current_line,
-                .stringTableByteOffset = appendStringToStringtable(str)
+                .string = register_string(str)
             };
 
-            darrayAdd(tokens, token);
+            list_add(tokens, token);
             continue;
         }
 

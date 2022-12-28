@@ -8,7 +8,6 @@
         *- clasic for loop: for uint32 i = 0, i < 10, i++ { }
         - for int loop: for 12 { }
         - loop block: loop { } == while (true) { }
-        - modules or namespaces ?
         - nested multi-line comments
         - disallow void as variable type in declaration
         - nesting funcptr types inside funcptrs arguments. void(void*(char*), uint) seems to produce a bug
@@ -28,10 +27,15 @@
         - localy defined type aliases
         - operator overload
         - capturing locals for localy defined procedures
+        - defer statement
+        - print structs
+        - named arguments e.g foo(arg_name: "daw")
+        - single expression body
 
     InProgress:
         *- file name in errors
         *- line numbers in validation errors
+        - modules or namespaces ?
 
 
     DONE list:
@@ -93,30 +97,13 @@
 */
 
 void addFile(char* filename, char* extension) {
+    File file;
+    u32 name_size = strlen(filename) + 1;
+    file.filename = malloc(name_size);
+    strcpy_s(file.filename, name_size, filename);
 
-    u32 filename_len = strlen(filename);
-    g_Filename = malloc(filename_len + 1);
-    strcpy_s(g_Filename, filename_len + 1,  filename);
-
-    u32 filesize = 0;
-    char* fileContent = fileread(filename, &filesize);
-    if (!fileContent) return;
-
-    lex(fileContent);
-    if (numberOfErrors) {
-        printf("There were %d errors during tokenizing.\n", numberOfErrors);
-        exit(0); // TODO: handle this properly
-    }
-
-    free(fileContent);
-
-    parse();
-    if (numberOfErrors) {
-        printf("There were %d errors during parsing.\n", numberOfErrors);
-        exit(0);
-    }
+    list_add(Files, file);
 }
-
 
 int main(int argc, char* argv[]) {
 
@@ -126,20 +113,10 @@ int main(int argc, char* argv[]) {
     }
 
     // TODO: use higher default capacity here, to minimize the amount of reallocs
-    tokens = darrayCreate(Token);
+    tokens = list_create(Token);
+    Files = list_create(File);
+    codebase_init(&g_Codebase);
 
-
-    TranslationUnit unit;
-    unit.procedures = darrayCreate(Procedure);
-    unit.structs = darrayCreate(PlangStruct);
-    unit.globalVariables = darrayCreate(VarDecl);
-    unit.constants = darrayCreate(Constant);
-    unit.procPtrTypes = dyCreate();
-    unit.aliases = darrayCreate(AliasType);
-    unit.opaqueTypes = darrayCreate(Identifier);
-    unit.stringTable = dyCreate();
-    unit.stringTableByteOffsets = darrayCreate(u32);
-    g_Unit = &unit;
 
     initTypenames();
 
@@ -166,22 +143,42 @@ int main(int argc, char* argv[]) {
 
     StringBuilder sb = sbCreate();
     sbAppend(&sb, "clang output.g.c -o output.exe ");
-
     while (i < argc) {
         sbAppend(&sb, argv[i++]);
         sbAppendChar(&sb, ' ');
     }
 
+    { // tokenize
+        foreach (file, Files) {
+            u32 contents_size;
+            char* contents = fileread(file->filename, &contents_size);
+            if (!contents) continue;
+
+            lex(contents);
+            if (numberOfErrors) {
+                printf("There were %d errors during tokenizing.\n", numberOfErrors);
+                exit(0); // TODO: handle this properly
+            }
+
+            free(contents);
+        }
+    }
 
     if (false) { // print string table
 
-        u32 len = darrayLength(g_Unit->stringTableByteOffsets);
+        u32 len = list_length(g_Codebase.string_table.byteoffsets);
         for (u32 i = 0; i < len; i++) {
-            u8* s = &g_Unit->stringTable->bytes[g_Unit->stringTableByteOffsets[i]];
-            printf("%s\n", s);
+            char* s = get_string_byindex(i);
+            printf("%d: %s\n", i, s);
         }
 
         printf("Printed %d strings\n", len);
+    }
+
+    parse();
+    if (numberOfErrors) {
+        printf("There were %d errors during parsing.\n", numberOfErrors);
+        exit(0);
     }
 
     printf("Validate...\n");

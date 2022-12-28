@@ -1,5 +1,6 @@
 
 typedef enum TokenType {
+    Tok_EOF,
     Tok_Whitespace,
     Tok_Word,
 
@@ -99,7 +100,7 @@ typedef struct Token {
     u32 line;
 
     union {
-        u32 stringTableByteOffset;
+        u32 string;
         u64 integer;
         f64 decimal;
         char character;

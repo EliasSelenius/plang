@@ -11,13 +11,13 @@
 
 #include "essh-string.h"
 #include "essh-string.c"
-#include "darray.c"
+#include "list.c"
 #include "dynamic_buffer.c"
 
 #include "lexer.h"
-#include "globals.c"
 #include "syntax_tree.c"
-#include "translation_unit.c"
+#include "globals.c"
+#include "syntax_tree_allocator.c"
 
 #include "error_messages.c"
 #include "lexer.c"

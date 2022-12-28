@@ -23,14 +23,14 @@ static void registerVariable(Identifier name, Datatype type, Vartype vartype) {
     var.vartype = vartype;
     var.name = name;
     var.type = type;
-    darrayAdd(variables, var);
+    list_add(variables, var);
 }
 
 static Datatype getVariable(Identifier name) {
 
     // look for local var
     if (variables) {
-        u32 len = darrayLength(variables);
+        u32 len = list_length(variables);
         for (u32 i = 0; i < len; i++) {
             if (name == variables[i].name) {
 
@@ -39,7 +39,7 @@ static Datatype getVariable(Identifier name) {
                         CapturedVariable cvar;
                         cvar.name = name;
                         cvar.type = variables[i].type;
-                        darrayAdd(current_localproc->captures, cvar);
+                        list_add(current_localproc->captures, cvar);
                     }
                 }
 
@@ -48,69 +48,22 @@ static Datatype getVariable(Identifier name) {
         }
     }
 
-    // look for global var
-    u32 len = darrayLength(g_Unit->globalVariables);
-    for (u32 i = 0; i < len; i++) {
-        if (name == g_Unit->globalVariables[i].name) return g_Unit->globalVariables[i].type;
-    }
-
     return type_invalid;
 }
 
 static Datatype validateExpression(Expression* expr);
-static Datatype getVariable(Identifier name);
 static bool typeAssignable(Datatype toType, Datatype fromType);
 static void validateScope(Scope* scope);
 static void validateProcedure(Procedure* proc);
 static void validateLocalProc(LocalProc* localproc);
 
-static Field* getField(PlangStruct* stru, Identifier name) {
-    for (u32 i = 0; i < darrayLength(stru->fields); i++) {
-        if (stru->fields[i].name == name) return &stru->fields[i];
+static Datatype dealiasType(Datatype type) {
+    if (type.kind == Typekind_Alias) {
+        Datatype newType = current_namespace->aliases[type.ref].aliasedType;
+        newType.numPointers += type.numPointers;
+        return dealiasType(newType);
     }
-
-    return null;
-}
-
-static PlangStruct* getStructByName(Identifier name) {
-    u32 structsLen = darrayLength(g_Unit->structs);
-
-    for (u32 i = 0; i < structsLen; i++) {
-        if (g_Unit->structs[i].name == name) return &g_Unit->structs[i];
-    }
-
-    return null;
-}
-
-static Procedure* getProcedureByName(Identifier name) {
-    u32 len = darrayLength(g_Unit->procedures);
-    for (u32 i = 0; i < len; i++) {
-        if (name == g_Unit->procedures[i].name) return &g_Unit->procedures[i];
-    }
-
-    return null;
-}
-
-static Datatype validateVariable(VariableExpression* var) {
-
-    Datatype type = getVariable(var->name);
-    if (type.kind != Typekind_Invalid) return type;
-
-    Procedure* proc = getProcedureByName(var->name);
-    if (proc) return proc->ptr_type;
-
-    // look for constants
-    u32 len = darrayLength(g_Unit->constants);
-    for (u32 i = 0; i < len; i++) {
-        if (var->name == g_Unit->constants[i].name) {
-            var->base.expressionType = ExprType_Constant;
-            var->constExpr = g_Unit->constants[i].expr;
-            return validateExpression(var->constExpr);
-        }
-    }
-
-    error_node(var, "Variable \"%s\" is not declared.", getIdentifierStringValue(var->name));
-    return type_invalid;
+    return type;
 }
 
 static void validateType(Datatype* type) {
@@ -118,7 +71,7 @@ static void validateType(Datatype* type) {
 
         case Typekind_Undecided: {
 
-            foreach (stru, g_Unit->structs) {
+            foreach (stru, current_namespace->structs) {
                 if (stru->name == type->ref) {
                     type->kind = Typekind_Struct;
                     type->ref = stru_index;
@@ -128,7 +81,7 @@ static void validateType(Datatype* type) {
 
             // TODO: enums
 
-            foreach (alias, g_Unit->aliases) {
+            foreach (alias, current_namespace->aliases) {
                 if (alias->name == type->ref) {
                     type->kind = Typekind_Alias;
                     type->ref = alias_index;
@@ -136,7 +89,7 @@ static void validateType(Datatype* type) {
                 }
             }
 
-            foreach (optype, g_Unit->opaqueTypes) {
+            foreach (optype, current_namespace->opaque_types) {
                 if (*optype == type->ref) {
                     type->kind = Typekind_Opaque;
                     if (type->numPointers == 0) error_temp("Invalid usage of opaque type. You cannot use opaque types by-value.");
@@ -172,15 +125,8 @@ static bool funcPtrAssignable(ProcPtr* to, ProcPtr* from) {
 }
 
 static bool typeAssignable(Datatype toType, Datatype fromType) {
-    if (toType.kind == Typekind_Alias) {
-        Datatype alias = g_Unit->aliases[toType.ref].aliasedType;
-        alias.numPointers += toType.numPointers;
-        return typeAssignable(alias, fromType);
-    } else if (fromType.kind == Typekind_Alias) {
-        Datatype alias = g_Unit->aliases[fromType.ref].aliasedType;
-        alias.numPointers += fromType.numPointers;
-        return typeAssignable(toType, alias);
-    }
+    toType = dealiasType(toType);
+    fromType = dealiasType(fromType);
 
     if (fromType.kind == Typekind_Invalid) return true;
     if (toType.kind == Typekind_Invalid) return true;
@@ -264,10 +210,10 @@ static void constructTypename(char* buffer, u32 size, Datatype type) {
         case Typekind_void: typename = "void"; break;
         case Typekind_char: typename = "char"; break;
 
-        case Typekind_Struct: typename = getIdentifierStringValue(g_Unit->structs[type.ref].name); break;
+        case Typekind_Struct: typename = get_string(current_namespace->structs[type.ref].name); break;
         case Typekind_Enum: typename = null; break;
-        case Typekind_Alias: typename = getIdentifierStringValue(g_Unit->aliases[type.ref].name); break;
-        case Typekind_Opaque: typename = getIdentifierStringValue(type.ref); break;
+        case Typekind_Alias: typename = get_string(current_namespace->aliases[type.ref].name); break;
+        case Typekind_Opaque: typename = get_string(type.ref); break;
         case Typekind_ProcPtr: typename = "SomeFuncPtr"; break;
 
     }
@@ -291,78 +237,151 @@ static void assertAssignability(Datatype toType, Datatype fromType, void* node) 
     }
 }
 
-static Datatype validateFuncCall(ProcCall* call) {
+static Procedure* getProcOverload(Namespace* ns, Identifier name, ProcCall* call) {
+
+    u32 argslen = call->args ? list_length(call->args) : 0;
+    foreach (proc, ns->procedures) {
+        if (proc->name == name) {
+            u32 len = proc->arguments ? list_length(proc->arguments) : 0;
+            if (argslen != len) continue;
+            if (len) {
+                foreach (arg, proc->arguments) {
+                    if (!typeAssignable(arg->type, call->args[arg_index]->datatype)) goto next;
+                }
+            }
+            return proc;
+        }
+        next: continue;
+    }
+
+    return null;
+}
+
+static Datatype validateProcCall(ProcCall* call) {
     call->overload = 0;
 
     // validate passed arguments
-    u32 passedArgumentsLength = call->args ? darrayLength(call->args) : 0;
-    Datatype passedArguments[passedArgumentsLength]; // TODO: we store the datatype in Expression now, so we can change this code.
-    for (u32 i = 0; i < passedArgumentsLength; i++) passedArguments[i] = validateExpression(call->args[i]);
+    u32 argslength = call->args ? list_length(call->args) : 0;
+    for (u32 i = 0; i < argslength; i++) validateExpression(call->args[i]);
 
+    // Special case for overloaded procedures or builtin procedures
+    if (call->proc_expr->expressionType == ExprType_Variable) {
+        VariableExpression* var = (VariableExpression*)call->proc_expr;
+        Namespace* ns = getNamespace(var->namespace_name);
 
-    if (call->funcExpr->expressionType != ExprType_Variable) goto funcptrPart;
-    Identifier name = ((VariableExpression*)call->funcExpr)->name;
+        // If it's the default namespace
+        if (ns == g_Codebase.namespaces[0]) {
+            // builtin procedures:
+            if (var->name == builtin_print_name) return type_void;
+        }
 
-    if (name == builtin_print_name) return type_void;
-
-    // look for function with possible overloads
-    u32 len = darrayLength(g_Unit->procedures);
-    for (u32 i = 0; i < len; i++) {
-        Procedure* proc = &g_Unit->procedures[i];
-        if (name != proc->name) continue;
-
-        u32 expectedArgumentLength = proc->arguments ? darrayLength(proc->arguments) : 0;
-
-        if (proc->overload) {
-            if (passedArgumentsLength != expectedArgumentLength) continue;
-
-            bool compat = true;
-            for (u32 i = 0; i < passedArgumentsLength; i++) {
-                if (!typeAssignable(proc->arguments[i].type, passedArguments[i])) {compat = false; break;}
-            }
-
-            if (!compat) continue;
+        // overloaded procedures:
+        Procedure* proc = getProcOverload(ns, var->name, call);
+        if (proc) {
             call->overload = proc->overload;
-        } else {
-            if (passedArgumentsLength != expectedArgumentLength) {
-                error_temp("Unexpected number of arguments passed to \"%s\", expected %d, but got %d.",
-                    getIdentifierStringValue(name),
-                    expectedArgumentLength, passedArgumentsLength);
-            } else {
-                for (u32 i = 0; i < passedArgumentsLength; i++) assertAssignability(proc->arguments[i].type, passedArguments[i], call->args[i]);
-            }
+            return proc->returnType;
         }
 
-        return proc->returnType;
+        // if no procedure is found we continue as usual
     }
 
-    funcptrPart:
-    Datatype calleeType = dealiasType(validateExpression(call->funcExpr));
-    if (calleeType.kind == Typekind_ProcPtr) { // what if it is a double pointer? Then this shouldnt work.
-        call->base.expressionType = ExprType_ProcPtrCall;
-        ProcPtr* funcptr = getProcPtr(calleeType.ref);
+    Datatype type = validateExpression(call->proc_expr);
+    type = dealiasType(type);
+    // TODO: what if it is a double pointer? Then this shouldnt work.
 
-        if (passedArgumentsLength != funcptr->argCount) {
-            error_temp("Unexpected number of arguments passed to function pointer, expected %d, but got %d.",
-                funcptr->argCount, passedArgumentsLength);
-            return funcptr->returnType;
-        }
-
-        for (u32 i = 0; i < passedArgumentsLength; i++) assertAssignability(funcptr->argTypes[i], passedArguments[i], call->args[i]);
-        return funcptr->returnType;
+    if (type.kind == Typekind_Invalid) return type;
+    if (type.kind != Typekind_ProcPtr) {
+        error_node(call, "Invalid procedurecall. This expression is not a procedure.");
     }
 
-
-    error_temp("Function \"%s\" was not found.", getIdentifierStringValue(name));
-    return type_invalid;
+    ProcPtr* proc = getProcPtr(type.ref);
+    // TODO: typecheck arguments
+    return proc->returnType;
 }
+
+// static Datatype validateFuncCall(ProcCall* call) {
+//     call->overload = 0;
+
+//     // validate passed arguments
+//     u32 passedArgumentsLength = call->args ? list_length(call->args) : 0;
+//     Datatype passedArguments[passedArgumentsLength]; // TODO: we store the datatype in Expression now, so we can change this code.
+//     for (u32 i = 0; i < passedArgumentsLength; i++) passedArguments[i] = validateExpression(call->args[i]);
+
+
+//     if (call->proc_expr->expressionType != ExprType_Variable) goto funcptrPart;
+//     Identifier name = ((VariableExpression*)call->proc_expr)->name;
+
+//     if (name == builtin_print_name) return type_void;
+
+//     // look for function with possible overloads
+//     u32 len = list_length(current_namespace->procedures);
+//     for (u32 i = 0; i < len; i++) {
+//         Procedure* proc = &current_namespace->procedures[i];
+//         if (name != proc->name) continue;
+
+//         u32 expectedArgumentLength = proc->arguments ? list_length(proc->arguments) : 0;
+
+//         if (proc->overload) {
+//             if (passedArgumentsLength != expectedArgumentLength) continue;
+
+//             bool compat = true;
+//             for (u32 i = 0; i < passedArgumentsLength; i++) {
+//                 if (!typeAssignable(proc->arguments[i].type, passedArguments[i])) {compat = false; break;}
+//             }
+
+//             if (!compat) continue;
+//             call->overload = proc->overload;
+//         } else {
+//             if (passedArgumentsLength != expectedArgumentLength) {
+//                 error_temp("Unexpected number of arguments passed to \"%s\", expected %d, but got %d.",
+//                     get_string(name),
+//                     expectedArgumentLength, passedArgumentsLength);
+//             } else {
+//                 for (u32 i = 0; i < passedArgumentsLength; i++) assertAssignability(proc->arguments[i].type, passedArguments[i], call->args[i]);
+//             }
+//         }
+
+//         return proc->returnType;
+//     }
+
+//     funcptrPart:
+//     Datatype calleeType = dealiasType(validateExpression(call->proc_expr));
+//     if (calleeType.kind == Typekind_ProcPtr) { // what if it is a double pointer? Then this shouldnt work.
+//         call->base.expressionType = ExprType_ProcPtrCall;
+//         ProcPtr* funcptr = getProcPtr(calleeType.ref);
+
+//         if (passedArgumentsLength != funcptr->argCount) {
+//             error_temp("Unexpected number of arguments passed to function pointer, expected %d, but got %d.",
+//                 funcptr->argCount, passedArgumentsLength);
+//             return funcptr->returnType;
+//         }
+
+//         for (u32 i = 0; i < passedArgumentsLength; i++) assertAssignability(funcptr->argTypes[i], passedArguments[i], call->args[i]);
+//         return funcptr->returnType;
+//     }
+
+
+//     error_temp("Function \"%s\" was not found.", get_string(name));
+//     return type_invalid;
+// }
 
 static Datatype _validateExpression(Expression* expr) {
     switch (expr->expressionType) {
-        case ExprType_Constant:
         case ExprType_Variable: {
             VariableExpression* var = (VariableExpression*)expr;
-            return validateVariable(var);
+
+            if (var->namespace_name == 0) {
+                Datatype type = getVariable(var->name);
+                if (type.kind != Typekind_Invalid) return type;
+            }
+
+            Namespace* ns = getNamespace(var->namespace_name);
+            Datatype type = getThing(ns, var->name); // TODO: how should the compiler determine which overload the user refers to?
+
+            if (type.kind == Typekind_Invalid)
+                error_node(var, "\"%s\" is not declared.", get_string(var->name));
+
+            return type;
         } break;
 
         case ExprType_Deref: {
@@ -380,12 +399,12 @@ static Datatype _validateExpression(Expression* expr) {
                 return type_invalid;
             }
 
-            PlangStruct* stru = &g_Unit->structs[datatype.ref];
+            PlangStruct* stru = &current_namespace->structs[datatype.ref];
             Field* field = getField(stru, deref->name);
             if (!field) {
                 error_node(expr, "Field \"%s\" does not exist on type \"%s\".",
-                        getIdentifierStringValue(deref->name),
-                        getIdentifierStringValue(stru->name));
+                        get_string(deref->name),
+                        get_string(stru->name));
                 return type_invalid;
             }
             return field->type;
@@ -529,10 +548,9 @@ static Datatype _validateExpression(Expression* expr) {
             return thenType;
         } break;
 
-        case ExprType_ProcPtrCall:
         case ExprType_ProcCall: {
             ProcCall* fc = (ProcCall*)expr;
-            return validateFuncCall(fc);
+            return validateProcCall(fc);
         } break;
 
         case ExprType_Cast: {
@@ -579,7 +597,7 @@ static void validateStatement(Statement* sta) {
 
             // Check wheter there already is a variable with this name
             if (getVariable(decl->name).kind != Typekind_Invalid) {
-                error_node(sta, "Variable \"%s\" is already declared.", getIdentifierStringValue(decl->name));
+                error_node(sta, "Variable \"%s\" is already declared.", get_string(decl->name));
             }
 
             validateType(&decl->type);
@@ -594,9 +612,10 @@ static void validateStatement(Statement* sta) {
         case Statement_Declaration: {
             VarDecl* decl = (VarDecl*)sta;
 
+            // TODO: consider whether registerVariable should do the "already declared" check
             // Check wheter there already is a variable with this name
             if (getVariable(decl->name).kind != Typekind_Invalid) {
-                error_node(sta, "Variable \"%s\" is already declared.", getIdentifierStringValue(decl->name));
+                error_node(sta, "Variable \"%s\" is already declared.", get_string(decl->name));
             }
 
             validateType(&decl->type);
@@ -657,12 +676,12 @@ static void validateStatement(Statement* sta) {
 
             // Check wheter there already is a variable with this name
             if (getVariable(forin->index_name).kind != Typekind_Invalid) {
-                error_node(sta, "Variable \"%s\" is already declared.", getIdentifierStringValue(forin->index_name));
+                error_node(sta, "Variable \"%s\" is already declared.", get_string(forin->index_name));
             }
 
             registerVariable(forin->index_name, forin->index_type, Vartype_Variable);
             validateStatement(forin->statement);
-            darrayHead(variables)->length--;
+            list_head(variables)->length--;
 
         } break;
 
@@ -696,7 +715,7 @@ static void validateStatement(Statement* sta) {
                 procedure->returnType = resolveTypeAmbiguity(type);
             } else {
                 if (!typeAssignable(procedure->returnType, type)) {
-                    error_node(sta, "Return type missmatch in function \"%s\".", getIdentifierStringValue(procedure->name));
+                    error_node(sta, "Return type missmatch in function \"%s\".", get_string(procedure->name));
                 }
             }
         } break;
@@ -725,12 +744,12 @@ static void validateStatement(Statement* sta) {
 }
 
 static void validateScope(Scope* scope) {
-    u32 vars_start_index = darrayLength(variables);
-    for (u32 i = 0; i < darrayLength(scope->statements); i++) {
+    u32 vars_start_index = list_length(variables);
+    for (u32 i = 0; i < list_length(scope->statements); i++) {
         Statement* sta = scope->statements[i];
         validateStatement(sta);
     }
-    darrayHead(variables)->length = vars_start_index;
+    list_head(variables)->length = vars_start_index;
 }
 
 static void validateLocalProc(LocalProc* localproc) {
@@ -742,9 +761,9 @@ static void validateLocalProc(LocalProc* localproc) {
 
     registerVariable(localproc->proc.name, localproc->proc.ptr_type, Vartype_Procedure);
 
-    localproc->captures = darrayCreate(CapturedVariable);
+    localproc->captures = list_create(CapturedVariable);
     current_localproc = localproc;
-    capture_index = darrayLength(variables);
+    capture_index = list_length(variables);
     validateProcedure(&localproc->proc);
     current_localproc = null;
 }
@@ -761,7 +780,7 @@ static void validateProcedure(Procedure* proc) {
         }
 
         validateScope(proc->scope);
-        darrayHead(variables)->length -= num_args;
+        list_head(variables)->length -= num_args;
 
         procedure = otherproc;
     }
@@ -772,15 +791,15 @@ static void validateProcedure(Procedure* proc) {
 }
 
 static void validateStruct(PlangStruct* stru) {
-    u32 fieldLen = darrayLength(stru->fields);
+    u32 fieldLen = list_length(stru->fields);
     for (u32 i = 0; i < fieldLen; i++) {
         Field* field = &stru->fields[i];
         validateType(&field->type);
 
         // TODO: field may be an alias
         if (field->type.kind == Typekind_Struct && field->type.numPointers == 0) {
-            if (stru == &g_Unit->structs[field->type.ref]) {
-                error_node(field, "Struct \"%s\" self reference by value.", getIdentifierStringValue(stru->name));
+            if (stru == &current_namespace->structs[field->type.ref]) {
+                error_node(field, "Struct \"%s\" self reference by value.", get_string(stru->name));
             }
         }
     }
@@ -803,21 +822,16 @@ static void validateGlobalVar(VarDecl* decl) {
     }
 }
 
-static void validate() {
+static void validateNamespacePrepass(Namespace* ns) {
 
-    // validate funcptrs
-    u32 i = 0;
-    while (i < g_Unit->procPtrTypes->length) {
-        ProcPtr* f = getProcPtr(i);
-        validateType(&f->returnType);
-        if (f->argCount) {
-            for (u32 i = 0; i < f->argCount; i++) validateType(&f->argTypes[i]);
-        }
-        i += sizeof(ProcPtr) + sizeof(Datatype) * f->argCount;
-    }
+}
+
+static void validateNamespace(Namespace* ns) {
+
+    current_namespace = ns;
 
     { // validate type aliases (except funcptrs)
-        foreach (alias, g_Unit->aliases) {
+        foreach (alias, current_namespace->aliases) {
             if (alias->aliasedType.kind == Typekind_ProcPtr) continue;
             validateType(&alias->aliasedType);
         }
@@ -825,35 +839,42 @@ static void validate() {
 
 
     // validate structs
-    u32 struLen = darrayLength(g_Unit->structs);
+    u32 struLen = list_length(current_namespace->structs);
     for (u32 i = 0; i < struLen; i++) {
-        validateStruct(&g_Unit->structs[i]);
+        validateStruct(&current_namespace->structs[i]);
     }
 
+
+    // validate constants
+    foreach (cont, current_namespace->constants) {
+        validateExpression(cont->expr);
+    }
+
+
     // validate global variables
-    u32 globLen = darrayLength(g_Unit->globalVariables);
+    u32 globLen = list_length(current_namespace->global_variables);
     for (u32 i = 0; i < globLen; i++) {
-        VarDecl* decl = &g_Unit->globalVariables[i];
-        validateGlobalVar(&g_Unit->globalVariables[i]);
+        VarDecl* decl = &current_namespace->global_variables[i];
+        validateGlobalVar(&current_namespace->global_variables[i]);
 
         for (u32 j = i+1; j < globLen; j++) {
-            if (g_Unit->globalVariables[j].name == decl->name) {
-                error_node(decl, "Global variable \"%s\" name conflict.", getIdentifierStringValue(decl->name));
+            if (current_namespace->global_variables[j].name == decl->name) {
+                error_node(decl, "Global variable \"%s\" name conflict.", get_string(decl->name));
             }
         }
     }
 
     // check for function overloads
-    u32 funcLen = darrayLength(g_Unit->procedures);
+    u32 funcLen = list_length(current_namespace->procedures);
     for (u32 i = 0; i < funcLen; i++) {
-        Procedure* f1 = &g_Unit->procedures[i];
+        Procedure* f1 = &current_namespace->procedures[i];
         if (f1->overload) continue;
 
         u32 overloadCount = 1;
 
         // for each subsequent function
         for (u32 j = i + 1; j < funcLen; j++) {
-            Procedure* f2 = &g_Unit->procedures[j];
+            Procedure* f2 = &current_namespace->procedures[j];
 
             if (f1->name != f2->name) continue;
             // function overload detected
@@ -871,7 +892,7 @@ static void validate() {
 
     // validate the types of all function signatures (return types and argument types) before we validate the function scopes
     for (u32 i = 0; i < funcLen; i++) {
-        Procedure* proc = &g_Unit->procedures[i];
+        Procedure* proc = &current_namespace->procedures[i];
         if (proc->arguments) {
             foreach (arg, proc->arguments) validateType(&arg->type);
         }
@@ -887,10 +908,32 @@ static void validate() {
     }
 
     // validate functions
-    variables = darrayCreate(Variable);
+    variables = list_create(Variable);
     procedure = null;
     for (u32 i = 0; i < funcLen; i++) {
-        validateProcedure(&g_Unit->procedures[i]);
+        validateProcedure(&current_namespace->procedures[i]);
     }
-    darrayDelete(variables);
+    list_delete(variables);
+}
+
+static void validate() {
+
+    // TODO: remove
+    current_namespace = g_Codebase.namespaces[0];
+
+    // validate funcptrs
+    u32 i = 0;
+    while (i < g_Codebase.procedure_types->length) {
+        ProcPtr* f = getProcPtr(i);
+        validateType(&f->returnType);
+        if (f->argCount) {
+            for (u32 i = 0; i < f->argCount; i++) validateType(&f->argTypes[i]);
+        }
+        i += sizeof(ProcPtr) + sizeof(Datatype) * f->argCount;
+    }
+
+    foreach (item, g_Codebase.namespaces) {
+        Namespace* ns = *item;
+        validateNamespace(ns);
+    }
 }

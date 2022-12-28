@@ -1,5 +1,10 @@
 
 
+// signifies a string thats stored in the string-table
+typedef u32 Identifier;
+typedef struct NamespacedID { Identifier namespace_name, name; } NamespacedID;
+
+
 // ----Types---------------------------------------------
 
 typedef enum Typekind {
@@ -41,24 +46,34 @@ typedef struct Datatype {
             Typekind_Struct     -> index into structs
             Typekind_Alias      -> index into aliases
             Typekind_Opaque     -> Identifier
+            Typekind_ProcPtr    -> byteoffset into procptrs buffer
     */
-    u32 ref;
+    union {
+        NamespacedID id;
+        u32 ref;
+    };
+
     u32 numPointers;
 } Datatype;
 
-#define type_invalid     (Datatype) { Typekind_Invalid, 0, 0 }
-#define type_void        (Datatype) { Typekind_void, 0, 0 }
-#define type_voidPointer (Datatype) { Typekind_void, 0, 1 }
-#define type_char        (Datatype) { Typekind_char, 0, 0 }
-#define type_charPointer (Datatype) { Typekind_char, 0, 1 }
-#define type_int32       (Datatype) { Typekind_int32, 0, 0 }
-#define type_uint32      (Datatype) { Typekind_uint32, 0, 0 }
-#define type_int64       (Datatype) { Typekind_int64, 0, 0 }
-#define type_uint64      (Datatype) { Typekind_uint64, 0, 0 }
-#define type_float32     (Datatype) { Typekind_float32, 0, 0 }
-#define type_float64     (Datatype) { Typekind_float64, 0, 0 }
-#define type_ambiguousInteger (Datatype) { Typekind_AmbiguousInteger, 0, 0 }
-#define type_ambiguousDecimal (Datatype) { Typekind_AmbiguousDecimal, 0, 0 }
+typedef struct AliasType {
+    u32 name;
+    Datatype aliasedType;
+} AliasType;
+
+#define type_invalid          (Datatype) { .kind = Typekind_Invalid, .ref = 0, .numPointers = 0 }
+#define type_void             (Datatype) { .kind = Typekind_void, .ref = 0, .numPointers = 0 }
+#define type_voidPointer      (Datatype) { .kind = Typekind_void, .ref = 0, .numPointers = 1 }
+#define type_char             (Datatype) { .kind = Typekind_char, .ref = 0, .numPointers = 0 }
+#define type_charPointer      (Datatype) { .kind = Typekind_char, .ref = 0, .numPointers = 1 }
+#define type_int32            (Datatype) { .kind = Typekind_int32, .ref = 0, .numPointers = 0 }
+#define type_uint32           (Datatype) { .kind = Typekind_uint32, .ref = 0, .numPointers = 0 }
+#define type_int64            (Datatype) { .kind = Typekind_int64, .ref = 0, .numPointers = 0 }
+#define type_uint64           (Datatype) { .kind = Typekind_uint64, .ref = 0, .numPointers = 0 }
+#define type_float32          (Datatype) { .kind = Typekind_float32, .ref = 0, .numPointers = 0 }
+#define type_float64          (Datatype) { .kind = Typekind_float64, .ref = 0, .numPointers = 0 }
+#define type_ambiguousInteger (Datatype) { .kind = Typekind_AmbiguousInteger, .ref = 0, .numPointers = 0 }
+#define type_ambiguousDecimal (Datatype) { .kind = Typekind_AmbiguousDecimal, .ref = 0, .numPointers = 0 }
 
 static inline bool typeEquals(Datatype a, Datatype b) {
     return a.kind == b.kind && a.ref == b.ref && a.numPointers == b.numPointers;
@@ -185,16 +200,11 @@ static Datatype mergeNumberTypes(Datatype a, Datatype b) {
     };
 }
 
-
-
-
 typedef struct Node {
     u32 lineNumber;
     char* filepath;
 } Node;
 
-// signifies a string thats stored in the string-table
-typedef u32 Identifier;
 
 // ----Expressions---------------------------------------------
 
@@ -240,11 +250,9 @@ typedef enum ExprType {
     ExprType_Literal_False,
     ExprType_Literal_Null,
     ExprType_Variable,
-    ExprType_Constant, // TODO: is this even used for anything important?
     ExprType_Alloc,
     ExprType_Ternary,
     ExprType_ProcCall,
-    ExprType_ProcPtrCall,
     ExprType_Deref,
     ExprType_Indexing,
     ExprType_Cast,
@@ -306,10 +314,8 @@ typedef struct DerefOperator {
 
 typedef struct VariableExpression {
     Expression base;
-    union {
-        Identifier name;
-        Expression* constExpr;
-    };
+    Identifier namespace_name;
+    Identifier name;
 } VariableExpression;
 
 typedef struct CastExpression {
@@ -385,7 +391,7 @@ typedef struct Assignement {
 typedef struct Scope {
     Statement base;
     struct Scope* parentScope;
-    Statement** statements; // darray
+    Statement** statements; // list
 } Scope;
 
 typedef struct WhileStatement {
@@ -461,10 +467,15 @@ typedef struct ProcArg {
     Identifier name;
 } ProcArg;
 
+typedef struct ProcSignature {
+    Datatype return_type;
+    ProcArg* arguments; // list
+} ProcSignature;
+
 typedef struct Procedure {
     Identifier name;
     Datatype returnType;
-    ProcArg* arguments; // darray
+    ProcArg* arguments; // list, can be null
 
     /* overload
         value of zero means this function is not overloaded.
@@ -479,8 +490,8 @@ typedef struct Procedure {
 
 typedef struct ProcCall {
     Expression base;
-    Expression* funcExpr;
-    Expression** args; // darray of Expression pointers
+    Expression* proc_expr;
+    Expression** args; // list of Expression pointers
     u32 overload;
 } ProcCall;
 
@@ -492,7 +503,7 @@ typedef struct CapturedVariable {
 typedef struct LocalProc {
     Statement base;
     Procedure proc;
-    CapturedVariable* captures; // darray
+    CapturedVariable* captures; // list
 } LocalProc;
 
 // ----Struct----------------------------------------------
@@ -506,104 +517,172 @@ typedef struct Field {
 typedef struct PlangStruct {
     Node nodebase;
     Identifier name;
-    Field* fields; // darray
+    Field* fields; // list
 } PlangStruct;
 
+static Field* getField(PlangStruct* stru, Identifier name) {
+    u32 len = list_length(stru->fields);
+    for (u32 i = 0; i < len; i++)
+        if (stru->fields[i].name == name) return &stru->fields[i];
+    return null;
+}
 
 typedef struct Constant {
     Identifier name;
     Expression* expr;
 } Constant;
 
+// ----Namespaces----------------------------------------------
 
+typedef struct Namespace {
+    Identifier name;
 
-// ----Allocator----------------------------------------------
+    Procedure* procedures; // list
+    VarDecl* global_variables; // list
+    Constant* constants; // list
 
-u32 ExpressionType_Bytesizes[] = {
-    [ExprType_Plus] = sizeof(BinaryExpression),
-    [ExprType_Minus] = sizeof(BinaryExpression),
-    [ExprType_Mul] = sizeof(BinaryExpression),
-    [ExprType_Div] = sizeof(BinaryExpression),
-    [ExprType_Mod] = sizeof(BinaryExpression),
-    [ExprType_Less] = sizeof(BinaryExpression),
-    [ExprType_Greater] = sizeof(BinaryExpression),
-    [ExprType_LessEquals] = sizeof(BinaryExpression),
-    [ExprType_GreaterEquals] = sizeof(BinaryExpression),
-    [ExprType_Equals] = sizeof(BinaryExpression),
-    [ExprType_NotEquals] = sizeof(BinaryExpression),
-    [ExprType_BooleanAnd] = sizeof(BinaryExpression),
-    [ExprType_BooleanOr] = sizeof(BinaryExpression),
-    [ExprType_Bitwise_And] = sizeof(BinaryExpression),
-    [ExprType_Bitwise_Or] = sizeof(BinaryExpression),
-    [ExprType_Bitwise_Xor] = sizeof(BinaryExpression),
-    [ExprType_Bitwise_Lshift] = sizeof(BinaryExpression),
-    [ExprType_Bitwise_Rshift] = sizeof(BinaryExpression),
-    [ExprType_Unary_PreIncrement] = sizeof(UnaryExpression),
-    [ExprType_Unary_PostIncrement] = sizeof(UnaryExpression),
-    [ExprType_Unary_PreDecrement] = sizeof(UnaryExpression),
-    [ExprType_Unary_PostDecrement] = sizeof(UnaryExpression),
-    [ExprType_Unary_Not] = sizeof(UnaryExpression),
-    [ExprType_Unary_BitwiseNot] = sizeof(UnaryExpression),
-    [ExprType_Unary_AddressOf] = sizeof(UnaryExpression),
-    [ExprType_Unary_ValueOf] = sizeof(UnaryExpression),
-    [ExprType_Unary_Negate] = sizeof(UnaryExpression),
-    [ExprType_Literal_Integer] = sizeof(LiteralExpression),
-    [ExprType_Literal_Decimal] = sizeof(LiteralExpression),
-    [ExprType_Literal_Char] = sizeof(LiteralExpression),
-    [ExprType_Literal_String] = sizeof(LiteralExpression),
-    [ExprType_Literal_True] = sizeof(LiteralExpression),
-    [ExprType_Literal_False] = sizeof(LiteralExpression),
-    [ExprType_Literal_Null] = sizeof(LiteralExpression),
-    [ExprType_Variable] = sizeof(VariableExpression),
-    [ExprType_Constant] = sizeof(VariableExpression),
-    [ExprType_Alloc] = sizeof(AllocExpression),
-    [ExprType_Ternary] = sizeof(TernaryExpression),
-    [ExprType_ProcCall] = sizeof(ProcCall),
-    [ExprType_ProcPtrCall] = sizeof(ProcCall),
-    [ExprType_Deref] = sizeof(DerefOperator),
-    [ExprType_Indexing] = sizeof(IndexingExpression),
-    [ExprType_Cast] = sizeof(CastExpression),
-    [ExprType_Sizeof] = sizeof(SizeofExpression),
-    [ExprType_Parenthesized] = sizeof(ParenthesizedExpression)
-};
+    PlangStruct* structs; // list
+    AliasType* aliases; // list
+    Identifier* opaque_types; // list
 
-u32 StatementType_Bytesizes[] = {
-    [Statement_Declaration] = sizeof(VarDecl),
-    [Statement_FixedArray_Declaration] = sizeof(VarDecl),
-    [Statement_Assignment] = sizeof(Assignement),
-    [Statement_Expression] = sizeof(StatementExpression),
-    [Statement_Scope] = sizeof(Scope),
-    [Statement_If] = sizeof(IfStatement),
-    [Statement_While] = sizeof(WhileStatement),
-    [Statement_ForIn] = sizeof(ForInStatement),
-    [Statement_For] = sizeof(ForStatement),
-    [Statement_Switch] = sizeof(SwitchStatement),
-    [Statement_LocalProc] = sizeof(LocalProc),
-    [Statement_Continue] = sizeof(Statement),
-    [Statement_Break] = sizeof(Statement),
-    [Statement_Return] = sizeof(ReturnStatement),
-    [Statement_Goto] = sizeof(GotoStatement),
-    [Statement_Label] = sizeof(LabelStatement),
-    [Statement_CaseLabel] = sizeof(CaseLabelStatement),
-    [Statement_DefaultLabel] = sizeof(Statement)
-};
+} Namespace;
 
-void* allocate_node(u32 node_size) {
-    Node* node = calloc(1, node_size);
-    node->filepath = g_Filename;
-    node->lineNumber = tokens[token_index].line;
-    return node;
+typedef struct Codebase {
+
+    Namespace** namespaces; // list
+
+    DynamicBuffer* procedure_types;
+
+    // TODO: might be a good idea to make the string table be a hashmap, every time we append a new string it must go through the entire table
+    struct {
+        u32* byteoffsets; // list
+        DynamicBuffer* data;
+    } string_table;
+
+} Codebase;
+
+static Codebase g_Codebase; // The current codebase that is being parsed/validated/transpiled
+
+static inline char* get_string(Identifier id) { return (char*)(&g_Codebase.string_table.data->bytes[id]); }
+static inline char* get_string_byindex(u32 index) { return (char*)(&g_Codebase.string_table.data->bytes[g_Codebase.string_table.byteoffsets[index]]); }
+
+static Identifier register_string(StrSpan word) {
+    u32 len = list_length(g_Codebase.string_table.byteoffsets);
+    for (u32 i = 0; i < len; i++) {
+        u32 byteOffset = g_Codebase.string_table.byteoffsets[i];
+        char* s = (char*)(&g_Codebase.string_table.data->bytes[byteOffset]);
+        if (spanEquals(word, s)) return byteOffset;
+    }
+
+    u32 byteOffset = dyReserve(&g_Codebase.string_table.data, word.length + 1);
+    u8* p = (&g_Codebase.string_table.data->bytes[byteOffset]);
+    for (u32 i = 0; i < word.length; i++) p[i] = word.start[i];
+    p[word.length] = '\0';
+
+    list_add(g_Codebase.string_table.byteoffsets, byteOffset);
+    return byteOffset;
 }
 
-void* allocExpr(ExprType type) {
-    Expression* expr = allocate_node(ExpressionType_Bytesizes[type]);
-    expr->expressionType = type;
-    expr->datatype = type_invalid;
-    return expr;
+static Namespace* namespace_create() {
+    Namespace* ns = malloc(sizeof(Namespace));
+    ns->name = 0;
+
+    ns->procedures = list_create(Procedure);
+
+    ns->global_variables = list_create(VarDecl);
+    ns->constants = list_create(Constant);
+
+    ns->structs = list_create(PlangStruct);
+    ns->aliases = list_create(AliasType);
+    ns->opaque_types = list_create(Identifier);
+
+    return ns;
 }
 
-void* allocStatement(StatementType type) {
-    Statement* sta = allocate_node(StatementType_Bytesizes[type]);
-    sta->statementType = type;
-    return sta;
+static Namespace* getNamespace(Identifier name) {
+    foreach (item, g_Codebase.namespaces) {
+        Namespace* ns = *item;
+        if (ns->name == name) return ns;
+    }
+
+    Namespace* ns = namespace_create();
+    ns->name = name;
+    list_add(g_Codebase.namespaces, ns);
+    return ns;
+}
+
+static void codebase_init(Codebase* codebase) {
+    codebase->namespaces = list_create(Namespace*);
+    Namespace* default_ns = namespace_create();
+    list_add(g_Codebase.namespaces, default_ns);
+
+    codebase->procedure_types = dyCreate();
+
+    codebase->string_table.byteoffsets = list_create(u32);
+    codebase->string_table.data = dyCreate();
+    register_string(spFrom("")); // empty string
+}
+
+// get procedure, global or const
+static Datatype getThing(Namespace* ns, Identifier name) {
+
+    foreach (proc, ns->procedures) {
+        if (proc->name == name) return proc->ptr_type;
+    }
+
+    foreach (glob, ns->global_variables) {
+        if (glob->name == name) return glob->type;
+    }
+
+    foreach (cont, ns->constants) {
+        if (cont->name == name) return cont->expr->datatype;
+    }
+
+    return type_invalid;
+}
+
+static void ensureProcSignature() {
+
+}
+
+static inline ProcPtr* getProcPtr(u32 id) { return (ProcPtr*)&g_Codebase.procedure_types->bytes[id]; }
+
+static Datatype ensureProcPtr(Procedure* proc) {
+
+    u32 argCount = proc->arguments ? list_length(proc->arguments) : 0;
+
+    u32 length = g_Codebase.procedure_types->length;
+    u32 procId = 0;
+    while (procId < length) {
+        ProcPtr* ptr = getProcPtr(procId);
+
+        if (ptr->argCount == argCount && typeEquals(proc->returnType, ptr->returnType)) {
+            for (u32 i = 0; i < argCount; i++)
+                if (!typeEquals(proc->arguments[i].type, ptr->argTypes[i])) goto skip;
+            return (Datatype) {
+                .kind = Typekind_ProcPtr,
+                .ref = procId,
+                .numPointers = 1
+            };
+        }
+
+        skip: procId += sizeof(ProcPtr) + sizeof(Datatype) * ptr->argCount;
+    }
+
+
+    procId = dyReserve(&g_Codebase.procedure_types, sizeof(ProcPtr));
+    ProcPtr* ptr = getProcPtr(procId);
+    ptr->returnType = proc->returnType;
+    ptr->argCount = argCount;
+    for (u32 i = 0; i < argCount; i++) {
+        u32 argRef = dyReserve(&g_Codebase.procedure_types, sizeof(Datatype));
+        *(Datatype*)(&g_Codebase.procedure_types->bytes[argRef]) = proc->arguments[i].type;
+    }
+
+
+    return (Datatype) {
+        .kind = Typekind_ProcPtr,
+        .ref = procId,
+        .numPointers = 1
+    };
 }
