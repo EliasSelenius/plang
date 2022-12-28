@@ -130,6 +130,8 @@ uint32 createShader() {
     char* fragCode = fileread("shaders/frag.glsl");
     let v = makeShader(program, GL_VERTEX_SHADER, vertCode);
     let f = makeShader(program, GL_FRAGMENT_SHADER, fragCode);
+    free(vertCode);
+    free(fragCode);
 
     glLinkProgram(program);
 
@@ -152,3 +154,13 @@ uint32 createShader() {
 
     return program;
 }
+
+
+/*
+    Textures
+
+        glGenTexture
+        bind
+        set tex params
+        glTexImage2D
+*/

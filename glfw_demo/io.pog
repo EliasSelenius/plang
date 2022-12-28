@@ -10,6 +10,7 @@ declare uint64 fread(void* buffer, uint64 elementSize, uint64 elementCount, void
 
 declare void* calloc(uint64 count, uint64 size);
 declare void* malloc(uint64 size);
+declare void free(void* block);
 declare void* realloc(void* buffer, uint64 size);
 declare void* memcpy(void* dst, void* src, uint64 size);
 

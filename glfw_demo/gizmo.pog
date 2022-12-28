@@ -1,0 +1,18 @@
+
+namespace gizmo;
+
+uint32 gizmo_vao, gizmo_vbo, gizmo_ebo;
+
+// struct GizmoLine {
+//     vec2 start;
+//     vec2 end;
+// }
+
+
+void initGizmos() {
+}
+
+
+// void drawArrow(vec2 start, vec2 dir) {
+//     let end = start + dir;
+// }

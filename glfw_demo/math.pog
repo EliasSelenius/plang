@@ -50,3 +50,4 @@ float32 sqlength(vec2 a) { return dot(a, a); }
 float32 length(vec2 a) { return sqrtf(dot(a, a)); }
 vec2 normalize(vec2 a) { return mul(a, 1.0 / length(a)); }
 vec2 reflect(vec2 a, vec2 normal) { return add(a, mul(normal, dot(a, normal) * -2.0)); }
+

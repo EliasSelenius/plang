@@ -3,8 +3,13 @@
     TODO:
         - 2d noise function
         - basic planet generation, using noise
-        - point to voxelgrid intersection func
         - player controller (gravity, collision, jump, jetpack)
+
+    InProgress:
+        - point to voxelgrid intersection func
+
+    DONE:
+
 */
 
 Transform camera;
@@ -25,6 +30,16 @@ void applyTransform(Transform t) {
     glUniform2f(glGetUniformLocation(shader, "entity_pos"), t.pos.x, t.pos.y);
     glUniform1f(glGetUniformLocation(shader, "entity_rot"), t.rot);
     glUniform1f(glGetUniformLocation(shader, "entity_scale"), t.scale);
+}
+
+vec2 rotate_vec(vec2 dir, float32 angle) {
+    float32 c = cosf(angle);
+    float32 s = sinf(angle);
+
+    vec2 res;
+    res.x = c*dir.x + s*dir.y;
+    res.y = -s*dir.x + c*dir.y;
+    return res;
 }
 
 vec2 right(Transform t) { return vec(cosf(t.rot), sinf(t.rot)); }
@@ -165,6 +180,15 @@ void updateEntity(Entity* entity) {
             // entity.vel = reflect(entity.vel, normal); // bounce
             entity.vel = add(entity.vel, mul(normal, -dot(entity.vel, normal))); // cancel velocity in direction of surface
         }
+    }
+
+    Intersection intersection;
+    if point_intersects(entity.transform.pos, *voxelGrid, *intersection) {
+        vec2 normal = intersection.surface_normal;
+        vec2 correction = mul(normal, -intersection.distance);
+        entity.transform.pos = add(entity.transform.pos, correction);
+
+        entity.vel = add(entity.vel, mul(normal, -dot(entity.vel, normal))); // cancel velocity in direction of surface
     }
 }
 
@@ -312,14 +336,12 @@ int32 main() {
 
             let mouseCoord = getMouseWorldCoord();
 
-            if point_intersects(mouseCoord, *voxelGrid) {
+            Intersection intersection;
+            if point_intersects(mouseCoord, *voxelGrid, *intersection) {
                 // let center = calcCenterOfMass(*voxelGrid);
                 // glUniform2f(glGetUniformLocation(shader, "entity_pos"), center.x, center.y);
                 // drawMesh(voxelMesh_circle);
-                print("Intersects\n");
-                glClearColor(0.5, 0.05, 0.05, 1.0);
-            } else {
-                glClearColor(0.05, 0.05, 0.05, 1.0);
+                print("Intersects ", intersection.distance, "\n");
             }
 
             if mouse(Left_Mouse) {

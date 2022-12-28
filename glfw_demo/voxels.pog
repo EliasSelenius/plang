@@ -18,10 +18,10 @@ const BottomRightBit = 1;
 
 const PointOnThreshold = 0.001;
 
-void addTri(void** list, uint32 i1, uint32 i2, uint32 i3) {
-    add(list, *i1);
-    add(list, *i2);
-    add(list, *i3);
+void addTri(uint32** inds, uint32 i1, uint32 i2, uint32 i3) {
+    add(inds, *i1);
+    add(inds, *i2);
+    add(inds, *i3);
 }
 
 uint32 getIndex(uint32 res, uint32 x, uint32 y) {
@@ -277,10 +277,10 @@ void VoxelGrid_removeCircle(VoxelGrid* grid, float32 radius, float32 x, float32 
 
 struct Intersection {
     vec2 surface_normal;
-    vec2 distance;
+    float32 distance;
 }
 
-int32 point_intersects(vec2 point, VoxelGrid* grid) {
+int32 point_intersects(vec2 point, VoxelGrid* grid, Intersection* out_intersection) {
 
     point = getLocalCoords(grid, point.x, point.y);
     int32 x = point.x as int32;
@@ -323,24 +323,22 @@ int32 point_intersects(vec2 point, VoxelGrid* grid) {
     vec2 b;
     switch (mask) {
         // corners
-        // case TopLeftBit: break;
-        // case TopRightBit: break;
-        // case BottomRightBit: break;
-        // case BottomLeftBit: break;
-
-
-            /*
-                *--------1--------*
-                |                 |
-                |                 |
-                |                 |
-                2                 3
-                |                 |
-                |                 |
-                |                 |
-                *--------4--------*
-            */
-
+        case TopLeftBit:
+            a = vec(p1, 1);
+            b = vec(0, 1 - p1);
+            break;
+        case TopRightBit:
+            a = vec(1, 1 - p2);
+            b = vec(1 - p2, 1);
+            break;
+        case BottomRightBit:
+            a = vec(1 - p4, 0);
+            b = vec(1, p4);
+            break;
+        case BottomLeftBit:
+            a = vec(0, p3);
+            b = vec(p3, 0);
+            break;
 
         // inverted corners
         case 0x0F & ~TopLeftBit:
@@ -391,12 +389,16 @@ int32 point_intersects(vec2 point, VoxelGrid* grid) {
         default: return false;
     }
 
+
     vec2 local = sub(point, vec(x, y));
     local = sub(local, a);
 
     vec2 normal = rot90deg(sub(b, a));
 
-    if dot(normal, local) <= 0 return true;
+    out_intersection.distance = dot(normal, local);
+    out_intersection.surface_normal = rotate_vec(normal, grid.transform.rot);
+
+    if out_intersection.distance <= 0 return true;
 
     return false;
 }
