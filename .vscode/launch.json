@@ -14,7 +14,7 @@
             "request": "launch",
             "terminal": "external",
             "program": "${workspaceFolder}/bin/plang.exe",
-            "args": ["test.pog"],
+            "args": ["test.pog", "test2.pog"],
             "cwd": "${workspaceFolder}",
         },
 

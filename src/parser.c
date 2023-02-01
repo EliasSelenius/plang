@@ -3,8 +3,6 @@
 static Scope* expectScope();
 static Expression* parseExpression();
 static Expression* expectExpression();
-static bool parseType(Datatype* type);
-static Datatype expectType();
 static Statement* expectStatement();
 
 // asserts the existence of a semicolon
@@ -28,8 +26,7 @@ static Identifier identifier() {
 
 static void expect(TokenType type) {
     if (tokens[token_index].type != type) {
-        // TODO: get TokenType as string
-        error_token("Unexpected token type %d.", tokens[token_index].type);
+        error_token("Unexpected token type %s.", TokenType_Names[tokens[token_index].type]);
         return;
     }
     token_index++;
@@ -50,10 +47,10 @@ static inline bool tok(TokenType type) {
 
 
 static inline bool funcPtrEquivalence(ProcPtr* a, ProcPtr* b) {
-    if (a->argCount != b->argCount) return false;
-    if (!typeEquals(a->returnType, b->returnType)) return false;
-    for (u32 i = 0; i < a->argCount; i++) {
-        if (!typeEquals(a->argTypes[i], b->argTypes[i])) return false;
+    if (a->arg_count != b->arg_count) return false;
+    if (!typeEquals(a->return_type, b->return_type)) return false;
+    for (u32 i = 0; i < a->arg_count; i++) {
+        if (!typeEquals(a->arg_types[i], b->arg_types[i])) return false;
     }
 
     return true;
@@ -90,6 +87,7 @@ static Identifier constructNameForFuncPtr(FuncPtr* funcPtr) {
 
 */
 
+/*
 
 static Datatype parseProcPtrArgs(Datatype retType) {
     if (!tok(Tok_OpenParen)) return retType;
@@ -143,70 +141,317 @@ static Datatype parseProcPtrArgs(Datatype retType) {
     return funcType;
 }
 
-// returns false if the token can not be interpreted as a type
-static bool parseInferableType(Datatype* type) {
-    if (tok(Tok_Keyword_Let)) {
-        *type = (Datatype){ Typekind_MustBeInfered, 0, 0 };
-        return true;
-    }
+*/
 
-    if (tokens[token_index].type == Tok_Word) {
-        u32 stbo = tokens[token_index++].string;
+static Datatype (*expectType)();
 
-        type->ref = 0;
+static Arena* unresolved_types_arena = &(Arena) {0};
 
-             if (stbo == type_name_int8) type->kind = Typekind_int8;
-        else if (stbo == type_name_uint8) type->kind = Typekind_uint8;
-        else if (stbo == type_name_int16) type->kind = Typekind_int16;
-        else if (stbo == type_name_uint16) type->kind = Typekind_uint16;
-        else if (stbo == type_name_int32) type->kind = Typekind_int32;
-        else if (stbo == type_name_uint32) type->kind = Typekind_uint32;
-        else if (stbo == type_name_int64) type->kind = Typekind_int64;
-        else if (stbo == type_name_uint64) type->kind = Typekind_uint64;
-        else if (stbo == type_name_float32) type->kind = Typekind_float32;
-        else if (stbo == type_name_float64) type->kind = Typekind_float64;
-        else if (stbo == type_name_char) type->kind = Typekind_char;
-        else if (stbo == type_name_void) type->kind = Typekind_void;
-        else {
-            type->kind = Typekind_Undecided;
-            type->ref = stbo;
-        }
+/*
+static Datatype expectUnresolvedType() {
+    Identifier name = identifier();
 
-
-        type->numPointers = 0;
-        while (tok(Tok_Mul)) type->numPointers++;
-
-        *type = parseProcPtrArgs(*type);
-
-        return true;
-    }
-
-    return false;
-}
-
-// returns false if the token can not be interpreted as a type
-static inline bool parseType(Datatype* type) {
-    if (parseInferableType(type)) {
-        if (type->kind == Typekind_MustBeInfered) {
-            error_at_token(token_index - 1, "Type cannot be infered here.");
-        }
-        return true;
-    }
-
-    return false;
-}
-
-static inline Datatype expectInferableType() {
     Datatype res = {0};
-    if (!parseInferableType(&res)) {
-        error_token("Expected type.");
+
+    UnresolvedType* unresolved = arena_alloc(unresolved_types_arena, sizeof(UnresolvedType));
+    unresolved->context = context;
+    unresolved->arg_count = 0;
+    unresolved->namespace_name = 0;
+    unresolved->name = name;
+    res = (Datatype) { .kind = Typekind_Unresolved, .unresolved = unresolved };
+
+    if (tok(Tok_Period)) {
+        unresolved->namespace_name = name;
+        unresolved->name = identifier();
     }
+
+    while (tok(Tok_Mul)) res.numPointers++;
+
+    if (tok(Tok_OpenParen)) {
+        if (!tok(Tok_CloseParen)) {
+            do {
+                Datatype arg = expectUnresolvedType();
+                unresolved->arg_count++;
+            } while (tok(Tok_Comma));
+            expect(Tok_CloseParen);
+        }
+    }
+
     return res;
 }
 
-static inline Datatype expectType() {
-    Datatype res = expectInferableType();
-    if (res.kind == Typekind_MustBeInfered) error_at_token(token_index - 1, "Type cannot be infered here.");
+*/
+
+static Datatype getType(Namespace* ns, Identifier name) {
+    foreach (alias, ns->aliases) {
+        if (alias->name == name) return (Datatype) { .kind = Typekind_Alias, .data_ptr = alias, 0 };
+    }
+
+    foreach (stru, ns->structs) {
+        if (stru->name == name) return (Datatype) { .kind = Typekind_Struct, .data_ptr = stru, 0 };
+    }
+
+    foreach (opaque, ns->opaque_types) {
+        if (*opaque == name) 
+            return (Datatype) { .kind = Typekind_Opaque, .opaque_name = name, 0 };
+    }
+
+    return type_invalid;
+}
+/*
+static UnresolvedType* resolveType(UnresolvedType* unres) {
+
+    if (unres->namespace_name == 0) {
+        unres->solution = getType(unres->context->namespace, unres->name);
+        if (unres->solution.kind == Typekind_Invalid) unres->solution = getType(g_Codebase.namespaces[0], unres->name);
+    } else {
+        Namespace* ns = getNamespace(unres->namespace_name);
+        if (!ns) {
+            printf("%s is not a namespace\n", get_string(unres->namespace_name)); // TODO
+        }
+        unres->solution = getType(ns, unres->name);
+    }
+
+    if (unres->solution.kind == Typekind_Invalid) {
+        // TODO: unresolved type error
+    }
+
+    if (unres->arg_count) {
+        u32 arg_count = unres->arg_count;
+
+        UnresolvedType* arg = unres + 1;
+        u32 i = 0;
+        while (i < arg_count) {
+            arg = resolveType(arg);
+        }
+
+        for (u32 i = 0; i < arg_count; i++) resolveType(unres + i);
+
+        u32 procId = 0;
+        while (procId < g_Codebase.arena_procedure_types.allocated) {
+            ProcPtr* ptr = getProcPtr(procId);
+            if (ptr->arg_count == arg_count && typeEquals(*datatype, ptr->return_type)) {
+                for (u32 i = 0; i < arg_count; i++)
+                    if (!typeEquals(unres->arguments[i], ptr->arg_types[i])) goto skip;
+
+                *datatype = (Datatype) { .kind = Typekind_ProcPtr, .procptr = ptr, .numPointers = 1 };
+                goto done;
+            }
+            skip: procId += sizeof(ProcPtr) + sizeof(Datatype) * ptr->arg_count;
+        }
+
+        ProcPtr* ptr = arena_alloc(&g_Codebase.arena_procedure_types, sizeof(ProcPtr) + sizeof(Datatype) * arg_count);
+        ptr->arg_count = arg_count;
+        ptr->return_type = *datatype;
+        for (u32 i = 0; i < arg_count; i++)
+            ptr->arg_types[i] = unres->arguments[i];
+        *datatype = (Datatype) { .kind = Typekind_ProcPtr, .procptr = ptr, .numPointers = 1 };
+
+        done:
+        list_delete(unres->arguments);
+    }
+
+    free(unres);
+}
+*/
+
+
+static Type* newTypeNode(TypeNode node_type) {
+    Type* res = malloc(sizeof(Type));
+    *res = (Type) { .node_type = node_type, {0} };
+    return res;
+}
+
+static Type* type_modifier(Type* type);
+
+static Type* test_parsetype() {
+    Type* type = newTypeNode(TypeNode_Normal);
+    type->context = context;
+    type->name = identifier();
+    if (tok(Tok_Period)) {
+        type->namespace_name = type->name;
+        type->name = identifier();
+    }
+
+    Type* mod = type;
+    while ( (mod = type_modifier(mod)) ) type = mod;
+
+    return type;
+}
+
+static Datatype test_expectType() {
+    Type* unres = test_parsetype();
+    return (Datatype) { .kind = Typekind_Unresolved, .unresolved = unres, 0 };
+}
+
+static Type* type_modifier(Type* type) {
+    if (tok(Tok_OpenParen)) {
+        Type* mod = newTypeNode(TypeNode_Procedure);
+        mod->procedure.return_type = type;
+        if (tok(Tok_CloseParen)) return mod;
+
+        Type* arg = test_parsetype();
+        mod->procedure.arguments = arg;
+        while (tok(Tok_Comma)) {
+            arg->next = test_parsetype();
+            arg = arg->next;
+        }
+        expect(Tok_CloseParen);
+        return mod;
+    }
+
+    if (tok(Tok_Mul)) {
+        Type* mod = newTypeNode(TypeNode_Pointer);
+        mod->pointedto = type;
+        return mod;
+    }
+
+    return null;
+}
+
+static void printType(Type* type) {
+    switch (type->node_type) {
+        case TypeNode_Normal: {
+            if (type->namespace_name) printf("%s.%s", get_string(type->namespace_name), get_string(type->name));
+            else printf("%s", get_string(type->name));
+        } break;
+        case TypeNode_Pointer: {
+            printType(type->pointedto);
+            printf("*");
+        } break;
+        case TypeNode_Procedure: {
+            printType(type->procedure.return_type);
+            printf("(");
+            Type* arg = type->procedure.arguments;
+            if (arg) {
+                printType(arg);
+                arg = arg->next;
+                while (arg) {
+                    printf(", ");
+                    printType(arg);
+                    arg = arg->next;
+                }
+            }
+            printf(")");
+        } break;
+    }
+}
+
+static Datatype test_type2datatype(Type* type) {
+    switch (type->node_type) {
+        case TypeNode_Normal: {
+            if (type->namespace_name == 0) {
+
+                     if (type->name == type_name_int8) return type_int8;
+                else if (type->name == type_name_uint8) return type_uint8;
+                else if (type->name == type_name_int16) return type_int16;
+                else if (type->name == type_name_uint16) return type_uint16;
+                else if (type->name == type_name_int32) return type_int32;
+                else if (type->name == type_name_uint32) return type_uint32;
+                else if (type->name == type_name_int64) return type_int64;
+                else if (type->name == type_name_uint64) return type_uint64;
+                else if (type->name == type_name_float32) return type_float32;
+                else if (type->name == type_name_float64) return type_float64;
+                else if (type->name == type_name_char) return type_char;
+                else if (type->name == type_name_void) return type_void;
+
+                Datatype res = getType(type->context->namespace, type->name);
+                if (res.kind == Typekind_Invalid) res = getType(g_Codebase.namespaces[0], type->name);
+
+                if (res.kind == Typekind_Invalid) goto fail;
+
+                return res;
+            }
+
+            Namespace* ns = getNamespace(type->namespace_name);
+            Datatype res = getType(ns, type->name);
+
+            if (res.kind == Typekind_Invalid) goto fail;
+            return res;
+        } break;
+        case TypeNode_Pointer: {
+            Datatype res = test_type2datatype(type->pointedto);
+            res.numPointers++;
+            return res;
+        } break;
+        case TypeNode_Procedure: {
+
+            ProcSignature* sig = createSignature(test_type2datatype(type->procedure.return_type));
+            Type* arg = type->procedure.arguments;
+            while (arg) {
+                addArgument(sig, test_type2datatype(arg), 0);
+                arg = arg->next;
+            }
+
+            return (Datatype) {
+                .kind = Typekind_Procedure,
+                .procedure = sig,
+                .numPointers = 1
+            };
+        } break;
+    }
+
+    fail:
+    error_temp("Failed to resolve type");
+    return type_invalid;
+}
+
+static void resolveType(Datatype* datatype) {
+    Type* type = datatype->unresolved;
+    // printf("Resolved type: ");
+    // printType(type);
+    // printf("\n");
+    *datatype = test_type2datatype(type);
+}
+
+static Datatype expectResolvedType() {
+
+    if (tok(Tok_Keyword_Let)) return (Datatype) { .kind = Typekind_MustBeInfered, {0} };
+
+    Datatype res = {0};
+
+    Identifier name = identifier();
+    Namespace* ns = getNamespace(name);
+    if (ns) {
+        expect(Tok_Period);
+        name = identifier();
+        res = getType(ns, name);
+    } else {
+
+             if (name == type_name_int8) res.kind = Typekind_int8;
+        else if (name == type_name_uint8) res.kind = Typekind_uint8;
+        else if (name == type_name_int16) res.kind = Typekind_int16;
+        else if (name == type_name_uint16) res.kind = Typekind_uint16;
+        else if (name == type_name_int32) res.kind = Typekind_int32;
+        else if (name == type_name_uint32) res.kind = Typekind_uint32;
+        else if (name == type_name_int64) res.kind = Typekind_int64;
+        else if (name == type_name_uint64) res.kind = Typekind_uint64;
+        else if (name == type_name_float32) res.kind = Typekind_float32;
+        else if (name == type_name_float64) res.kind = Typekind_float64;
+        else if (name == type_name_char) res.kind = Typekind_char;
+        else if (name == type_name_void) res.kind = Typekind_void;
+        else {
+            res = getType(context->namespace, name);
+            if (res.kind == Typekind_Invalid) res = getType(g_Codebase.namespaces[0], name);
+        }
+    }
+
+    if (res.kind == Typekind_Invalid) {
+        error_temp("Could not find type \"%s\"", get_string(name));
+    }
+
+    while (tok(Tok_Mul)) res.numPointers++;
+
+    if (tok(Tok_OpenParen)) {
+        // ProcSignature* sig = createSignature(res);
+        if (!tok(Tok_CloseParen)) {
+            do {
+                Datatype arg = expectResolvedType();
+            } while (tok(Tok_Comma));
+            expect(Tok_CloseParen);
+        }
+    }
+
     return res;
 }
 
@@ -311,14 +556,27 @@ static Expression* parseLeafExpression() {
     switch (tokens[token_index].type) {
         case Tok_Word: {
             VariableExpression* ve = allocExpr(ExprType_Variable);
-            ve->namespace_name = 0;
-            ve->name = identifier();
-            if (tokens[token_index].type == Tok_Colon
-             && tokens[token_index + 1].type == Tok_Colon) {
-                token_index += 2;
-                ve->namespace_name = ve->name;
-                ve->name = identifier();
+
+            Identifier name = identifier();
+            Namespace* ns = getNamespace(name);
+            if (ns) {
+                expect(Tok_Period);
+                name = identifier();
+                ve->ref = getReference(ns, name);
+            } else {
+                ve->ref = getReference(context->namespace, name);
+                if (ve->ref.reftype == RefType_Invalid) {
+                    ve->ref = getReference(g_Codebase.namespaces[0], name);
+                }
+
+                if (ve->ref.reftype == RefType_Invalid) {
+
+                    
+
+                    ve->ref.name = name;
+                }
             }
+
             res = (Expression*)ve;
         } break;
 
@@ -665,7 +923,7 @@ static u32 peekType() {
 static VarDecl* expectVarDecl() {
     VarDecl* decl = malloc(sizeof(VarDecl));
     decl->base.statementType = Statement_Declaration;
-    decl->type = expectInferableType();
+    decl->type = expectType();
     decl->name = identifier();
 
     decl->assignmentOrNull = null;
@@ -679,22 +937,18 @@ static VarDecl* expectVarDecl() {
 }
 
 static ProcArg* expectProcArguments() {
-    ProcArg* res = null;
 
-    ProcArg arg;
-    if (parseType(&arg.type)) {
-        arg.name = identifier();
-
-        res = list_create(ProcArg);
-        list_add(res, arg);
-
-        while (tok(Tok_Comma)) {
-            arg.type = expectType();
-            arg.name = identifier();
-            list_add(res, arg);
-        }
+    if (tok(Tok_CloseParen)) {
+        return null;
     }
 
+    ProcArg* res = list_create(ProcArg);
+    ProcArg arg;
+    do {
+        arg.type = expectType();
+        arg.name = identifier();
+        list_add(res, arg);
+    } while (tok(Tok_Comma));
     expect(Tok_CloseParen);
 
     return res;
@@ -827,7 +1081,7 @@ static Statement* expectStatement() {
 
             LocalProc* localproc = allocStatement(Statement_LocalProc);
             localproc->proc.overload = 0;
-            localproc->proc.returnType = expectInferableType();
+            localproc->proc.returnType = expectType();
             localproc->proc.name = identifier();
             expect(Tok_OpenParen);
             localproc->proc.arguments = expectProcArguments();
@@ -838,7 +1092,7 @@ static Statement* expectStatement() {
             // confirmed declaration
 
             VarDecl* decl = allocStatement(Statement_Declaration);
-            decl->type = expectInferableType();
+            decl->type = expectType();
             decl->name = identifier();
 
             // fixed sized arrays
@@ -969,27 +1223,78 @@ static PlangStruct expectStruct() {
     return stru;
 }
 
+typedef enum ParseJobKind {
+    ParseJobKind_Scope,
+    ParseJobKind_Expression
+} ParseJobKind;
+
+typedef struct ParseJob {
+    File* context;
+    ParseJobKind kind;
+    u32 token_index;
+} ParseJob;
+
+static ParseJob* createParseJob(ParseJobKind kind) {
+    ParseJob* job = malloc(sizeof(ParseJob));
+    job->context = context;
+    job->token_index = token_index;
+    job->kind = kind;
+    return job;
+}
+
+static void* executeParseJob(ParseJob* job) {
+    token_index = job->token_index;
+    context = job->context;
+    ParseJobKind kind = job->kind;
+    free(job);
+
+    switch (kind) {
+        case ParseJobKind_Scope:
+            activateScope(null);
+            return expectScope();
+        case ParseJobKind_Expression:
+            return expectExpression();
+        default: break;
+    }
+
+    return null;
+}
+
+static void skipBody() {
+    while (true) {
+        switch (tokens[token_index].type) {
+            case Tok_OpenCurl: token_index++; skipBody(); break;
+            case Tok_CloseCurl: token_index++; return;
+            case Tok_EOF: error_temp("Unmatched curly-bracket.\n"); return;
+            default: token_index++; break;
+        }
+    }
+}
+
 static void funcOrGlobal() {
-    Datatype type = expectInferableType();
+    Datatype type = expectType();
     Identifier name = identifier();
 
     if (tok(Tok_OpenParen)) {
         // function
 
-        Procedure proc;
+        Procedure proc = {0};
         proc.overload = 0;
+        proc.next_overload = null;
         proc.returnType = type;
         proc.name = name;
         proc.arguments = expectProcArguments();
 
-        activateScope(null);
-        proc.scope = expectScope();
+        proc.pre_scope_data.begin_scope_token = token_index;
+        proc.pre_scope_data.context = context;
+        expect(Tok_OpenCurl);
+        skipBody();
 
         list_add(context->namespace->procedures, proc);
 
     } else {
         // global variable
-        VarDecl decl;
+        VarDecl decl = {0};
         decl.base.statementType = Statement_Declaration;
         decl.assignmentOrNull = null;
         decl.name = name;
@@ -997,7 +1302,9 @@ static void funcOrGlobal() {
 
         globvar:
         if (tok(Tok_Assign)) {
-            decl.assignmentOrNull = expectExpression();
+            // decl.assignmentOrNull = expectExpression();
+            decl.assignmentOrNull = (Expression*)createParseJob(ParseJobKind_Expression);
+            while (tokens[token_index].type != Tok_Semicolon && tokens[token_index].type != Tok_Comma) token_index++;
         } else if (decl.type.kind == Typekind_MustBeInfered) {
             error_token("Global variable \"%s\" must be assigned to, to be type inferred.", get_string(decl.name));
         }
@@ -1040,7 +1347,7 @@ static bool parseProgramEntity() {
             u32 lineNum = tokens[token_index].line;
             token_index++;
 
-            AliasType alias;
+            AliasType alias = {0};
             alias.name = identifier();
             if (tok(Tok_Assign)) {
                 alias.aliasedType = expectType();
@@ -1056,13 +1363,14 @@ static bool parseProgramEntity() {
             u32 lineNum = tokens[token_index].line;
             token_index++;
 
-            Constant constant;
+            Constant constant = {0};
             constant.name = identifier();
             expect(Tok_Assign);
-            constant.expr = expectExpression();
-            semicolon();
-
+            constant.expr = (Expression*)createParseJob(ParseJobKind_Expression);
+            // constant.expr = expectExpression();
             list_add(context->namespace->constants, constant);
+
+            while (tokens[token_index++].type != Tok_Semicolon);
         } break;
 
         case Tok_Keyword_Let:
@@ -1073,7 +1381,7 @@ static bool parseProgramEntity() {
 
             token_index++;
 
-            Procedure proc;
+            Procedure proc = {0};
             proc.overload = 0;
             proc.scope = null;
             proc.returnType = expectType();
@@ -1105,7 +1413,7 @@ static bool parseProgramEntity() {
 static void parseFile() {
     if (tok(Tok_Keyword_Namespace)) {
         Identifier name = identifier();
-        Namespace* ns = getNamespace(name);
+        Namespace* ns = ensureNamespace(name);
         context->namespace = ns;
         semicolon();
     } else context->namespace = g_Codebase.namespaces[0];
@@ -1113,44 +1421,13 @@ static void parseFile() {
     while (parseProgramEntity());
 }
 
-static bool tryParseThing() {
-    switch (tokens[token_index].type) {
-        case Tok_Keyword_Struct: {
-            PlangStruct stru = {0};
-            stru.nodebase.lineNumber = tokens[token_index].line;
-            stru.nodebase.filepath = context->filename;
-            token_index++;
-            stru.name = identifier();
-
-            list_add(context->namespace->structs, stru);
-        } return true;
-
-        case Tok_Keyword_Type: return true;
-        case Tok_Keyword_Const: return true;
-        case Tok_EOF: return false;
-        default: return true;
-    }
-}
-
-static void parseAllTypes() {
-    u32 tokens_length = list_length(tokens);
-    u32 file_index = 0;
-    token_index = 0;
-    while (token_index < tokens_length) {
-        context = &Files[file_index++];
-
-        if (tok(Tok_Keyword_Namespace)) {
-            Identifier name = identifier();
-            Namespace* ns = getNamespace(name);
-            context->namespace = ns;
-            semicolon();
-        } else context->namespace = g_Codebase.namespaces[0];
-
-        while (tryParseThing());
-    }
-}
 
 static void parse() {
+
+    // expectType = expectUnresolvedType;
+    expectType = test_expectType;
+
+    *unresolved_types_arena = arena_create();
 
     u32 tokens_length = list_length(tokens);
     u32 file_index = 0;
@@ -1158,5 +1435,92 @@ static void parse() {
     while (token_index < tokens_length) {
         context = &Files[file_index++];
         parseFile();
+    }
+
+
+    { // resolve types
+        // TODO: maybe acumulate unresolved types in a list and iterate that, instead of having this much loop nesting
+
+        foreach (nsp, g_Codebase.namespaces) {
+            Namespace* ns = *nsp;
+
+            foreach (alias, ns->aliases) {
+                resolveType(&alias->aliasedType);
+            }
+
+            foreach (proc, ns->procedures) {
+                resolveType(&proc->returnType);
+                if (proc->arguments) {
+                    foreach (arg, proc->arguments) {
+                        resolveType(&arg->type);
+                    }
+                }
+            }
+
+            foreach (glob, ns->global_variables) {
+                resolveType(&glob->type);
+            }
+
+            foreach (stru, ns->structs) {
+                foreach (field, stru->fields) {
+                    resolveType(&field->type);
+                }
+            }
+        }
+    }
+
+    { // overloads
+        foreach (nsp, g_Codebase.namespaces) {
+            Namespace* ns = *nsp;
+
+            u32 procs_length = list_length(ns->procedures);
+            for (u32 i = 0; i < procs_length; i++) {
+                Procedure* p1 = &ns->procedures[i];
+
+                createSignatureFromProcedure(p1);
+
+                if (p1->overload) continue;
+
+                u32 overload_count = 1;
+                Procedure* it = p1;
+
+                // for each subsequent procedure
+                for (u32 j = i + 1; j < procs_length; j++) {
+                    Procedure* p2 = &ns->procedures[j];
+                    if (it->name != p2->name) continue;
+
+                    p2->overload = ++overload_count;
+                    it->next_overload = p2;
+                    it = p2;
+
+                    // TODO: check if it is a valid overload pair
+                }
+
+                if (overload_count != 1) p1->overload = 1;
+            }
+        }
+    }
+
+
+    expectType = expectResolvedType;
+
+    iterate(constants, {
+        item->expr = executeParseJob((ParseJob*)item->expr);
+    });
+
+    iterate(global_variables, {
+        if (item->assignmentOrNull == null) continue;
+        item->assignmentOrNull = executeParseJob((ParseJob*)item->assignmentOrNull);
+    });
+
+    foreach (ns, g_Codebase.namespaces) {
+        foreach (proc, (*ns)->procedures) {
+            token_index = proc->pre_scope_data.begin_scope_token;
+            if (token_index) {
+                context = proc->pre_scope_data.context;
+                activateScope(null);
+                proc->scope = expectScope();
+            }
+        }
     }
 }

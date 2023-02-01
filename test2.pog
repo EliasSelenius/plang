@@ -1,0 +1,6 @@
+
+namespace OtherNamespace;
+
+void hello() {
+    print("Hello from OtherNamespace");
+}

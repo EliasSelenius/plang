@@ -1,4 +1,8 @@
 
+namespace MyTestNamespace;
+
+declare void goo();
+
 OpaqueType* ot;
 
 type OpaqueType;
@@ -15,13 +19,42 @@ void reg(func f) {
     f(null);
 }
 
+type SomeProc = void(void*(char*), uint32);
+
+void SomeProcImpl(void*(char*) f, uint32 n) {
+    print("SomeNumber: ", n, " ");
+    float32* x = f("Mario");
+    print(@x, " at ", x);
+}
+
+void* SomeProcImplArg(char* name) {
+    print(name);
+    float32* res = alloc float32;
+    @res = 3.14;
+
+    return res;
+}
+
+
 int32 main() {
+
+    OtherNamespace.hello();
+
+    {
+        // SomeProc p = SomeProcImpl;
+        // p(SomeProcImplArg, 42);
+
+        SomeProcImpl(SomeProcImplArg, 42);
+        print("\n\n");
+    }
 
     let f = Foo;
     f = 0x10;
 
     f = 0x;
 
+    // void(func) r = reg;
+    // r(take_opaque);
     reg(take_opaque);
 
 

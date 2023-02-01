@@ -1,9 +1,4 @@
 
-typedef struct File {
-    char* filename;
-    Namespace* namespace;
-} File;
-
 static File* Files; // list
 static File* context; // currently parsed file
 static Namespace* current_namespace; // currently validated namespace

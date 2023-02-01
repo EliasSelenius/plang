@@ -280,6 +280,11 @@ struct Intersection {
     float32 distance;
 }
 
+vec2 rot90deg(vec2 v) {
+    vec2 res = vec(-v.y, v.x); // rotate 90 degrees to the left. (multiplication with imaginary unit)
+    return res;
+}
+
 int32 point_intersects(vec2 point, VoxelGrid* grid, Intersection* out_intersection) {
 
     point = getLocalCoords(grid, point.x, point.y);
@@ -313,11 +318,6 @@ int32 point_intersects(vec2 point, VoxelGrid* grid, Intersection* out_intersecti
     // let e1 = g2_byteoffset + x * grid.res + (y + 1);
     // let e4 = g2_byteoffset + x * grid.res + y;
 
-
-    vec2 rot90deg(vec2 v) {
-        vec2 res = vec(-v.y, v.x); // rotate 90 degrees to the left. (multiplication with imaginary unit)
-        return res;
-    }
 
     vec2 a;
     vec2 b;

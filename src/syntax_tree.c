@@ -2,15 +2,23 @@
 
 // signifies a string thats stored in the string-table
 typedef u32 Identifier;
-typedef struct NamespacedID { Identifier namespace_name, name; } NamespacedID;
 
+typedef struct Namespace Namespace;
+typedef struct Procedure Procedure;
+typedef struct VarDecl VarDecl;
+typedef struct Constant Constant;
+
+typedef struct File {
+    char* filename;
+    Namespace* namespace;
+} File;
 
 // ----Types---------------------------------------------
 
 typedef enum Typekind {
 
     Typekind_Invalid = 0, // used by validator to signify a type that could not be determined because of an error
-    Typekind_Undecided, // used by parser to mean either struct, enum or alias
+    Typekind_Unresolved,
     Typekind_MustBeInfered,
     Typekind_AmbiguousInteger,
     Typekind_AmbiguousDecimal,
@@ -35,8 +43,22 @@ typedef enum Typekind {
     Typekind_Enum,
     Typekind_Alias,
     Typekind_Opaque,
-    Typekind_ProcPtr
+    Typekind_ProcPtr,
+    Typekind_Procedure
 } Typekind;
+
+typedef struct PlangStruct PlangStruct;
+typedef struct AliasType AliasType;
+typedef struct ProcPtr ProcPtr;
+typedef struct ProcSignature ProcSignature;
+typedef struct Datatype Datatype;
+
+typedef struct UnresolvedType {
+    File* context;
+    Identifier namespace_name, name;
+    u32 arg_count;
+    // Datatype solution;
+} UnresolvedType;
 
 typedef struct Datatype {
     Typekind kind;
@@ -49,31 +71,69 @@ typedef struct Datatype {
             Typekind_ProcPtr    -> byteoffset into procptrs buffer
     */
     union {
-        NamespacedID id;
         u32 ref;
+
+        void* data_ptr;
+        Identifier opaque_name;
+        struct Type* unresolved;
+        // UnresolvedType* unresolved;
+        PlangStruct* stru;
+        AliasType* alias;
+        ProcPtr* procptr;
+        ProcSignature* procedure;
     };
 
     u32 numPointers;
 } Datatype;
+
+typedef enum TypeNode {
+    TypeNode_Normal,
+    TypeNode_Pointer,
+    TypeNode_Procedure
+} TypeNode;
+
+typedef struct Type {
+    TypeNode node_type;
+    union {
+        struct {
+            Identifier namespace_name, name;
+            File* context;
+        };
+        struct Type* pointedto;
+        struct {
+            struct Type* return_type;
+            struct Type* arguments;
+        } procedure;
+
+        Datatype solvedstate;
+    };
+
+    struct Type* next;
+} Type;
 
 typedef struct AliasType {
     u32 name;
     Datatype aliasedType;
 } AliasType;
 
-#define type_invalid          (Datatype) { .kind = Typekind_Invalid, .ref = 0, .numPointers = 0 }
-#define type_void             (Datatype) { .kind = Typekind_void, .ref = 0, .numPointers = 0 }
+#define type_invalid          (Datatype) { .kind = Typekind_Invalid, {0} }
 #define type_voidPointer      (Datatype) { .kind = Typekind_void, .ref = 0, .numPointers = 1 }
-#define type_char             (Datatype) { .kind = Typekind_char, .ref = 0, .numPointers = 0 }
 #define type_charPointer      (Datatype) { .kind = Typekind_char, .ref = 0, .numPointers = 1 }
-#define type_int32            (Datatype) { .kind = Typekind_int32, .ref = 0, .numPointers = 0 }
-#define type_uint32           (Datatype) { .kind = Typekind_uint32, .ref = 0, .numPointers = 0 }
-#define type_int64            (Datatype) { .kind = Typekind_int64, .ref = 0, .numPointers = 0 }
-#define type_uint64           (Datatype) { .kind = Typekind_uint64, .ref = 0, .numPointers = 0 }
-#define type_float32          (Datatype) { .kind = Typekind_float32, .ref = 0, .numPointers = 0 }
-#define type_float64          (Datatype) { .kind = Typekind_float64, .ref = 0, .numPointers = 0 }
-#define type_ambiguousInteger (Datatype) { .kind = Typekind_AmbiguousInteger, .ref = 0, .numPointers = 0 }
-#define type_ambiguousDecimal (Datatype) { .kind = Typekind_AmbiguousDecimal, .ref = 0, .numPointers = 0 }
+#define type_ambiguousInteger (Datatype) { .kind = Typekind_AmbiguousInteger, {0} }
+#define type_ambiguousDecimal (Datatype) { .kind = Typekind_AmbiguousDecimal, {0} }
+
+#define type_int8    (Datatype) { .kind = Typekind_int8, {0} }
+#define type_uint8   (Datatype) { .kind = Typekind_uint8, {0} }
+#define type_int16   (Datatype) { .kind = Typekind_int16, {0} }
+#define type_uint16  (Datatype) { .kind = Typekind_uint16, {0} }
+#define type_int32   (Datatype) { .kind = Typekind_int32, {0} }
+#define type_uint32  (Datatype) { .kind = Typekind_uint32, {0} }
+#define type_int64   (Datatype) { .kind = Typekind_int64, {0} }
+#define type_uint64  (Datatype) { .kind = Typekind_uint64, {0} }
+#define type_float32 (Datatype) { .kind = Typekind_float32, {0} }
+#define type_float64 (Datatype) { .kind = Typekind_float64, {0} }
+#define type_char    (Datatype) { .kind = Typekind_char, {0} }
+#define type_void    (Datatype) { .kind = Typekind_void, {0} }
 
 static inline bool typeEquals(Datatype a, Datatype b) {
     return a.kind == b.kind && a.ref == b.ref && a.numPointers == b.numPointers;
@@ -193,11 +253,7 @@ static Typekind getTypekindOfNumberInfo(NumberInfo info) {
 }
 
 static Datatype mergeNumberTypes(Datatype a, Datatype b) {
-    return (Datatype) {
-        .kind = getTypekindOfNumberInfo(mergeNumberInfos(getNumberInfo(a.kind), getNumberInfo(b.kind))),
-        .ref = 0,
-        .numPointers = 0
-    };
+    return (Datatype) { .kind = getTypekindOfNumberInfo(mergeNumberInfos(getNumberInfo(a.kind), getNumberInfo(b.kind))), {0} };
 }
 
 typedef struct Node {
@@ -312,10 +368,29 @@ typedef struct DerefOperator {
     Identifier name;
 } DerefOperator;
 
+typedef enum RefType {
+    RefType_Invalid = 0,
+    RefType_Procedure,
+    RefType_Global,
+    RefType_Constant
+} RefType;
+
+typedef struct Reference {
+    RefType reftype;
+    union {
+        void* data;
+        Identifier name; // TODO: temporary
+        Procedure* procedure;
+        VarDecl* global;
+        Constant* constant;
+    };
+} Reference;
+
+#define reference_invalid (Reference) {0};
+
 typedef struct VariableExpression {
     Expression base;
-    Identifier namespace_name;
-    Identifier name;
+    Reference ref;
 } VariableExpression;
 
 typedef struct CastExpression {
@@ -457,9 +532,9 @@ typedef struct CaseLabelStatement {
 // ----Procedures----------------------------------------------
 
 typedef struct ProcPtr {
-    Datatype returnType;
-    u32 argCount;
-    Datatype argTypes[];
+    Datatype return_type;
+    u32 arg_count;
+    Datatype arg_types[];
 } ProcPtr;
 
 typedef struct ProcArg {
@@ -467,9 +542,16 @@ typedef struct ProcArg {
     Identifier name;
 } ProcArg;
 
+typedef struct Argument {
+    Datatype type;
+    Identifier name;
+    struct Argument* next;
+} Argument;
+
 typedef struct ProcSignature {
     Datatype return_type;
-    ProcArg* arguments; // list
+    u32 arg_count;
+    Argument* arguments;
 } ProcSignature;
 
 typedef struct Procedure {
@@ -482,8 +564,15 @@ typedef struct Procedure {
         a value of N means this function is the N'th function in the set of all its siblings. Where N > 0
     */
     u32 overload;
+    struct Procedure* next_overload;
 
-    Scope* scope; // scope can be null
+    union {
+        struct {
+            File* context;
+            u32 begin_scope_token;
+        } pre_scope_data;
+        Scope* scope; // scope can be null
+    };
 
     Datatype ptr_type;
 } Procedure;
@@ -491,7 +580,7 @@ typedef struct Procedure {
 typedef struct ProcCall {
     Expression base;
     Expression* proc_expr;
-    Expression** args; // list of Expression pointers
+    Expression** args; // list, can be null
     u32 overload;
 } ProcCall;
 
@@ -517,6 +606,7 @@ typedef struct Field {
 typedef struct PlangStruct {
     Node nodebase;
     Identifier name;
+    u32 deps; // TODO: temporary, until we figure out a better way of transpiling structs in the correct order
     Field* fields; // list
 } PlangStruct;
 
@@ -547,11 +637,16 @@ typedef struct Namespace {
 
 } Namespace;
 
+
 typedef struct Codebase {
 
     Namespace** namespaces; // list
 
-    DynamicBuffer* procedure_types;
+    // DynamicBuffer* procedure_types;
+    Arena arena_procedure_types;
+
+    Arena arena_signatures;
+    ProcSignature* proc_signatures;
 
     // TODO: might be a good idea to make the string table be a hashmap, every time we append a new string it must go through the entire table
     struct {
@@ -562,6 +657,9 @@ typedef struct Codebase {
 } Codebase;
 
 static Codebase g_Codebase; // The current codebase that is being parsed/validated/transpiled
+
+#define foreachNamespace(scope) { foreach (nsp, g_Codebase.namespaces) { Namespace* ns = *nsp; scope } }
+#define iterate(collection, scope) foreachNamespace(foreach(item, ns->collection) {scope} )
 
 static inline char* get_string(Identifier id) { return (char*)(&g_Codebase.string_table.data->bytes[id]); }
 static inline char* get_string_byindex(u32 index) { return (char*)(&g_Codebase.string_table.data->bytes[g_Codebase.string_table.byteoffsets[index]]); }
@@ -599,7 +697,7 @@ static Namespace* namespace_create() {
     return ns;
 }
 
-static Namespace* getNamespace(Identifier name) {
+static Namespace* ensureNamespace(Identifier name) {
     foreach (item, g_Codebase.namespaces) {
         Namespace* ns = *item;
         if (ns->name == name) return ns;
@@ -611,78 +709,171 @@ static Namespace* getNamespace(Identifier name) {
     return ns;
 }
 
+static Namespace* getNamespace(Identifier name) {
+    foreach (item, g_Codebase.namespaces) {
+        Namespace* ns = *item;
+        if (ns->name == name) return ns;
+    }
+
+    return null;
+}
+
 static void codebase_init(Codebase* codebase) {
     codebase->namespaces = list_create(Namespace*);
     Namespace* default_ns = namespace_create();
-    list_add(g_Codebase.namespaces, default_ns);
+    list_add(codebase->namespaces, default_ns);
 
-    codebase->procedure_types = dyCreate();
+    // codebase->procedure_types = dyCreate();
+    codebase->arena_procedure_types = arena_create();
+    codebase->arena_signatures = arena_create();
+
 
     codebase->string_table.byteoffsets = list_create(u32);
     codebase->string_table.data = dyCreate();
     register_string(spFrom("")); // empty string
 }
 
+static ProcSignature* createSignature(Datatype return_type) {
+    ProcSignature* sig = arena_alloc(&g_Codebase.arena_signatures, sizeof(ProcSignature));
+    sig->return_type = return_type;
+    return sig;
+}
+
+static void addArgument(ProcSignature* sig, Datatype argtype, Identifier argname) {
+    Argument* arg = arena_alloc(&g_Codebase.arena_signatures, sizeof(Argument));
+    arg->name = argname;
+    arg->type = argtype;
+
+    if (sig->arguments) {
+        Argument* last = sig->arguments;
+        while (last->next) last = last->next;
+        last->next = arg;
+    } else {
+        sig->arguments = arg;
+    }
+
+    sig->arg_count++;
+}
+
+static void createSignatureFromProcedure(Procedure* proc) {
+    ProcSignature* sig = createSignature(proc->returnType);
+    if (proc->arguments) {
+        foreach (arg, proc->arguments) {
+            addArgument(sig, arg->type, 0);
+        }
+    }
+
+    proc->ptr_type = (Datatype) { .kind = Typekind_Procedure, .procedure = sig, .numPointers = 1 };
+}
+
 // get procedure, global or const
-static Datatype getThing(Namespace* ns, Identifier name) {
+static Reference getReference(Namespace* ns, Identifier name) {
 
     foreach (proc, ns->procedures) {
-        if (proc->name == name) return proc->ptr_type;
+        if (proc->name == name) return (Reference) { .reftype = RefType_Procedure, .data = proc };
     }
 
     foreach (glob, ns->global_variables) {
-        if (glob->name == name) return glob->type;
+        if (glob->name == name) return (Reference) { .reftype = RefType_Global, .data = glob };
     }
 
     foreach (cont, ns->constants) {
-        if (cont->name == name) return cont->expr->datatype;
+        if (cont->name == name) return (Reference) { .reftype = RefType_Constant, .data = cont };
     }
 
-    return type_invalid;
+    return reference_invalid;
 }
 
-static void ensureProcSignature() {
-
+static Datatype reference2datatype(Reference ref) {
+    switch (ref.reftype) {
+        case RefType_Invalid: return type_invalid;
+        case RefType_Procedure: return ref.procedure->ptr_type;
+        case RefType_Global: return ref.global->type;
+        case RefType_Constant: return ref.constant->expr->datatype;
+    }
 }
 
-static inline ProcPtr* getProcPtr(u32 id) { return (ProcPtr*)&g_Codebase.procedure_types->bytes[id]; }
+
+static inline ProcPtr* getProcPtr(u32 id) { return (ProcPtr*)&((char*)g_Codebase.arena_procedure_types.data)[id]; }
 
 static Datatype ensureProcPtr(Procedure* proc) {
-
     u32 argCount = proc->arguments ? list_length(proc->arguments) : 0;
-
-    u32 length = g_Codebase.procedure_types->length;
+    u32 length = g_Codebase.arena_procedure_types.allocated;
     u32 procId = 0;
     while (procId < length) {
         ProcPtr* ptr = getProcPtr(procId);
 
-        if (ptr->argCount == argCount && typeEquals(proc->returnType, ptr->returnType)) {
+        if (ptr->arg_count == argCount && typeEquals(proc->returnType, ptr->return_type)) {
             for (u32 i = 0; i < argCount; i++)
-                if (!typeEquals(proc->arguments[i].type, ptr->argTypes[i])) goto skip;
-            return (Datatype) {
-                .kind = Typekind_ProcPtr,
-                .ref = procId,
-                .numPointers = 1
-            };
+                if (!typeEquals(proc->arguments[i].type, ptr->arg_types[i])) goto skip;
+            return (Datatype) { .kind = Typekind_ProcPtr, .procptr = ptr, .numPointers = 1 };
         }
 
-        skip: procId += sizeof(ProcPtr) + sizeof(Datatype) * ptr->argCount;
+        skip: procId += sizeof(ProcPtr) + sizeof(Datatype) * ptr->arg_count;
     }
 
-
-    procId = dyReserve(&g_Codebase.procedure_types, sizeof(ProcPtr));
-    ProcPtr* ptr = getProcPtr(procId);
-    ptr->returnType = proc->returnType;
-    ptr->argCount = argCount;
+    ProcPtr* ptr = arena_alloc(&g_Codebase.arena_procedure_types, sizeof(ProcPtr));
+    ptr->return_type = proc->returnType;
+    ptr->arg_count = argCount;
     for (u32 i = 0; i < argCount; i++) {
-        u32 argRef = dyReserve(&g_Codebase.procedure_types, sizeof(Datatype));
-        *(Datatype*)(&g_Codebase.procedure_types->bytes[argRef]) = proc->arguments[i].type;
+        Datatype* arg = arena_alloc(&g_Codebase.arena_procedure_types, sizeof(Datatype));
+        *arg = proc->arguments[i].type;
     }
 
-
-    return (Datatype) {
-        .kind = Typekind_ProcPtr,
-        .ref = procId,
-        .numPointers = 1
-    };
+    return (Datatype) { .kind = Typekind_ProcPtr, .procptr = ptr, .numPointers = 1 };
 }
+
+
+static void printScope(StringBuilder* sb, Scope* scope) {
+    sbAppend(sb, "{\n");
+
+    foreach (stap, scope->statements) {
+        Statement* sta = *stap;
+        switch (sta->statementType) {
+            case Statement_Declaration: sbAppend(sb, "");  break;
+            case Statement_FixedArray_Declaration: sbAppend(sb, "");  break;
+            case Statement_Assignment: sbAppend(sb, "");  break;
+            case Statement_Expression: sbAppend(sb, "");  break;
+            case Statement_Scope:
+                printScope(sb, (Scope*)sta);
+                break;
+            case Statement_If: sbAppend(sb, "if\n"); break;
+            case Statement_While: sbAppend(sb, "while\n"); break;
+            case Statement_ForIn: sbAppend(sb, "for in\n"); break;
+            case Statement_For: sbAppend(sb, "for\n"); break;
+            case Statement_Switch: sbAppend(sb, "switch\n"); break;
+            case Statement_LocalProc: sbAppend(sb, "local_proc\n"); break;
+            case Statement_Continue: sbAppend(sb, "continue\n"); break;
+            case Statement_Break: sbAppend(sb, "break\n"); break;
+            case Statement_Return: sbAppend(sb, "return\n"); break;
+            case Statement_Goto: sbAppend(sb, "goto\n"); break;
+            case Statement_Label: sbAppend(sb, "label\n"); break;
+            case Statement_CaseLabel: sbAppend(sb, "case label\n"); break;
+            case Statement_DefaultLabel: sbAppend(sb, "defalut label\n"); break;
+        }
+    }
+    sbAppend(sb, "}\n");
+}
+
+
+static void printCodebase(Codebase* codebase) {
+
+    StringBuilder builder = sbCreate();
+    StringBuilder* sb = &builder;
+
+    foreach (nsp, codebase->namespaces) {
+        Namespace* ns = *nsp;
+
+        sbAppend(sb, "Namespace ");
+        sbAppend(sb, get_string(ns->name));
+
+        foreach (proc, ns->procedures) {
+            sbAppend(sb, "Proc: ");
+            sbAppend(sb, get_string(proc->name));
+            if (proc->scope) printScope(sb, proc->scope);
+        }
+    }
+
+    sbDestroy(sb);
+}
+

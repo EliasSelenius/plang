@@ -10,7 +10,6 @@
         - loop block: loop { } == while (true) { }
         - nested multi-line comments
         - disallow void as variable type in declaration
-        - nesting funcptr types inside funcptrs arguments. void(void*(char*), uint) seems to produce a bug
         *- make assignments be expressions
         - contextual inclusion (the with keyword on struct fields)
         - member-like functions (the with keyword on function arguments)
@@ -39,6 +38,7 @@
 
 
     DONE list:
+        - nesting funcptr types inside funcptrs arguments. void(void*(char*), uint) seems to produce a bug
         - localy defined procedures
         - allow underscores in number literals
         - "plang build" CLI. build all .pog files in directory.

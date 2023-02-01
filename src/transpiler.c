@@ -35,12 +35,18 @@ static char* getTypeCname(Datatype type) {
 
         // These should not exist at this point
         case Typekind_Invalid:
-        case Typekind_Undecided:
+            printf("Attempted to transpile an invalid type. This is a bug!\n");
+            return "$error_invalid";
         case Typekind_MustBeInfered:
+            printf("Attempted to transpile a type that has not been infered. This is a bug!\n");
+            return "$error_notinfered";
         case Typekind_AmbiguousInteger:
         case Typekind_AmbiguousDecimal:
+            printf("Attempted to transpile an ambiguous type. This is a bug!\n");
+            return "$error_ambiguous";
+        case Typekind_Unresolved:
             printf("Attempted to transpile a type that should have been resolved. This is a bug!\n");
-            return "$error_type";
+            return "$error_unresolved";
 
         case Typekind_uint8: return "uint8";
         case Typekind_uint16: return "uint16";
@@ -55,15 +61,17 @@ static char* getTypeCname(Datatype type) {
         case Typekind_void: return "void";
         case Typekind_char: return "char";
 
-        case Typekind_Struct: return get_string(current_namespace->structs[type.ref].name);
+        case Typekind_Struct: return get_string(type.stru->name);
         case Typekind_Enum: return null;
-        case Typekind_Alias: return get_string(current_namespace->aliases[type.ref].name);
-        case Typekind_Opaque: return get_string(type.ref);
+        case Typekind_Alias: return get_string(type.alias->name);
+        case Typekind_Opaque: return get_string(type.opaque_name);
         case Typekind_ProcPtr: return "SomeFuncPtr";
-
+        case Typekind_Procedure: return "/*proc*/void";
     }
     return null;
 }
+
+
 
 static void transpileType(Datatype type) {
 
@@ -81,8 +89,32 @@ static void transpileType(Datatype type) {
 }
 
 static void transpileFuncCall(ProcCall* call) {
-    transpileExpression(call->proc_expr);
-    if (call->overload) sbAppendChar(sb, getCharFromU32(call->overload));
+
+    // TODO: ad-hoc solution
+    Datatype dealiased = dealiasType(call->proc_expr->datatype);
+    if (dealiased.kind == Typekind_Procedure) {
+        ProcSignature* sig = dealiased.procedure;
+        sbAppend(sb, "((");
+        transpileType(sig->return_type);
+        sbAppend(sb, " (*)(");
+        if (sig->arguments) {
+            Argument* arg = sig->arguments;
+            transpileType(arg->type);
+            arg = arg->next;
+            while (arg) {
+                sbAppend(sb, ", ");
+                transpileType(arg->type);
+                arg = arg->next;
+            }
+        }
+        sbAppend(sb, "))");
+        transpileExpression(call->proc_expr);
+        sbAppend(sb, ")");
+    } else {
+        transpileExpression(call->proc_expr);
+        if (call->overload) sbAppendChar(sb, getCharFromU32(call->overload));
+    }
+
     sbAppend(sb, "(");
     if (call->args) {
         transpileExpression(call->args[0]);
@@ -99,7 +131,11 @@ static void transpileFuncCall(ProcCall* call) {
 static char* getFormatTypeSpecifier(Datatype type) {
     Datatype datatype = dealiasType(type);
 
-    if (datatype.numPointers == 1) if (datatype.kind == Typekind_char) return "%s";
+    if (datatype.numPointers == 1) {
+        if (datatype.kind == Typekind_char) return "%s";
+
+        return "%p";
+    }
 
     if (datatype.numPointers == 0) {
         switch (datatype.kind) {
@@ -259,7 +295,17 @@ static void transpileExpression(Expression* expr) {
 
         case ExprType_Variable: {
             VariableExpression* var = (VariableExpression*)expr;
-            sbAppend(sb, get_string(var->name));
+
+            Identifier name = 0;
+
+            switch (var->ref.reftype) {
+                case RefType_Invalid: name = var->ref.name; break; // TODO: temporary
+                case RefType_Procedure: name = var->ref.procedure->name; break;
+                case RefType_Global: name = var->ref.global->name; break;
+                case RefType_Constant: name = var->ref.constant->name; break;
+            }
+
+            sbAppend(sb, get_string(name));
         } break;
 
         case ExprType_Alloc: {
@@ -302,10 +348,13 @@ static void transpileExpression(Expression* expr) {
             ProcCall* fc = (ProcCall*)expr;
 
             if (fc->proc_expr->expressionType == ExprType_Variable) {
-                Identifier name = ((VariableExpression*)fc->proc_expr)->name;
-                if (name == builtin_print_name) {
-                    transpilePrint(fc->args);
-                    break;
+                VariableExpression* var = (VariableExpression*)fc->proc_expr;
+                if (var->ref.reftype == RefType_Invalid) {
+                    Identifier name = var->ref.name;
+                    if (name == builtin_print_name) {
+                        transpilePrint(fc->args);
+                        break;
+                    }
                 }
             }
 
@@ -616,7 +665,7 @@ static u32 countStructDependencies(PlangStruct* stru) {
         if (datatype.kind != Typekind_Struct) continue;
 
         deps++;
-        deps += countStructDependencies(&current_namespace->structs[datatype.ref]);
+        deps += countStructDependencies(datatype.stru);
     }
 
     return deps;
@@ -634,7 +683,6 @@ static void transpileFuncptrType(Datatype type) {
     transpileType(type);
 }
 
-#define iterateThing(thing) foreach (ns, g_Codebase.namespaces) foreach (item, (*ns)->thing)
 
 static void transpile() {
     // TODO: use a higer initial capacity for the string builder
@@ -683,6 +731,87 @@ static void transpile() {
     sbAppend(sb, "typedef float float32;\n");
     sbAppend(sb, "typedef double float64;\n");
 
+    sbAppend(sb, "\n// Opaque types\n");
+    iterate(opaque_types, {
+        char* typename = get_string(*item);
+        sbAppend(sb, "typedef struct ");
+        sbAppend(sb, typename);
+        sbAppend(sb, " ");
+        sbAppend(sb, typename);
+        sbAppend(sb, ";\n");
+    });
+
+    sbAppend(sb, "\n// Structs forward declarations\n");
+    iterate(structs, {
+        char* name = get_string(item->name);
+        sbAppend(sb, "typedef struct ");
+        sbAppend(sb, name);
+        sbAppend(sb, " ");
+        sbAppend(sb, name);
+        sbAppend(sb, ";\n");
+    });
+
+    sbAppend(sb, "\n// Type aliases\n");
+    iterate(aliases, {
+        char* typename = get_string(item->name);
+        sbAppend(sb, "typedef ");
+        transpileType(item->aliasedType);
+        sbAppend(sb, " ");
+        sbAppend(sb, typename);
+        sbAppend(sb, ";\n");
+    });
+
+
+    {
+        sbAppend(sb, "\n// Structs\n");
+        u32 structs_count = 0;
+        iterate(structs, {
+            item->deps = countStructDependencies(item);
+            structs_count++;
+        });
+
+        u32 dep = 0;
+        u32 transpiled = 0;
+        while (transpiled < structs_count) {
+            iterate(structs, {
+                if (item->deps == dep) {
+                    transpileStruct(item);
+                    transpiled++;
+                }
+            });
+            dep++;
+        }
+    }
+
+    sbAppend(sb, "\n// Forward declarations\n");
+    iterate(procedures, {
+        transpileFunctionSignature(item);
+        sbAppend(sb, ";\n");
+    });
+
+    sbAppend(sb, "\n// Constants\n");
+    iterate(constants, {
+        sbAppend(sb, "#define ");
+        sbAppend(sb, get_string(item->name));
+        sbAppend(sb, " ");
+        transpileExpression(item->expr);
+        sbAppend(sb, "\n");
+    });
+
+    sbAppend(sb, "\n// Globals\n");
+    iterate(global_variables, {
+        transpileVarDecl(item);
+        sbAppend(sb, "\n");
+    });
+
+    sbAppend(sb, "\n// Implementations\n");
+    iterate(procedures, {
+        if (!item->scope) continue;
+        transpileProcedure(item);
+    });
+
+
+/*
     { // opaque types
         sbAppend(sb, "\n// Opaque types\n");
         foreach (optype, current_namespace->opaque_types) {
@@ -720,41 +849,43 @@ static void transpile() {
         }
     }
 
-    { // Func ptrs
-        sbAppend(sb, "\n// Function pointers\n");
-        u32 i = 0;
-        while (i < g_Codebase.procedure_types->length) {
-            ProcPtr* f = getProcPtr(i);
-            sbAppend(sb, "typedef ");
-            transpileFuncptrType(f->returnType);
-            sbAppend(sb, " ");
-            sbAppend(sb, "proc_");
-            sbAppendSpan(sb, numberToString(i));
-            sbAppend(sb, "(");
-            if (f->argCount) {
-                transpileFuncptrType(f->argTypes[0]);
-                for (u32 i = 1; i < f->argCount; i++) {
-                    sbAppend(sb, ", ");
-                    transpileFuncptrType(f->argTypes[i]);
-                }
-            }
-            sbAppend(sb, ");\n");
-            i += sizeof(ProcPtr) + sizeof(Datatype) * f->argCount;
-        }
-    }
 
-    { // type aliases (funcptrs only)
-        sbAppend(sb, "\n// Function pointer aliases\n");
-        foreach (alias, current_namespace->aliases) {
-            if (alias->aliasedType.kind != Typekind_ProcPtr) continue;
-            char* typename = get_string(alias->name);
-            sbAppend(sb, "typedef ");
-            transpileType(alias->aliasedType);
-            sbAppend(sb, " ");
-            sbAppend(sb, typename);
-            sbAppend(sb, ";\n");
-        }
-    }
+    // { // Func ptrs
+    //     sbAppend(sb, "\n// Function pointers\n");
+    //     u32 i = 0;
+    //     while (i < g_Codebase.arena_procedure_types.allocated) {
+    //         ProcPtr* f = getProcPtr(i);
+    //         sbAppend(sb, "typedef ");
+    //         transpileFuncptrType(f->return_type);
+    //         sbAppend(sb, " ");
+    //         sbAppend(sb, "proc_");
+    //         sbAppendSpan(sb, numberToString(i));
+    //         sbAppend(sb, "(");
+    //         if (f->arg_count) {
+    //             transpileFuncptrType(f->arg_types[0]);
+    //             for (u32 i = 1; i < f->arg_count; i++) {
+    //                 sbAppend(sb, ", ");
+    //                 transpileFuncptrType(f->arg_types[i]);
+    //             }
+    //         }
+    //         sbAppend(sb, ");\n");
+    //         i += sizeof(ProcPtr) + sizeof(Datatype) * f->arg_count;
+    //     }
+    // }
+
+    // { // type aliases (funcptrs only)
+    //     sbAppend(sb, "\n// Function pointer aliases\n");
+    //     foreach (alias, current_namespace->aliases) {
+    //         if (alias->aliasedType.kind != Typekind_ProcPtr) continue;
+    //         char* typename = get_string(alias->name);
+    //         sbAppend(sb, "typedef ");
+    //         transpileType(alias->aliasedType);
+    //         sbAppend(sb, " ");
+    //         sbAppend(sb, typename);
+    //         sbAppend(sb, ";\n");
+    //     }
+    // }
+
 
     { // structs
         sbAppend(sb, "\n// Structs\n");
@@ -818,7 +949,7 @@ static void transpile() {
         if (!proc->scope) continue;
         transpileProcedure(proc);
     }
-
+*/
 
     FILE* file;
     if ( !fopen_s(&file, "output.g.c", "w") ) {

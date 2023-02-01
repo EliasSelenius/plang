@@ -9,10 +9,13 @@
 
 #include "prelude.h"
 
+#include "platform.h"
+
 #include "essh-string.h"
 #include "essh-string.c"
 #include "list.c"
 #include "dynamic_buffer.c"
+#include "arena.c"
 
 #include "lexer.h"
 #include "syntax_tree.c"
@@ -24,8 +27,6 @@
 #include "parser.c"
 #include "validator.c"
 #include "transpiler.c"
-
-#include "platform.h"
 
 #include "io.c"
 #include "main.c"
