@@ -1,65 +1,39 @@
 
 #include <stdio.h>
-#include <math.h>
-#include <stdlib.h>
-#include <string.h>
 
-#include <Windows.h>
-
-#define true 1
-#define false 0
-
-typedef unsigned int uint32;
-
-SYSTEM_INFO sys_info;
-
-void* memory_reserve(uint32 num_reservations) {
-    return VirtualAlloc(NULL, sys_info.dwAllocationGranularity * num_reservations, MEM_RESERVE, PAGE_READWRITE);
-}
-
-void* memory_commit(void* reservated, uint32 num_pages) {
-    return VirtualAlloc(reservated, sys_info.dwPageSize * num_pages, MEM_COMMIT, PAGE_READWRITE);
+void my_proc(int i) {
+    printf("%d\n", i);
 }
 
 int main() {
 
-    GetSystemInfo(&sys_info);
-    printf("Pagesize:               %lu\n"
-           "Allocation Granularity: %lu\n",
-           sys_info.dwPageSize,
-           sys_info.dwAllocationGranularity);
 
 
-    char* string = "Hello, Allocator";
-    int len = strlen(string);
 
-    SIZE_T size = sys_info.dwPageSize;
 
-    void* reserved = VirtualAlloc(NULL, size, MEM_RESERVE, PAGE_READWRITE);
-    void* reserved2 = VirtualAlloc(NULL, size, MEM_RESERVE, PAGE_READWRITE);
 
-    printf("%p\n%p\n", reserved, reserved2);
+    {
+        // void(char*)(void(int), float) Hello;
 
-    void* p = VirtualAlloc(reserved, size + 1, MEM_COMMIT, PAGE_READWRITE);
+        void (*(**Hello)(void (*)(int), float))(char*);
 
-    DWORD error = GetLastError();
-    char* error_str;
-    FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM,
-                  NULL, error, 0, error_str, 0, NULL);
-    printf("%s\n", error_str);
+        void (*ret)(char*) = (*Hello)(my_proc, 3.14);
 
-    printf("allocations done\n"
-           "reserved/commited pointers:\n%p\n%p\n", reserved, p);
-
-    char* s = p;
-    int i;
-    for (i = 0; i < len; i++) {
-        s[i] = string[i];
+        ret("Test");
     }
-    s[i] = '\0';
 
-    printf("string: %s\n", s);
 
-    printf("Done");
+
+    {
+        void (*(*(*p1)(int))(int))(int);
+
+        void (*(*p2)(int))(int) = p1(12);
+
+        void (*p3)(int) = p2(24);
+
+        p3(48);
+    }
+
+
     return 0;
 }

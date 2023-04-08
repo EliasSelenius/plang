@@ -8,7 +8,7 @@
 
 
 #include "prelude.h"
-
+#include "io.c"
 #include "platform.h"
 
 #include "essh-string.h"
@@ -28,6 +28,5 @@
 #include "validator.c"
 #include "transpiler.c"
 
-#include "io.c"
 #include "main.c"
 

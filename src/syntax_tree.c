@@ -6,7 +6,14 @@ typedef u32 Identifier;
 typedef struct Namespace Namespace;
 typedef struct Procedure Procedure;
 typedef struct VarDecl VarDecl;
+typedef struct ForStatement ForStatement;
 typedef struct Constant Constant;
+typedef struct PlangStruct PlangStruct;
+typedef struct AliasType AliasType;
+typedef struct ProcSignature ProcSignature;
+typedef struct Datatype Datatype;
+typedef struct ProcArg ProcArg;
+typedef struct LocalProc LocalProc;
 
 typedef struct File {
     char* filename;
@@ -18,8 +25,6 @@ typedef struct File {
 typedef enum Typekind {
 
     Typekind_Invalid = 0, // used by validator to signify a type that could not be determined because of an error
-    Typekind_Unresolved,
-    Typekind_MustBeInfered,
     Typekind_AmbiguousInteger,
     Typekind_AmbiguousDecimal,
 
@@ -43,43 +48,16 @@ typedef enum Typekind {
     Typekind_Enum,
     Typekind_Alias,
     Typekind_Opaque,
-    Typekind_ProcPtr,
     Typekind_Procedure
 } Typekind;
 
-typedef struct PlangStruct PlangStruct;
-typedef struct AliasType AliasType;
-typedef struct ProcPtr ProcPtr;
-typedef struct ProcSignature ProcSignature;
-typedef struct Datatype Datatype;
-
-typedef struct UnresolvedType {
-    File* context;
-    Identifier namespace_name, name;
-    u32 arg_count;
-    // Datatype solution;
-} UnresolvedType;
-
 typedef struct Datatype {
     Typekind kind;
-    /*
-        ref:
-            Typekind_Undecided  -> Identifier of struct/enum/alias
-            Typekind_Struct     -> index into structs
-            Typekind_Alias      -> index into aliases
-            Typekind_Opaque     -> Identifier
-            Typekind_ProcPtr    -> byteoffset into procptrs buffer
-    */
     union {
-        u32 ref;
-
         void* data_ptr;
         Identifier opaque_name;
-        struct Type* unresolved;
-        // UnresolvedType* unresolved;
         PlangStruct* stru;
         AliasType* alias;
-        ProcPtr* procptr;
         ProcSignature* procedure;
     };
 
@@ -87,6 +65,7 @@ typedef struct Datatype {
 } Datatype;
 
 typedef enum TypeNode {
+    TypeNode_MustInfer,
     TypeNode_Normal,
     TypeNode_Pointer,
     TypeNode_Procedure
@@ -94,31 +73,34 @@ typedef enum TypeNode {
 
 typedef struct Type {
     TypeNode node_type;
+
+    Datatype solvedstate;
+
     union {
         struct {
-            Identifier namespace_name, name;
             File* context;
+            Identifier namespace_name, name;
         };
+
         struct Type* pointedto;
+
         struct {
             struct Type* return_type;
             struct Type* arguments;
         } procedure;
-
-        Datatype solvedstate;
     };
 
     struct Type* next;
 } Type;
 
 typedef struct AliasType {
-    u32 name;
-    Datatype aliasedType;
+    Type* aliasedType;
+    Identifier name;
 } AliasType;
 
 #define type_invalid          (Datatype) { .kind = Typekind_Invalid, {0} }
-#define type_voidPointer      (Datatype) { .kind = Typekind_void, .ref = 0, .numPointers = 1 }
-#define type_charPointer      (Datatype) { .kind = Typekind_char, .ref = 0, .numPointers = 1 }
+#define type_voidPointer      (Datatype) { .kind = Typekind_void, .numPointers = 1 }
+#define type_charPointer      (Datatype) { .kind = Typekind_char, .numPointers = 1 }
 #define type_ambiguousInteger (Datatype) { .kind = Typekind_AmbiguousInteger, {0} }
 #define type_ambiguousDecimal (Datatype) { .kind = Typekind_AmbiguousDecimal, {0} }
 
@@ -136,7 +118,7 @@ typedef struct AliasType {
 #define type_void    (Datatype) { .kind = Typekind_void, {0} }
 
 static inline bool typeEquals(Datatype a, Datatype b) {
-    return a.kind == b.kind && a.ref == b.ref && a.numPointers == b.numPointers;
+    return a.kind == b.kind && a.data_ptr == b.data_ptr && a.numPointers == b.numPointers;
 }
 
 static inline Datatype resolveTypeAmbiguity(Datatype type) {
@@ -258,11 +240,20 @@ static Datatype mergeNumberTypes(Datatype a, Datatype b) {
 
 typedef struct Node {
     u32 lineNumber;
-    char* filepath;
+    File* file;
 } Node;
 
 
 // ----Expressions---------------------------------------------
+
+// TODO:
+// typedef enum BinaryOperator {
+//     BinaryOperator_Addition,
+//     BinaryOperator_Subtraction,
+//     BinaryOperator_Multiplication,
+//     BinaryOperator_Division,
+//     BinaryOperator_Modulus
+// } BinaryOperator;
 
 typedef enum ExprType {
 
@@ -359,7 +350,7 @@ typedef struct IndexingExpression {
 typedef struct AllocExpression {
     Expression base;
     Expression* sizeExpr;
-    Datatype type;
+    Type* type;
 } AllocExpression;
 
 typedef struct DerefOperator {
@@ -370,19 +361,28 @@ typedef struct DerefOperator {
 
 typedef enum RefType {
     RefType_Invalid = 0,
+    RefType_Local,
+    RefType_Forloop,
+    RefType_Argument,
+    RefType_LocalProc,
     RefType_Procedure,
     RefType_Global,
-    RefType_Constant
+    RefType_Constant,
+    RefType_Namespace
 } RefType;
 
 typedef struct Reference {
     RefType reftype;
     union {
         void* data;
-        Identifier name; // TODO: temporary
+        VarDecl* local_variable;
+        ForStatement* forloop;
+        ProcArg* proc_arg;
+        LocalProc* local_procedure;
         Procedure* procedure;
         VarDecl* global;
         Constant* constant;
+        Namespace* namespace;
     };
 } Reference;
 
@@ -390,18 +390,20 @@ typedef struct Reference {
 
 typedef struct VariableExpression {
     Expression base;
-    Reference ref;
+    Identifier name;
+
+    Reference reference;
 } VariableExpression;
 
 typedef struct CastExpression {
     Expression base;
     Expression* expr;
-    Datatype castToType;
+    Type* castToType;
 } CastExpression;
 
 typedef struct SizeofExpression {
     Expression base;
-    Datatype type;
+    Type* type;
 } SizeofExpression;
 
 typedef struct TernaryExpression {
@@ -425,7 +427,6 @@ typedef enum StatementType {
     Statement_Scope,
     Statement_If,
     Statement_While,
-    Statement_ForIn,
     Statement_For,
     Statement_Switch,
     Statement_LocalProc,
@@ -451,17 +452,17 @@ typedef struct StatementExpression {
 
 typedef struct VarDecl {
     Statement base;
-    Datatype type;
+    Type* type;
     Identifier name;
     Expression* assignmentOrNull;
 } VarDecl;
 
-typedef struct Assignement {
+typedef struct Assignment {
     Statement base;
     Expression* assigneeExpr;
     TokenType assignmentOper; // = += -= *= /= etc...
     Expression* expr;
-} Assignement;
+} Assignment;
 
 typedef struct Scope {
     Statement base;
@@ -475,32 +476,20 @@ typedef struct WhileStatement {
     Statement* statement;
 } WhileStatement;
 
-typedef struct ForInStatement {
+typedef struct ForStatement {
     Statement base;
-    Datatype index_type;
+    Type* index_type;
     Identifier index_name;
     Expression* min_expr;
     Expression* max_expr;
     Statement* statement;
-} ForInStatement;
-
-typedef struct ForStatement {
-    Statement base;
-
-    union {
-        VarDecl* decl;
-        Expression* expr;
-    } init;
-
-    Expression* test_expression;
-    Expression* update_expression;
 } ForStatement;
 
 typedef struct IfStatement {
     Statement base;
-    Expression* condition; // if condition is null, this is an else-statement
-    Statement* statement;
-    struct IfStatement* next;
+    Expression* condition;
+    Statement* then_statement;
+    Statement* else_statement;
 } IfStatement;
 
 typedef struct SwitchStatement {
@@ -531,14 +520,8 @@ typedef struct CaseLabelStatement {
 
 // ----Procedures----------------------------------------------
 
-typedef struct ProcPtr {
-    Datatype return_type;
-    u32 arg_count;
-    Datatype arg_types[];
-} ProcPtr;
-
 typedef struct ProcArg {
-    Datatype type;
+    Type* type;
     Identifier name;
 } ProcArg;
 
@@ -556,7 +539,7 @@ typedef struct ProcSignature {
 
 typedef struct Procedure {
     Identifier name;
-    Datatype returnType;
+    Type* returnType;
     ProcArg* arguments; // list, can be null
 
     /* overload
@@ -566,13 +549,7 @@ typedef struct Procedure {
     u32 overload;
     struct Procedure* next_overload;
 
-    union {
-        struct {
-            File* context;
-            u32 begin_scope_token;
-        } pre_scope_data;
-        Scope* scope; // scope can be null
-    };
+    Scope* scope; // scope can be null
 
     Datatype ptr_type;
 } Procedure;
@@ -599,7 +576,7 @@ typedef struct LocalProc {
 
 typedef struct Field {
     Node nodebase;
-    Datatype type;
+    Type* type;
     Identifier name;
 } Field;
 
@@ -756,10 +733,10 @@ static void addArgument(ProcSignature* sig, Datatype argtype, Identifier argname
 }
 
 static void createSignatureFromProcedure(Procedure* proc) {
-    ProcSignature* sig = createSignature(proc->returnType);
+    ProcSignature* sig = createSignature(proc->returnType->solvedstate);
     if (proc->arguments) {
         foreach (arg, proc->arguments) {
-            addArgument(sig, arg->type, 0);
+            addArgument(sig, arg->type->solvedstate, 0);
         }
     }
 
@@ -767,7 +744,7 @@ static void createSignatureFromProcedure(Procedure* proc) {
 }
 
 // get procedure, global or const
-static Reference getReference(Namespace* ns, Identifier name) {
+static Reference getReferenceFromNamespace(Namespace* ns, Identifier name) {
 
     foreach (proc, ns->procedures) {
         if (proc->name == name) return (Reference) { .reftype = RefType_Procedure, .data = proc };
@@ -787,40 +764,16 @@ static Reference getReference(Namespace* ns, Identifier name) {
 static Datatype reference2datatype(Reference ref) {
     switch (ref.reftype) {
         case RefType_Invalid: return type_invalid;
+        case RefType_Local: return ref.local_variable->type->solvedstate;
+        case RefType_Forloop: return ref.forloop->index_type ? ref.forloop->index_type->solvedstate : type_int32; // TODO: change this
+        case RefType_Argument: return ref.proc_arg->type->solvedstate;
+        case RefType_LocalProc: return ref.local_procedure->proc.ptr_type;
         case RefType_Procedure: return ref.procedure->ptr_type;
-        case RefType_Global: return ref.global->type;
+        case RefType_Global: return ref.global->type->solvedstate;
         case RefType_Constant: return ref.constant->expr->datatype;
     }
-}
 
-
-static inline ProcPtr* getProcPtr(u32 id) { return (ProcPtr*)&((char*)g_Codebase.arena_procedure_types.data)[id]; }
-
-static Datatype ensureProcPtr(Procedure* proc) {
-    u32 argCount = proc->arguments ? list_length(proc->arguments) : 0;
-    u32 length = g_Codebase.arena_procedure_types.allocated;
-    u32 procId = 0;
-    while (procId < length) {
-        ProcPtr* ptr = getProcPtr(procId);
-
-        if (ptr->arg_count == argCount && typeEquals(proc->returnType, ptr->return_type)) {
-            for (u32 i = 0; i < argCount; i++)
-                if (!typeEquals(proc->arguments[i].type, ptr->arg_types[i])) goto skip;
-            return (Datatype) { .kind = Typekind_ProcPtr, .procptr = ptr, .numPointers = 1 };
-        }
-
-        skip: procId += sizeof(ProcPtr) + sizeof(Datatype) * ptr->arg_count;
-    }
-
-    ProcPtr* ptr = arena_alloc(&g_Codebase.arena_procedure_types, sizeof(ProcPtr));
-    ptr->return_type = proc->returnType;
-    ptr->arg_count = argCount;
-    for (u32 i = 0; i < argCount; i++) {
-        Datatype* arg = arena_alloc(&g_Codebase.arena_procedure_types, sizeof(Datatype));
-        *arg = proc->arguments[i].type;
-    }
-
-    return (Datatype) { .kind = Typekind_ProcPtr, .procptr = ptr, .numPointers = 1 };
+    return type_invalid;
 }
 
 
@@ -839,8 +792,7 @@ static void printScope(StringBuilder* sb, Scope* scope) {
                 break;
             case Statement_If: sbAppend(sb, "if\n"); break;
             case Statement_While: sbAppend(sb, "while\n"); break;
-            case Statement_ForIn: sbAppend(sb, "for in\n"); break;
-            case Statement_For: sbAppend(sb, "for\n"); break;
+            case Statement_For: sbAppend(sb, "for in\n"); break;
             case Statement_Switch: sbAppend(sb, "switch\n"); break;
             case Statement_LocalProc: sbAppend(sb, "local_proc\n"); break;
             case Statement_Continue: sbAppend(sb, "continue\n"); break;

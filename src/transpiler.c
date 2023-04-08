@@ -37,16 +37,10 @@ static char* getTypeCname(Datatype type) {
         case Typekind_Invalid:
             printf("Attempted to transpile an invalid type. This is a bug!\n");
             return "$error_invalid";
-        case Typekind_MustBeInfered:
-            printf("Attempted to transpile a type that has not been infered. This is a bug!\n");
-            return "$error_notinfered";
         case Typekind_AmbiguousInteger:
         case Typekind_AmbiguousDecimal:
             printf("Attempted to transpile an ambiguous type. This is a bug!\n");
             return "$error_ambiguous";
-        case Typekind_Unresolved:
-            printf("Attempted to transpile a type that should have been resolved. This is a bug!\n");
-            return "$error_unresolved";
 
         case Typekind_uint8: return "uint8";
         case Typekind_uint16: return "uint16";
@@ -65,55 +59,76 @@ static char* getTypeCname(Datatype type) {
         case Typekind_Enum: return null;
         case Typekind_Alias: return get_string(type.alias->name);
         case Typekind_Opaque: return get_string(type.opaque_name);
-        case Typekind_ProcPtr: return "SomeFuncPtr";
         case Typekind_Procedure: return "/*proc*/void";
     }
     return null;
 }
 
+static void _transpileDatatype(Datatype type, Identifier name);
+static void transpileDatatype(Datatype type) { _transpileDatatype(type, 0); }
 
-
-static void transpileType(Datatype type) {
-
-    if (type.kind == Typekind_ProcPtr) {
-        sbAppend(sb, "proc_");
-        sbAppendSpan(sb, numberToString(type.ref));
-    } else {
-        sbAppend(sb, getTypeCname(type));
+static void transpileProcSigArguments(ProcSignature* sig) {
+    sbAppend(sb, "(");
+    Argument* arg = sig->arguments;
+    while (arg) {
+        transpileDatatype(arg->type);
+        if (arg->next) sbAppend(sb, ", ");
+        arg = arg->next;
     }
+    sbAppend(sb, ")");
+}
+
+static void transpileProcSigStart(ProcSignature* sig) {
+    if (sig->return_type.kind == Typekind_Procedure) {
+        transpileProcSigStart(sig->return_type.procedure);
+    } else {
+        transpileDatatype(sig->return_type);
+        sbAppend(sb, " ");
+    }
+
+    sbAppend(sb, "(*");
+}
+
+static void transpileProcSigWithName(ProcSignature* sig, Identifier name) {
+    transpileProcSigStart(sig);
+
+    sbAppend(sb, get_string(name));
+    sbAppend(sb, ")");
+    transpileProcSigArguments(sig);
+
+    while (sig->return_type.kind == Typekind_Procedure) {
+        sbAppend(sb, ")");
+        sig = sig->return_type.procedure;
+        transpileProcSigArguments(sig);
+    }
+}
+
+static void _transpileDatatype(Datatype type, Identifier name) {
+
+    if (type.kind == Typekind_Procedure) {
+        ProcSignature* sig = type.procedure;
+        transpileProcSigWithName(sig, name);
+        return;
+    }
+
+    sbAppend(sb, getTypeCname(type));
 
     u32 np = type.numPointers;
     while (np-- > 0) {
         sbAppend(sb, "*");
     }
+
+    if (name) { sbAppend(sb, " "); sbAppend(sb, get_string(name));}
+}
+
+static void transpileType(Type* type) {
+    transpileDatatype(type->solvedstate);
 }
 
 static void transpileFuncCall(ProcCall* call) {
 
-    // TODO: ad-hoc solution
-    Datatype dealiased = dealiasType(call->proc_expr->datatype);
-    if (dealiased.kind == Typekind_Procedure) {
-        ProcSignature* sig = dealiased.procedure;
-        sbAppend(sb, "((");
-        transpileType(sig->return_type);
-        sbAppend(sb, " (*)(");
-        if (sig->arguments) {
-            Argument* arg = sig->arguments;
-            transpileType(arg->type);
-            arg = arg->next;
-            while (arg) {
-                sbAppend(sb, ", ");
-                transpileType(arg->type);
-                arg = arg->next;
-            }
-        }
-        sbAppend(sb, "))");
-        transpileExpression(call->proc_expr);
-        sbAppend(sb, ")");
-    } else {
-        transpileExpression(call->proc_expr);
-        if (call->overload) sbAppendChar(sb, getCharFromU32(call->overload));
-    }
+    transpileExpression(call->proc_expr);
+    if (call->overload) sbAppendChar(sb, getCharFromU32(call->overload));
 
     sbAppend(sb, "(");
     if (call->args) {
@@ -295,17 +310,7 @@ static void transpileExpression(Expression* expr) {
 
         case ExprType_Variable: {
             VariableExpression* var = (VariableExpression*)expr;
-
-            Identifier name = 0;
-
-            switch (var->ref.reftype) {
-                case RefType_Invalid: name = var->ref.name; break; // TODO: temporary
-                case RefType_Procedure: name = var->ref.procedure->name; break;
-                case RefType_Global: name = var->ref.global->name; break;
-                case RefType_Constant: name = var->ref.constant->name; break;
-            }
-
-            sbAppend(sb, get_string(name));
+            sbAppend(sb, get_string(var->name));
         } break;
 
         case ExprType_Alloc: {
@@ -349,12 +354,9 @@ static void transpileExpression(Expression* expr) {
 
             if (fc->proc_expr->expressionType == ExprType_Variable) {
                 VariableExpression* var = (VariableExpression*)fc->proc_expr;
-                if (var->ref.reftype == RefType_Invalid) {
-                    Identifier name = var->ref.name;
-                    if (name == builtin_print_name) {
-                        transpilePrint(fc->args);
-                        break;
-                    }
+                if (var->name == builtin_print_name) {
+                    transpilePrint(fc->args);
+                    break;
                 }
             }
 
@@ -386,36 +388,30 @@ static void transpileCondition(Expression* cond) {
 }
 
 static void transpileIfStatement(IfStatement* ifst) {
-    if (ifst->condition) {
-        sbAppend(sb, "if ");
-        transpileCondition(ifst->condition);
-        sbAppend(sb, " ");
-    }
+    sbAppend(sb, "if ");
+    transpileCondition(ifst->condition);
+    sbAppend(sb, " ");
 
-    transpileStatement(ifst->statement);
+    transpileStatement(ifst->then_statement);
 
-    if (ifst->next) {
+    if (ifst->else_statement) {
         sbAppend(sb, " else ");
-        transpileIfStatement(ifst->next);
+        transpileStatement(ifst->else_statement);
     }
 }
 
 static void transpileVarDecl(VarDecl* decl) {
     if (decl->base.statementType == Statement_FixedArray_Declaration) {
-        decl->type.numPointers--;
-        transpileType(decl->type);
-        decl->type.numPointers++;
-        sbAppend(sb, " ");
-        sbAppend(sb, get_string(decl->name));
 
+        decl->type->solvedstate.numPointers--;
+        _transpileDatatype(decl->type->solvedstate, decl->name);
         sbAppend(sb, "[");
         transpileExpression(decl->assignmentOrNull);
         sbAppend(sb, "]");
-    } else {
-        transpileType(decl->type);
-        sbAppend(sb, " ");
-        sbAppend(sb, get_string(decl->name));
 
+    } else {
+
+        _transpileDatatype(decl->type->solvedstate, decl->name);
         if (decl->assignmentOrNull) {
             sbAppend(sb, " = ");
             transpileExpression(decl->assignmentOrNull);
@@ -433,7 +429,7 @@ static void transpileStatement(Statement* statement) {
             transpileVarDecl(decl);
         } break;
         case Statement_Assignment: {
-            Assignement* ass = (Assignement*)statement;
+            Assignment* ass = (Assignment*)statement;
             transpileExpression(ass->assigneeExpr);
 
             switch (ass->assignmentOper) {
@@ -465,27 +461,30 @@ static void transpileStatement(Statement* statement) {
             sbAppend(sb, " ");
             transpileStatement(sta->statement);
         } break;
-        case Statement_ForIn: {
-            ForInStatement* forin = (ForInStatement*)statement;
-            char* name = get_string(forin->index_name);
+        case Statement_For: {
+            ForStatement* forsta = (ForStatement*)statement;
+            char* name = get_string(forsta->index_name);
 
             sbAppend(sb, "for (");
-            transpileType(forin->index_type);
+
+            if (forsta->index_type) transpileType(forsta->index_type);
+            else transpileDatatype(type_int32); // TODO: change this
+
             sbAppend(sb, " ");
             sbAppend(sb, name);
             sbAppend(sb, " = ");
-            transpileExpression(forin->min_expr);
+            transpileExpression(forsta->min_expr);
             sbAppend(sb, "; ");
 
             sbAppend(sb, name);
             sbAppend(sb, " < ");
-            transpileExpression(forin->max_expr);
+            transpileExpression(forsta->max_expr);
             sbAppend(sb, "; ");
 
             sbAppend(sb, name);
             sbAppend(sb, "++) ");
 
-            transpileStatement(forin->statement);
+            transpileStatement(forsta->statement);
         } break;
 
         case Statement_Switch: {
@@ -568,7 +567,7 @@ static void transpileLocalProc(LocalProc* localproc) {
     foreach (captured, localproc->captures) {
         Datatype type = captured->type;
         type.numPointers++;
-        transpileType(type);
+        transpileDatatype(type);
         sbAppend(sb, " ");
         sbAppend(sb, get_string(captured->name));
         sbAppend(sb, ", ");
@@ -594,23 +593,14 @@ static void transpileFunctionSignature(Procedure* proc) {
     sbAppend(sb, " ");
     sbAppend(sb, get_string(proc->name));
     if (proc->overload) sbAppendChar(sb, getCharFromU32(proc->overload));
+
     sbAppend(sb, "(");
     if (proc->arguments) {
-
-        ProcArg arg = proc->arguments[0];
-        transpileType(arg.type);
-        sbAppend(sb, " ");
-        sbAppend(sb, get_string(arg.name));
-
-        u32 len = list_length(proc->arguments);
-        for (u32 i = 1; i < len; i++) {
+        foreach (arg, proc->arguments) {
+            _transpileDatatype(arg->type->solvedstate, arg->name);
             sbAppend(sb, ", ");
-
-            arg = proc->arguments[i];
-            transpileType(arg.type);
-            sbAppend(sb, " ");
-            sbAppend(sb, get_string(arg.name));
         }
+        sb->length -= 2;
     }
     sbAppend(sb, ")");
 }
@@ -639,12 +629,9 @@ static void transpileStruct(PlangStruct* stru) {
 
     tabing++;
 
-    u32 len = list_length(stru->fields);
-    for (u32 i = 0; i < len; i++) {
+    foreach (field, stru->fields) {
         newline();
-        transpileType(stru->fields[i].type);
-        sbAppend(sb, " ");
-        sbAppend(sb, get_string(stru->fields[i].name));
+        _transpileDatatype(field->type->solvedstate, field->name);
         sbAppend(sb, ";");
     }
 
@@ -660,7 +647,7 @@ static u32 countStructDependencies(PlangStruct* stru) {
     u32 deps = 0;
     u32 fieldsLen = list_length(stru->fields);
     for (u32 f = 0; f < fieldsLen; f++) {
-        Datatype datatype = stru->fields[f].type;
+        Datatype datatype = stru->fields[f].type->solvedstate;
         if (datatype.numPointers) continue;
         if (datatype.kind != Typekind_Struct) continue;
 
@@ -671,19 +658,6 @@ static u32 countStructDependencies(PlangStruct* stru) {
     return deps;
 }
 
-static void transpileFuncptrType(Datatype type) {
-    if (type.kind == Typekind_Alias) {
-        Datatype dealiased = dealiasType(type);
-        if (dealiased.kind == Typekind_ProcPtr) {
-            transpileType(dealiased);
-            return;
-        }
-    }
-
-    transpileType(type);
-}
-
-
 static void transpile() {
     // TODO: use a higer initial capacity for the string builder
     StringBuilder builder = sbCreate();
@@ -692,8 +666,6 @@ static void transpile() {
     // sbAppend(sb, "#include <stdlib.h>\n"); // malloc
     // sbAppend(sb, "#include <stdio.h>\n"); // printf
     // sbAppend(sb, "#define true 1\n#define false 0\n");
-
-    current_namespace = g_Codebase.namespaces[0];
 
     { // namespaces
         sbAppend(sb, "/* Namespaces\n");
@@ -753,11 +725,8 @@ static void transpile() {
 
     sbAppend(sb, "\n// Type aliases\n");
     iterate(aliases, {
-        char* typename = get_string(item->name);
         sbAppend(sb, "typedef ");
-        transpileType(item->aliasedType);
-        sbAppend(sb, " ");
-        sbAppend(sb, typename);
+        _transpileDatatype(item->aliasedType->solvedstate, item->name);
         sbAppend(sb, ";\n");
     });
 
@@ -811,146 +780,6 @@ static void transpile() {
     });
 
 
-/*
-    { // opaque types
-        sbAppend(sb, "\n// Opaque types\n");
-        foreach (optype, current_namespace->opaque_types) {
-            char* typename = get_string(*optype);
-            sbAppend(sb, "typedef struct ");
-            sbAppend(sb, typename);
-            sbAppend(sb, " ");
-            sbAppend(sb, typename);
-            sbAppend(sb, ";\n");
-        }
-    }
-
-    { // struct typedefs
-        sbAppend(sb, "\n// Structs forward declarations\n");
-        foreach (stru, current_namespace->structs) {
-            char* name = get_string(stru->name);
-            sbAppend(sb, "typedef struct ");
-            sbAppend(sb, name);
-            sbAppend(sb, " ");
-            sbAppend(sb, name);
-            sbAppend(sb, ";\n");
-        }
-    }
-
-    { // type aliases (except funcptrs)
-        sbAppend(sb, "\n// Type aliases\n");
-        foreach (alias, current_namespace->aliases) {
-            if (alias->aliasedType.kind == Typekind_ProcPtr) continue;
-            char* typename = get_string(alias->name);
-            sbAppend(sb, "typedef ");
-            transpileType(alias->aliasedType);
-            sbAppend(sb, " ");
-            sbAppend(sb, typename);
-            sbAppend(sb, ";\n");
-        }
-    }
-
-
-    // { // Func ptrs
-    //     sbAppend(sb, "\n// Function pointers\n");
-    //     u32 i = 0;
-    //     while (i < g_Codebase.arena_procedure_types.allocated) {
-    //         ProcPtr* f = getProcPtr(i);
-    //         sbAppend(sb, "typedef ");
-    //         transpileFuncptrType(f->return_type);
-    //         sbAppend(sb, " ");
-    //         sbAppend(sb, "proc_");
-    //         sbAppendSpan(sb, numberToString(i));
-    //         sbAppend(sb, "(");
-    //         if (f->arg_count) {
-    //             transpileFuncptrType(f->arg_types[0]);
-    //             for (u32 i = 1; i < f->arg_count; i++) {
-    //                 sbAppend(sb, ", ");
-    //                 transpileFuncptrType(f->arg_types[i]);
-    //             }
-    //         }
-    //         sbAppend(sb, ");\n");
-    //         i += sizeof(ProcPtr) + sizeof(Datatype) * f->arg_count;
-    //     }
-    // }
-
-    // { // type aliases (funcptrs only)
-    //     sbAppend(sb, "\n// Function pointer aliases\n");
-    //     foreach (alias, current_namespace->aliases) {
-    //         if (alias->aliasedType.kind != Typekind_ProcPtr) continue;
-    //         char* typename = get_string(alias->name);
-    //         sbAppend(sb, "typedef ");
-    //         transpileType(alias->aliasedType);
-    //         sbAppend(sb, " ");
-    //         sbAppend(sb, typename);
-    //         sbAppend(sb, ";\n");
-    //     }
-    // }
-
-
-    { // structs
-        sbAppend(sb, "\n// Structs\n");
-        u32 structsLen = list_length(current_namespace->structs);
-        u32* deps = malloc(sizeof(u32) * structsLen);
-
-        for (u32 i = 0; i < structsLen; i++) {
-            PlangStruct* stru = &current_namespace->structs[i];
-
-            deps[i] = countStructDependencies(stru);
-        }
-
-        u32 dep = 0;
-        u32 transpiled = 0;
-        while (transpiled < structsLen) {
-            for (u32 i = 0; i < structsLen; i++) {
-                if (deps[i] == dep) {
-                    PlangStruct* stru = &current_namespace->structs[i];
-                    char buffer[16];
-                    sprintf_s(buffer, 16, "// deps: %d\n", deps[i]);
-                    sbAppend(sb, buffer);
-                    transpileStruct(stru);
-                    transpiled++;
-                }
-            }
-            dep++;
-        }
-
-        free(deps);
-    }
-
-    sbAppend(sb, "\n// Forward declarations\n");
-    u32 functionsLen = list_length(current_namespace->procedures);
-    for (u32 i = 0; i < functionsLen; i++) {
-        Procedure* proc = &current_namespace->procedures[i];
-
-        transpileFunctionSignature(proc);
-        sbAppend(sb, ";\n");
-    }
-
-    sbAppend(sb, "\n// Constants\n");
-    foreach (cont, current_namespace->constants) {
-        sbAppend(sb, "#define ");
-        sbAppend(sb, get_string(cont->name));
-        sbAppend(sb, " ");
-        transpileExpression(cont->expr);
-        sbAppend(sb, "\n");
-    }
-
-    sbAppend(sb, "\n// Globals\n");
-    u32 globLen = list_length(current_namespace->global_variables);
-    for (u32 i = 0; i < globLen; i++) {
-        transpileVarDecl(&current_namespace->global_variables[i]);
-        sbAppend(sb, "\n");
-    }
-
-    sbAppend(sb, "\n// Implementations\n");
-
-    for (u32 i = 0; i < functionsLen; i++) {
-        Procedure* proc = &current_namespace->procedures[i];
-        if (!proc->scope) continue;
-        transpileProcedure(proc);
-    }
-*/
-
     FILE* file;
     if ( !fopen_s(&file, "output.g.c", "w") ) {
         fprintf(file, "%s", sb->content);
@@ -958,7 +787,6 @@ static void transpile() {
     } else {
         printf("Could not write to output.g.c\n");
     }
-
 
     sbDestroy(sb);
 }

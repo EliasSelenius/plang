@@ -30,6 +30,8 @@
         - print structs
         - named arguments e.g foo(arg_name: "daw")
         - single expression body
+        *- array literal
+        *- struct literal
 
     InProgress:
         *- file name in errors
@@ -112,13 +114,8 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
-    // TODO: use higher default capacity here, to minimize the amount of reallocs
-    tokens = list_create(Token);
     Files = list_create(File);
-    codebase_init(&g_Codebase);
 
-
-    initTypenames();
 
     startPerf();
 
@@ -128,7 +125,6 @@ int main(int argc, char* argv[]) {
         if (cstrEquals(argv[1], "build")) {
             foreachFile(".pog", addFile);
             i = 2;
-            goto skipfiles;
         }
     }
 
@@ -139,8 +135,6 @@ int main(int argc, char* argv[]) {
         addFile(arg, null);
     }
 
-    skipfiles:
-
     StringBuilder sb = sbCreate();
     sbAppend(&sb, "clang output.g.c -o output.exe ");
     while (i < argc) {
@@ -148,34 +142,8 @@ int main(int argc, char* argv[]) {
         sbAppendChar(&sb, ' ');
     }
 
-    { // tokenize
-        foreach (file, Files) {
-            u32 contents_size;
-            char* contents = fileread(file->filename, &contents_size);
-            if (!contents) continue;
 
-            lex(contents);
-            if (numberOfErrors) {
-                printf("There were %d errors during tokenizing.\n", numberOfErrors);
-                exit(0); // TODO: handle this properly
-            }
-
-            free(contents);
-        }
-    }
-
-    if (false) { // print string table
-
-        u32 len = list_length(g_Codebase.string_table.byteoffsets);
-        for (u32 i = 0; i < len; i++) {
-            char* s = get_string_byindex(i);
-            printf("%d: %s\n", i, s);
-        }
-
-        printf("Printed %d strings\n", len);
-    }
-
-    parse();
+    parse(Files);
     if (numberOfErrors) {
         printf("There were %d errors during parsing.\n", numberOfErrors);
         exit(0);

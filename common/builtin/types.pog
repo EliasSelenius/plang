@@ -1,0 +1,26 @@
+
+namespace builtin;
+
+struct Field {
+    char* name;
+}
+
+struct Struct {
+    char* name;
+    Field* fields;
+    uint32 fields_count;
+}
+
+struct Procedure {
+    char* name;
+    void* code;
+}
+
+/*
+    static Procedure procedures[number_of_procs] = {
+        {
+            .name = "test",
+            .code = test
+        }
+    };
+*/

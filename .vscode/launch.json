@@ -17,7 +17,33 @@
             "args": ["test.pog", "test2.pog"],
             "cwd": "${workspaceFolder}",
         },
+        {
+            "name": "compile minbug.pog",
+            "type": "lldb",
+            "request": "launch",
+            "terminal": "external",
+            "program": "${workspaceFolder}/bin/plang.exe",
+            "args": ["minbug.pog"],
+            "cwd": "${workspaceFolder}",
+        },
 
+        {
+            "name": "compile minesweeper",
+            "type": "lldb",
+            "request": "launch",
+            "terminal": "external",
+            "program": "${workspaceFolder}/bin/plang.exe",
+            "args": [
+                "src/main.pog",
+                "src/renderer.pog",
+                "../plang/common/basic.pog",
+                "../plang/common/glfw3.pog",
+                "../plang/common/OpenGL.pog",
+                "cflags",
+                "-lglfw3dll",
+            ],
+            "cwd": "${workspaceFolder}/../minesweeper",
+        },
 
         {
             "name": "compile glfw_demo",
@@ -25,10 +51,8 @@
             "request": "launch",
             "terminal": "external",
             "program": "${workspaceFolder}/bin/plang.exe",
-            "args": ["build", "-lglfw3dll"],
-            // "args": ["math.pog", "graphics.pog", "main.pog", "io.pog", "glfw3.pog", "OpenGL.pog", "cflags", "-lglfw3dll.lib"],
+            "args": ["build", "../common/OpenGL.pog", "../common/glfw3.pog", "cflags",  "-lglfw3dll"],
             "cwd": "${workspaceFolder}/glfw_demo",
-            // "preLaunchTask": "c_project_build"
         },
         {
             "name": "glfw_demo",

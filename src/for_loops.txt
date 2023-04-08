@@ -1,0 +1,49 @@
+
+// expr must be a type that can be enumerated, for example an array.
+for expr {
+    print(it);
+}
+
+// same as above, but with an explicit name for the item.
+for i : expr {
+    print(i);
+}
+
+// same as above but with explicit type and name.
+for type i : expr {
+    print(i);
+}
+
+for min .. max  {
+    print(it);
+}
+
+for i : min .. max {
+    print(i);
+}
+
+for type i : min .. max {
+    print(i);
+}
+
+for expr, expr, expr {
+
+}
+
+for decl, expr, expr {
+
+}
+
+int32 i;
+for i = 0, i < 100, i++ {
+
+}
+
+for expr, expr {
+
+}
+
+int32 i = 0;
+for i < 100, i++ {
+    
+}

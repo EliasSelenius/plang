@@ -1,8 +1,5 @@
 
 static File* Files; // list
-static File* context; // currently parsed file
-static Namespace* current_namespace; // currently validated namespace
-
 
 static char* g_Filename;
 static Token* tokens; // darray
@@ -39,4 +36,54 @@ static void initTypenames() {
     type_name_void    = register_string(spFrom("void"));
 
     builtin_print_name = register_string(spFrom("print"));
+}
+
+typedef struct LocalDecl {
+    Identifier name;
+    Reference ref;
+} LocalDecl;
+
+typedef struct Parser {
+    File* src_files;
+    File* current_file;
+    Scope* scope;
+
+    // The local declarations of the currently parsed procedure
+    LocalDecl* stack;
+
+    Reference last_reference; // used by validateProcCall to get the Procedure that might be overloaded
+
+    Type** unresolved_types; // list
+
+    Token* tokens;
+    u32 token_index;
+} Parser;
+
+static Parser parser;
+
+static Reference stack_get(Identifier name) {
+    if (!parser.stack) return reference_invalid;
+
+    i32 len = (i32)list_length(parser.stack);
+    for (i32 i = len-1; i >= 0; i--) {
+        LocalDecl local = parser.stack[i];
+        if (local.name == name) return local.ref;
+    }
+
+    return reference_invalid;
+}
+
+static void stack_declare(Identifier name, RefType type, void* data) {
+
+    Reference ref = stack_get(name);
+    if (ref.reftype != RefType_Invalid) {
+        // TODO: already declared error
+    }
+
+    LocalDecl local = (LocalDecl) { .name = name, .ref = { .reftype = type, .data = data }};
+    list_add(parser.stack, local);
+}
+
+static void stack_pop(u32 num) {
+    list_head(parser.stack)->length -= num;
 }
