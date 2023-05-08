@@ -1,5 +1,4 @@
 
-declare void printf(char* format, uint32 arg);
 
 int32 main() {
 

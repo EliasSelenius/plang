@@ -1,5 +1,8 @@
 
 /*
+
+    compile command: ../bin/plang.exe build ../common/OpenGL.pog ../common/glfw3.pog cflags -lglfw3dll
+
     TODO:
         - 2d noise function
         - basic planet generation, using noise

@@ -1,6 +1,10 @@
 
 namespace OtherNamespace;
 
+MyTestNamespace.Test test;
+
 void hello() {
-    print("Hello from OtherNamespace");
+    print("Hello from OtherNamespace\n");
+
+    test.x = 10;
 }

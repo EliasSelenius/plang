@@ -22,32 +22,16 @@ static bool isBasicType() {
 }
 
 static u32 peekType() {
+
+    if (tokens[token_index].type == Tok_Keyword_Let) return 1;
+
     u32 ti = token_index;
-
-    if (isBasicType()) {
-        u32 res = token_index;
-        token_index = ti;
-        return res;
-    } else {
-        token_index = ti;
-        return 0;
-    }
+    u32 res = 0;
+    if (isBasicType()) res = token_index;
+    token_index = ti;
+    return res;
 }
 
-static VarDecl* expectVarDecl() {
-    VarDecl* decl = allocStatement(Statement_Declaration);
-    decl->type = expectType();
-    decl->name = identifier();
-
-    decl->assignmentOrNull = null;
-    if (tok(Tok_Assign)) {
-        decl->assignmentOrNull = expectExpression();
-    } else if (decl->type->node_type == TypeNode_MustInfer) {
-        error_token("Variable \"%s\" must be assigned to, to be type inferred.", get_string(decl->name));
-    }
-
-    return decl;
-}
 
 static Statement* expectStatement() {
     switch (tokens[token_index].type) {
@@ -153,8 +137,12 @@ static Statement* expectStatement() {
             return (Statement*)go;
         }
 
-        case Tok_Keyword_Let: {
-            VarDecl* decl = expectVarDecl();
+        case Tok_Keyword_Const: {
+            Declaration* decl = allocStatement(Statement_Constant);
+            token_index++;
+            decl->name = identifier();
+            expect(Tok_Assign);
+            decl->expr = expectExpression();
             semicolon();
             return (Statement*)decl;
         }
@@ -174,40 +162,37 @@ static Statement* expectStatement() {
     u32 postType = peekType();
     if (postType && tokens[postType].type == Tok_Word) {
 
-        if (tokens[postType + 1].type == Tok_OpenParen) {
-            // confirmed procedure
+        Node node = node_init();
+        Type* type = expectType();
+        Identifier name = identifier();
 
-            LocalProc* localproc = allocStatement(Statement_LocalProc);
-            localproc->proc.overload = 0;
-            localproc->proc.returnType = expectType();
-            localproc->proc.name = identifier();
-            expect(Tok_OpenParen);
-            localproc->proc.arguments = expectProcArguments();
-            localproc->proc.scope = expectScope();
+        if (tok(Tok_OpenParen)) {
 
-            return (Statement*)localproc;
-        } else {
-            // confirmed declaration
+            Procedure* proc = allocStatement(Statement_Procedure);
+            proc->base.nodebase = node;
+            proc->returnType = type;
+            proc->name = name;
+            proc->arguments = expectProcArguments();
+            proc->scope = expectScope();
 
-            VarDecl* decl = allocStatement(Statement_Declaration);
-            decl->type = expectType();
-            decl->name = identifier();
-
-            // fixed sized arrays
-            if (tok(Tok_OpenSquare)) {
-                decl->base.statementType = Statement_FixedArray_Declaration;
-                Expression* sizeExpr = expectExpression();
-                expect(Tok_CloseSquare);
-                decl->assignmentOrNull = sizeExpr;
-                // decl->type.numPointers++;
-                // TODO: line above breaks fixed sized arrays
-            } else {
-                decl->assignmentOrNull = tok(Tok_Assign) ? expectExpression() : null;
-            }
-
-            semicolon();
-            return (Statement*)decl;
+            return (Statement*)proc;
         }
+
+        Declaration* decl = allocStatement(Statement_Declaration);
+        decl->base.nodebase = node;
+        decl->type = type;
+        decl->name = name;
+
+        if (tok(Tok_OpenSquare)) {
+            decl->base.statementType = Statement_FixedArray_Declaration;
+            decl->expr = expectExpression();
+            expect(Tok_CloseSquare);
+        } else {
+            if (tok(Tok_Assign)) decl->expr = expectExpression();
+        }
+
+        semicolon();
+        return (Statement*)decl;
     }
 
 

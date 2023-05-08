@@ -47,8 +47,10 @@ u32 ExpressionType_Bytesizes[] = {
 };
 
 u32 StatementType_Bytesizes[] = {
-    [Statement_Declaration] = sizeof(VarDecl),
-    [Statement_FixedArray_Declaration] = sizeof(VarDecl),
+    [Statement_Declaration] = sizeof(Declaration),
+    [Statement_FixedArray_Declaration] = sizeof(Declaration),
+    [Statement_Constant] = sizeof(Declaration),
+    [Statement_Typedef] = sizeof(Declaration),
     [Statement_Assignment] = sizeof(Assignment),
     [Statement_Expression] = sizeof(StatementExpression),
     [Statement_Scope] = sizeof(Scope),
@@ -56,7 +58,7 @@ u32 StatementType_Bytesizes[] = {
     [Statement_While] = sizeof(WhileStatement),
     [Statement_For] = sizeof(ForStatement),
     [Statement_Switch] = sizeof(SwitchStatement),
-    [Statement_LocalProc] = sizeof(LocalProc),
+    [Statement_Procedure] = sizeof(Procedure),
     [Statement_Continue] = sizeof(Statement),
     [Statement_Break] = sizeof(Statement),
     [Statement_Return] = sizeof(ReturnStatement),
@@ -65,6 +67,13 @@ u32 StatementType_Bytesizes[] = {
     [Statement_CaseLabel] = sizeof(CaseLabelStatement),
     [Statement_DefaultLabel] = sizeof(Statement)
 };
+
+Node node_init() {
+    Node node = {0};
+    node.file = parser.current_file;
+    node.lineNumber = tokens[token_index].line;
+    return node;
+}
 
 void* allocate_node(u32 node_size) {
     Node* node = calloc(1, node_size);

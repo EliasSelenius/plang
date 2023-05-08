@@ -2,14 +2,11 @@
 
 static Procedure* procedure;
 
-static u32 capture_index;
-static LocalProc* current_localproc = null;
 
 static Datatype validateExpression(Expression* expr);
 static bool typeAssignable(Datatype toType, Datatype fromType);
 static void validateScope(Scope* scope);
 static void validateProcedure(Procedure* proc);
-static void validateLocalProc(LocalProc* localproc);
 
 static Datatype dealiasType(Datatype type) {
     if (type.kind == Typekind_Alias) {
@@ -18,12 +15,6 @@ static Datatype dealiasType(Datatype type) {
         return dealiasType(newType);
     }
     return type;
-}
-
-static void validateType(Datatype* type) {
-
-    // TODO: we might remove this procedure
-
 }
 
 
@@ -171,7 +162,6 @@ static Procedure* searchMatchingOverload(Procedure* proc, ProcCall* call) {
 }
 
 static Datatype validateProcCall(ProcCall* call) {
-    call->overload = 0;
 
     // validate passed arguments
     u32 argslength = call->args ? list_length(call->args) : 0;
@@ -179,7 +169,7 @@ static Datatype validateProcCall(ProcCall* call) {
 
     if (call->proc_expr->expressionType == ExprType_Variable) {
         VariableExpression* var = (VariableExpression*)call->proc_expr;
-        if (var->name == builtin_print_name) return type_void;
+        if (var->name == builtin_string_print) return type_void;
     }
 
     parser.last_reference = reference_invalid;
@@ -192,7 +182,7 @@ static Datatype validateProcCall(ProcCall* call) {
         Procedure* proc = parser.last_reference.procedure;
         Procedure* correct_overload = searchMatchingOverload(proc, call);
         if (correct_overload) {
-            call->overload = correct_overload->overload;
+            call->proc = correct_overload;
             return correct_overload->returnType->solvedstate;
         }
 
@@ -269,7 +259,7 @@ static Datatype _validateExpression(Expression* expr) {
                 return type_invalid;
             }
 
-            Field* field = getField(datatype.stru, deref->name);
+            Declaration* field = getField(datatype.stru, deref->name);
             if (!field) {
                 error_node(expr, "Field \"%s\" does not exist on type \"%s\".",
                         get_string(deref->name),
@@ -386,7 +376,6 @@ static Datatype _validateExpression(Expression* expr) {
 
         case ExprType_Alloc: {
             AllocExpression* alloc = (AllocExpression*)expr;
-            validateType(&alloc->type);
 
             // recurse on possibe size-subexpression
             if (alloc->sizeExpr) {
@@ -401,7 +390,6 @@ static Datatype _validateExpression(Expression* expr) {
 
         case ExprType_Sizeof: {
             SizeofExpression* sof = (SizeofExpression*)expr;
-            validateType(&sof->type);
             return type_uint32;
         } break;
 
@@ -427,7 +415,6 @@ static Datatype _validateExpression(Expression* expr) {
             // TODO: is this a valid casting operation
 
             Datatype type = validateExpression(cast->expr);
-            validateType(&cast->castToType);
 
             return cast->castToType->solvedstate;
         } break;
@@ -459,35 +446,37 @@ static Datatype validateExpression(Expression* expr) {
     return expr->datatype;
 }
 
+// NOTE: only for Statement_Declaration
+static void validateDeclaration(Declaration* decl) {
+    if (decl->expr) {
+        Datatype type = validateExpression(decl->expr);
+        if (type.kind == Typekind_Invalid) return;
+
+        if (decl->type->node_type == TypeNode_MustInfer) {
+            decl->type->solvedstate = resolveTypeAmbiguity(type);
+        } else {
+            assertAssignability(decl->type->solvedstate, type, decl->expr);
+        }
+    }
+}
+
 static void validateStatement(Statement* sta) {
     switch (sta->statementType) {
         case Statement_FixedArray_Declaration: {
-            VarDecl* decl = (VarDecl*)sta;
+            Declaration* decl = (Declaration*)sta;
 
             decl->type->solvedstate.numPointers++; // because this is a fixed array declaration.
 
-            // NOTE: decl->assignmentOrNull is used as the size expression for this fixed array
-            Datatype sizetype = validateExpression(decl->assignmentOrNull);
+            // NOTE: decl->expr is used as the size expression for this fixed array
+            Datatype sizetype = validateExpression(decl->expr);
             // TODO: is asstype a valid integer expression?
 
             stack_declare(decl->name, RefType_Local, decl);
 
         } break;
         case Statement_Declaration: {
-            VarDecl* decl = (VarDecl*)sta;
-
-            if (decl->assignmentOrNull) {
-                Datatype assType = validateExpression(decl->assignmentOrNull);
-
-                if (assType.kind == Typekind_Invalid) break; // if type could not be determined then we should not continue, act as if this statement does not exist
-
-                if (decl->type->node_type == TypeNode_MustInfer) {
-                    decl->type->solvedstate = resolveTypeAmbiguity(assType);
-                } else {
-                    assertAssignability(decl->type->solvedstate, assType, decl->assignmentOrNull);
-                }
-            }
-
+            Declaration* decl = (Declaration*)sta;
+            validateDeclaration(decl);
             stack_declare(decl->name, RefType_Local, decl);
         } break;
         case Statement_Assignment: {
@@ -542,9 +531,12 @@ static void validateStatement(Statement* sta) {
             validateScope(switchSta->scope);
         } break;
 
-        case Statement_LocalProc: {
-            LocalProc* localproc = (LocalProc*)sta;
-            validateLocalProc(localproc);
+        case Statement_Procedure: {
+            Procedure* proc = (Procedure*)sta;
+
+            createSignatureFromProcedure(proc);
+            stack_declare(proc->name, RefType_Procedure, proc);
+            validateProcedure(proc);
         } break;
 
         case Statement_Break: {
@@ -602,23 +594,6 @@ static void validateScope(Scope* scope) {
     list_head(parser.stack)->length = vars_start_index;
 }
 
-static void validateLocalProc(LocalProc* localproc) {
-    validateType(&localproc->proc.returnType);
-    if (localproc->proc.arguments) {
-        foreach (arg, localproc->proc.arguments) validateType(&arg->type);
-    }
-
-    createSignatureFromProcedure(&localproc->proc);
-
-    stack_declare(localproc->proc.name, RefType_LocalProc, localproc);
-
-    localproc->captures = list_create(CapturedVariable);
-    current_localproc = localproc;
-    capture_index = list_length(parser.stack);
-    validateProcedure(&localproc->proc);
-    current_localproc = null;
-}
-
 static void validateProcedure(Procedure* proc) {
     if (proc->scope) {
         Procedure* otherproc = procedure;
@@ -644,8 +619,7 @@ static void validateProcedure(Procedure* proc) {
 static void validateStruct(PlangStruct* stru) {
     u32 fieldLen = list_length(stru->fields);
     for (u32 i = 0; i < fieldLen; i++) {
-        Field* field = &stru->fields[i];
-        validateType(&field->type);
+        Declaration* field = &stru->fields[i];
 
         // TODO: field may be an alias
         if (field->type->solvedstate.kind == Typekind_Struct && field->type->solvedstate.numPointers == 0) {
@@ -653,23 +627,6 @@ static void validateStruct(PlangStruct* stru) {
                 error_node(field, "Struct \"%s\" self reference by value.", get_string(stru->name));
             }
         }
-    }
-}
-
-static void validateGlobalVar(VarDecl* decl) {
-    if (decl->assignmentOrNull) {
-        Datatype assType = validateExpression(decl->assignmentOrNull);
-        if (assType.kind == Typekind_Invalid) return; // if type could not be determined then we should not continue.
-
-        if (decl->type->node_type == TypeNode_MustInfer) {
-            decl->type->solvedstate = resolveTypeAmbiguity(assType);
-        } else {
-            validateType(&decl->type);
-            assertAssignability(decl->type->solvedstate, assType, decl->assignmentOrNull);
-        }
-
-    } else {
-        validateType(&decl->type);
     }
 }
 
@@ -682,21 +639,14 @@ static void validateNamespace(Namespace* ns) {
         validateStruct(&ns->structs[i]);
     }
 
-    // validate constants
-    foreach (cont, ns->constants) {
-        validateExpression(cont->expr);
-    }
-
-    // validate global variables
-    u32 globLen = list_length(ns->global_variables);
-    for (u32 i = 0; i < globLen; i++) {
-        VarDecl* decl = &ns->global_variables[i];
-        validateGlobalVar(&ns->global_variables[i]);
-
-        for (u32 j = i+1; j < globLen; j++) {
-            if (ns->global_variables[j].name == decl->name) {
-                error_node(decl, "Global variable \"%s\" name conflict.", get_string(decl->name));
-            }
+    foreach (decl, ns->declarations) {
+        if (decl->base.statementType == Statement_Declaration) {
+            validateDeclaration(decl);
+        } else if (decl->base.statementType == Statement_Constant) {
+            validateExpression(decl->expr);
+        } else if (decl->base.statementType == Statement_FixedArray_Declaration) {
+            decl->type->solvedstate.numPointers++;
+            Datatype size_type = validateExpression(decl->expr);
         }
     }
 }

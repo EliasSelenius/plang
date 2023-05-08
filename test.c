@@ -13,9 +13,9 @@ int main() {
 
 
     {
-        // void(char*)(void(int), float) Hello;
+        // void(char*)(void(int), float) Hello[16]
 
-        void (*(**Hello)(void (*)(int), float))(char*);
+        void (*(*Hello[16])(void (*)(int), float))(char*);
 
         void (*ret)(char*) = (*Hello)(my_proc, 3.14);
 

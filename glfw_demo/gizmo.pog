@@ -1,7 +1,7 @@
 
 namespace gizmo;
 
-uint32 gizmo_vao, gizmo_vbo, gizmo_ebo;
+uint32 vao, vbo, ebo;
 
 // struct GizmoLine {
 //     vec2 start;

@@ -9,6 +9,16 @@ static void error_v(u32 line, char* filename, char* format, va_list args) {
     numberOfErrors++;
 }
 
+static void fatal_parse_error(char* format, ...) {
+    Token* tok = &tokens[token_index];
+    va_list args;
+    va_start(args, format);
+    error_v(tok->line, parser.current_file->filename, format, args);
+    va_end(args);
+
+    exit(1);
+}
+
 static void error_temp(char* format, ...) {
     va_list args;
     va_start(args, format);

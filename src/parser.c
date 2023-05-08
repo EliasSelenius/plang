@@ -21,7 +21,7 @@ static inline void semicolon() {
 static Identifier identifier() {
     Token token = tokens[token_index];
     if (token.type != Tok_Word) {
-        error_token("Invalid identifier.");
+        fatal_parse_error("Invalid identifier: %s", TokenType_Names[tokens[token_index].type]);
         return -1;
     }
     token_index++;
@@ -30,15 +30,14 @@ static Identifier identifier() {
 
 static void expect(TokenType type) {
     if (tokens[token_index].type != type) {
-        error_token("Unexpected token type %s.", TokenType_Names[tokens[token_index].type]);
+        fatal_parse_error("Unexpected token type %s.", TokenType_Names[tokens[token_index].type]);
         return;
     }
     token_index++;
 }
 
 static void unexpectedToken() {
-    error_token("Unexpected token.");
-    token_index++;
+    fatal_parse_error("Unexpected token.");
 }
 
 static inline bool tok(TokenType type) {
@@ -52,16 +51,16 @@ static inline bool tok(TokenType type) {
 
 static Datatype getType(Namespace* ns, Identifier name) {
     foreach (alias, ns->aliases) {
-        if (alias->name == name) return (Datatype) { .kind = Typekind_Alias, .data_ptr = alias, 0 };
+        if (alias->name == name) return (Datatype) { .kind = Typekind_Alias, .data_ptr = alias };
     }
 
     foreach (stru, ns->structs) {
-        if (stru->name == name) return (Datatype) { .kind = Typekind_Struct, .data_ptr = stru, 0 };
+        if (stru->name == name) return (Datatype) { .kind = Typekind_Struct, .data_ptr = stru };
     }
 
     foreach (opaque, ns->opaque_types) {
         if (*opaque == name) {
-            Datatype res = { .kind = Typekind_Opaque, .data_ptr = (void*)name, 0 };
+            Datatype res = { .kind = Typekind_Opaque, .data_ptr = (void*)name };
             return res;
         }
     }
@@ -247,6 +246,7 @@ static ProcArg* expectProcArguments() {
     ProcArg* res = list_create(ProcArg);
     ProcArg arg;
     do {
+        tok(Tok_Keyword_With);
         arg.type = expectType();
         arg.name = identifier();
         list_add(res, arg);
@@ -263,19 +263,20 @@ static ProcArg* expectProcArguments() {
 static PlangStruct expectStruct() {
     PlangStruct stru;
     stru.name = identifier();
-    stru.fields = list_create(Field);
+    stru.fields = list_create(Declaration);
 
     expect(Tok_OpenCurl);
 
     do {
-        Field field;
-        field.nodebase.lineNumber = tokens[token_index].line;
+        Declaration field;
+        field.base.nodebase = node_init();
+        field.base.statementType = Statement_Declaration;
         field.type = expectType();
         field.name = identifier();
         list_add(stru.fields, field);
 
         while (tok(Tok_Comma)) {
-            field.nodebase.lineNumber = tokens[token_index].line;
+            field.base.nodebase.lineNumber = tokens[token_index].line;
             field.name = identifier();
             list_add(stru.fields, field);
         }
@@ -300,48 +301,69 @@ static void skipBody() {
     }
 }
 
-static void funcOrGlobal() {
+/*
+    type var;
+    type var = expr;
+    const var = expr;
+    type var1, var2;
+    type var1 = expr1, var2 = expr2;
+    type var[expr];
+    type var(args...) {scope}
+
+    locals
+    globals
+    fields
+    args
+
+*/
+
+
+static void proc_or_global() {
+
+    Node node = node_init();
     Type* type = expectType();
     Identifier name = identifier();
 
     if (tok(Tok_OpenParen)) {
-        // function
 
         Procedure proc = {0};
-        proc.overload = 0;
-        proc.next_overload = null;
+        proc.base.nodebase = node;
         proc.returnType = type;
         proc.name = name;
         proc.arguments = expectProcArguments();
         proc.scope = expectScope();
 
         list_add(parser.current_file->namespace->procedures, proc);
-
-    } else {
-        // global variable
-        VarDecl decl = {0};
-        decl.base.statementType = Statement_Declaration;
-        decl.assignmentOrNull = null;
-        decl.name = name;
-        decl.type = type;
-
-        globvar:
-        if (tok(Tok_Assign)) {
-            decl.assignmentOrNull = expectExpression();
-        } else if (decl.type->node_type == TypeNode_MustInfer) {
-            error_token("Global variable \"%s\" must be assigned to, to be type inferred.", get_string(decl.name));
-        }
-
-        list_add(parser.current_file->namespace->global_variables, decl);
-
-        if (tok(Tok_Comma)) {
-            decl.name = identifier();
-            decl.assignmentOrNull = null;
-            goto globvar;
-        }
-
-        semicolon();
+        return;
     }
+
+
+    Declaration decl = {0};
+    decl.base.nodebase = node;
+    decl.base.statementType = Statement_Declaration;
+    decl.type = type;
+    decl.name = name;
+
+    globvar:
+
+    if (tok(Tok_OpenSquare)) {
+        decl.base.statementType = Statement_FixedArray_Declaration;
+        decl.expr = expectExpression();
+        expect(Tok_CloseSquare);
+    } else {
+        if (tok(Tok_Assign)) decl.expr = expectExpression();
+    }
+
+    list_add(parser.current_file->namespace->declarations, decl);
+
+    if (tok(Tok_Comma)) {
+        decl.base.statementType = Statement_Declaration;
+        decl.name = identifier();
+        decl.expr = null;
+        goto globvar;
+    }
+
+    semicolon();
 }
 
 static bool parseProgramEntity() {
@@ -382,21 +404,21 @@ static bool parseProgramEntity() {
 
         } break;
 
-        case Tok_Keyword_Const: {
-            u32 lineNum = tokens[token_index].line;
-            token_index++;
-
-            Constant constant = {0};
-            constant.name = identifier();
-            expect(Tok_Assign);
-            constant.expr = expectExpression();
-            list_add(parser.current_file->namespace->constants, constant);
-
-            while (tokens[token_index++].type != Tok_Semicolon);
-        } break;
-
         case Tok_Keyword_Let:
-        case Tok_Word: funcOrGlobal(); break;
+        case Tok_Word: proc_or_global(); break;
+
+        case Tok_Keyword_Const: {
+            Declaration decl = {0};
+            decl.base.nodebase = node_init();
+            decl.base.statementType = Statement_Constant;
+            token_index++;
+            decl.name = identifier();
+            expect(Tok_Assign);
+            decl.expr = expectExpression();
+            semicolon();
+
+            list_add(parser.current_file->namespace->declarations, decl);
+        } break;
 
         case Tok_Keyword_Declare: {
             // function declaration
@@ -404,6 +426,7 @@ static bool parseProgramEntity() {
             token_index++;
 
             Procedure proc = {0};
+            proc.base.nodebase = node_init();
             proc.overload = 0;
             proc.scope = null;
             proc.returnType = expectType();

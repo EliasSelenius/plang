@@ -2409,9 +2409,8 @@ proc_glViewportIndexedf glViewportIndexedf = null;
 proc_glViewportIndexedfv glViewportIndexedfv = null;
 proc_glWaitSync glWaitSync = null;
 
-// type void_func = void();
 
-void load_opengl(void*(char*) getProcAddress) {
+void load_opengl(void()(char*) getProcAddress) {
     glActiveShaderProgram                         = getProcAddress("glActiveShaderProgram")                         as proc_glActiveShaderProgram;
     glActiveTexture                               = getProcAddress("glActiveTexture")                               as proc_glActiveTexture;
     glAttachShader                                = getProcAddress("glAttachShader")                                as proc_glAttachShader;

@@ -19,7 +19,8 @@ static Identifier type_name_char = 0;
 static Identifier type_name_void = 0;
 
 
-static Identifier builtin_print_name = 0;
+static Identifier builtin_string_print = 0;
+static Identifier builtin_string_main = 0;
 
 static void initTypenames() {
     type_name_int8    = register_string(spFrom("int8"));
@@ -35,7 +36,8 @@ static void initTypenames() {
     type_name_char    = register_string(spFrom("char"));
     type_name_void    = register_string(spFrom("void"));
 
-    builtin_print_name = register_string(spFrom("print"));
+    builtin_string_print = register_string(spFrom("print"));
+    builtin_string_main = register_string(spFrom("main"));
 }
 
 typedef struct LocalDecl {

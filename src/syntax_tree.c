@@ -5,15 +5,13 @@ typedef u32 Identifier;
 
 typedef struct Namespace Namespace;
 typedef struct Procedure Procedure;
-typedef struct VarDecl VarDecl;
 typedef struct ForStatement ForStatement;
-typedef struct Constant Constant;
 typedef struct PlangStruct PlangStruct;
 typedef struct AliasType AliasType;
 typedef struct ProcSignature ProcSignature;
 typedef struct Datatype Datatype;
 typedef struct ProcArg ProcArg;
-typedef struct LocalProc LocalProc;
+typedef struct Declaration Declaration;
 
 typedef struct File {
     char* filename;
@@ -53,6 +51,7 @@ typedef enum Typekind {
 
 typedef struct Datatype {
     Typekind kind;
+    u32 numPointers;
     union {
         void* data_ptr;
         Identifier opaque_name;
@@ -60,8 +59,6 @@ typedef struct Datatype {
         AliasType* alias;
         ProcSignature* procedure;
     };
-
-    u32 numPointers;
 } Datatype;
 
 typedef enum TypeNode {
@@ -98,24 +95,24 @@ typedef struct AliasType {
     Identifier name;
 } AliasType;
 
-#define type_invalid          (Datatype) { .kind = Typekind_Invalid, {0} }
+#define type_invalid          (Datatype) { .kind = Typekind_Invalid }
 #define type_voidPointer      (Datatype) { .kind = Typekind_void, .numPointers = 1 }
 #define type_charPointer      (Datatype) { .kind = Typekind_char, .numPointers = 1 }
-#define type_ambiguousInteger (Datatype) { .kind = Typekind_AmbiguousInteger, {0} }
-#define type_ambiguousDecimal (Datatype) { .kind = Typekind_AmbiguousDecimal, {0} }
+#define type_ambiguousInteger (Datatype) { .kind = Typekind_AmbiguousInteger }
+#define type_ambiguousDecimal (Datatype) { .kind = Typekind_AmbiguousDecimal }
 
-#define type_int8    (Datatype) { .kind = Typekind_int8, {0} }
-#define type_uint8   (Datatype) { .kind = Typekind_uint8, {0} }
-#define type_int16   (Datatype) { .kind = Typekind_int16, {0} }
-#define type_uint16  (Datatype) { .kind = Typekind_uint16, {0} }
-#define type_int32   (Datatype) { .kind = Typekind_int32, {0} }
-#define type_uint32  (Datatype) { .kind = Typekind_uint32, {0} }
-#define type_int64   (Datatype) { .kind = Typekind_int64, {0} }
-#define type_uint64  (Datatype) { .kind = Typekind_uint64, {0} }
-#define type_float32 (Datatype) { .kind = Typekind_float32, {0} }
-#define type_float64 (Datatype) { .kind = Typekind_float64, {0} }
-#define type_char    (Datatype) { .kind = Typekind_char, {0} }
-#define type_void    (Datatype) { .kind = Typekind_void, {0} }
+#define type_int8    (Datatype) { .kind = Typekind_int8 }
+#define type_uint8   (Datatype) { .kind = Typekind_uint8 }
+#define type_int16   (Datatype) { .kind = Typekind_int16 }
+#define type_uint16  (Datatype) { .kind = Typekind_uint16 }
+#define type_int32   (Datatype) { .kind = Typekind_int32 }
+#define type_uint32  (Datatype) { .kind = Typekind_uint32 }
+#define type_int64   (Datatype) { .kind = Typekind_int64 }
+#define type_uint64  (Datatype) { .kind = Typekind_uint64 }
+#define type_float32 (Datatype) { .kind = Typekind_float32 }
+#define type_float64 (Datatype) { .kind = Typekind_float64 }
+#define type_char    (Datatype) { .kind = Typekind_char }
+#define type_void    (Datatype) { .kind = Typekind_void }
 
 static inline bool typeEquals(Datatype a, Datatype b) {
     return a.kind == b.kind && a.data_ptr == b.data_ptr && a.numPointers == b.numPointers;
@@ -235,12 +232,12 @@ static Typekind getTypekindOfNumberInfo(NumberInfo info) {
 }
 
 static Datatype mergeNumberTypes(Datatype a, Datatype b) {
-    return (Datatype) { .kind = getTypekindOfNumberInfo(mergeNumberInfos(getNumberInfo(a.kind), getNumberInfo(b.kind))), {0} };
+    return (Datatype) { .kind = getTypekindOfNumberInfo(mergeNumberInfos(getNumberInfo(a.kind), getNumberInfo(b.kind))) };
 }
 
 typedef struct Node {
-    u32 lineNumber;
     File* file;
+    u32 lineNumber;
 } Node;
 
 
@@ -364,7 +361,6 @@ typedef enum RefType {
     RefType_Local,
     RefType_Forloop,
     RefType_Argument,
-    RefType_LocalProc,
     RefType_Procedure,
     RefType_Global,
     RefType_Constant,
@@ -375,13 +371,10 @@ typedef struct Reference {
     RefType reftype;
     union {
         void* data;
-        VarDecl* local_variable;
+        Declaration* decl;
         ForStatement* forloop;
         ProcArg* proc_arg;
-        LocalProc* local_procedure;
         Procedure* procedure;
-        VarDecl* global;
-        Constant* constant;
         Namespace* namespace;
     };
 } Reference;
@@ -421,6 +414,11 @@ typedef struct TernaryExpression {
 typedef enum StatementType {
     Statement_Declaration,
     Statement_FixedArray_Declaration,
+    Statement_Constant,
+    Statement_Typedef,
+    Statement_Procedure,
+    Statement_Struct,
+
     Statement_Assignment,
     Statement_Expression,
 
@@ -429,7 +427,6 @@ typedef enum StatementType {
     Statement_While,
     Statement_For,
     Statement_Switch,
-    Statement_LocalProc,
 
     Statement_Continue,
     Statement_Break,
@@ -450,12 +447,18 @@ typedef struct StatementExpression {
     Expression* expr;
 } StatementExpression;
 
-typedef struct VarDecl {
+
+/*
+    type name = SomeType; // type definition      --
+    const name = expr;    // compiletime constant -- type is null
+    SomeType name = expr; // variable             -- type is not null
+*/
+typedef struct Declaration {
     Statement base;
     Type* type;
+    Expression* expr; // if this is a fixed sized array expr is the size expression for the array
     Identifier name;
-    Expression* assignmentOrNull;
-} VarDecl;
+} Declaration;
 
 typedef struct Assignment {
     Statement base;
@@ -538,6 +541,7 @@ typedef struct ProcSignature {
 } ProcSignature;
 
 typedef struct Procedure {
+    Statement base;
     Identifier name;
     Type* returnType;
     ProcArg* arguments; // list, can be null
@@ -558,7 +562,7 @@ typedef struct ProcCall {
     Expression base;
     Expression* proc_expr;
     Expression** args; // list, can be null
-    u32 overload;
+    Procedure* proc; // can be null if this ProcCall is calling a procptr
 } ProcCall;
 
 typedef struct CapturedVariable {
@@ -566,38 +570,24 @@ typedef struct CapturedVariable {
     Datatype type;
 } CapturedVariable;
 
-typedef struct LocalProc {
-    Statement base;
-    Procedure proc;
-    CapturedVariable* captures; // list
-} LocalProc;
 
 // ----Struct----------------------------------------------
 
-typedef struct Field {
-    Node nodebase;
-    Type* type;
-    Identifier name;
-} Field;
 
 typedef struct PlangStruct {
     Node nodebase;
     Identifier name;
     u32 deps; // TODO: temporary, until we figure out a better way of transpiling structs in the correct order
-    Field* fields; // list
+    Declaration* fields; // list
 } PlangStruct;
 
-static Field* getField(PlangStruct* stru, Identifier name) {
+static Declaration* getField(PlangStruct* stru, Identifier name) {
     u32 len = list_length(stru->fields);
     for (u32 i = 0; i < len; i++)
         if (stru->fields[i].name == name) return &stru->fields[i];
     return null;
 }
 
-typedef struct Constant {
-    Identifier name;
-    Expression* expr;
-} Constant;
 
 // ----Namespaces----------------------------------------------
 
@@ -605,8 +595,8 @@ typedef struct Namespace {
     Identifier name;
 
     Procedure* procedures; // list
-    VarDecl* global_variables; // list
-    Constant* constants; // list
+
+    Declaration* declarations; // list
 
     PlangStruct* structs; // list
     AliasType* aliases; // list
@@ -663,9 +653,7 @@ static Namespace* namespace_create() {
     ns->name = 0;
 
     ns->procedures = list_create(Procedure);
-
-    ns->global_variables = list_create(VarDecl);
-    ns->constants = list_create(Constant);
+    ns->declarations = list_create(Declaration);
 
     ns->structs = list_create(PlangStruct);
     ns->aliases = list_create(AliasType);
@@ -750,12 +738,10 @@ static Reference getReferenceFromNamespace(Namespace* ns, Identifier name) {
         if (proc->name == name) return (Reference) { .reftype = RefType_Procedure, .data = proc };
     }
 
-    foreach (glob, ns->global_variables) {
-        if (glob->name == name) return (Reference) { .reftype = RefType_Global, .data = glob };
-    }
-
-    foreach (cont, ns->constants) {
-        if (cont->name == name) return (Reference) { .reftype = RefType_Constant, .data = cont };
+    foreach (decl, ns->declarations) {
+        if (decl->name == name) {
+            return (Reference) { .reftype = decl->base.statementType == Statement_Declaration ? RefType_Global : RefType_Constant, .data = decl };
+        }
     }
 
     return reference_invalid;
@@ -764,68 +750,15 @@ static Reference getReferenceFromNamespace(Namespace* ns, Identifier name) {
 static Datatype reference2datatype(Reference ref) {
     switch (ref.reftype) {
         case RefType_Invalid: return type_invalid;
-        case RefType_Local: return ref.local_variable->type->solvedstate;
+        case RefType_Local: return ref.decl->type->solvedstate;
         case RefType_Forloop: return ref.forloop->index_type ? ref.forloop->index_type->solvedstate : type_int32; // TODO: change this
         case RefType_Argument: return ref.proc_arg->type->solvedstate;
-        case RefType_LocalProc: return ref.local_procedure->proc.ptr_type;
         case RefType_Procedure: return ref.procedure->ptr_type;
-        case RefType_Global: return ref.global->type->solvedstate;
-        case RefType_Constant: return ref.constant->expr->datatype;
+        case RefType_Global: return ref.decl->type->solvedstate;
+        case RefType_Constant: return ref.decl->expr->datatype;
+        case RefType_Namespace: return type_invalid;
     }
 
     return type_invalid;
-}
-
-
-static void printScope(StringBuilder* sb, Scope* scope) {
-    sbAppend(sb, "{\n");
-
-    foreach (stap, scope->statements) {
-        Statement* sta = *stap;
-        switch (sta->statementType) {
-            case Statement_Declaration: sbAppend(sb, "");  break;
-            case Statement_FixedArray_Declaration: sbAppend(sb, "");  break;
-            case Statement_Assignment: sbAppend(sb, "");  break;
-            case Statement_Expression: sbAppend(sb, "");  break;
-            case Statement_Scope:
-                printScope(sb, (Scope*)sta);
-                break;
-            case Statement_If: sbAppend(sb, "if\n"); break;
-            case Statement_While: sbAppend(sb, "while\n"); break;
-            case Statement_For: sbAppend(sb, "for in\n"); break;
-            case Statement_Switch: sbAppend(sb, "switch\n"); break;
-            case Statement_LocalProc: sbAppend(sb, "local_proc\n"); break;
-            case Statement_Continue: sbAppend(sb, "continue\n"); break;
-            case Statement_Break: sbAppend(sb, "break\n"); break;
-            case Statement_Return: sbAppend(sb, "return\n"); break;
-            case Statement_Goto: sbAppend(sb, "goto\n"); break;
-            case Statement_Label: sbAppend(sb, "label\n"); break;
-            case Statement_CaseLabel: sbAppend(sb, "case label\n"); break;
-            case Statement_DefaultLabel: sbAppend(sb, "defalut label\n"); break;
-        }
-    }
-    sbAppend(sb, "}\n");
-}
-
-
-static void printCodebase(Codebase* codebase) {
-
-    StringBuilder builder = sbCreate();
-    StringBuilder* sb = &builder;
-
-    foreach (nsp, codebase->namespaces) {
-        Namespace* ns = *nsp;
-
-        sbAppend(sb, "Namespace ");
-        sbAppend(sb, get_string(ns->name));
-
-        foreach (proc, ns->procedures) {
-            sbAppend(sb, "Proc: ");
-            sbAppend(sb, get_string(proc->name));
-            if (proc->scope) printScope(sb, proc->scope);
-        }
-    }
-
-    sbDestroy(sb);
 }
 
