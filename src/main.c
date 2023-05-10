@@ -4,7 +4,6 @@
     llvm-symbolizer.exe --use-native-pdb-reader --print-source-context-lines=20 -e ./bin/plang.exe
 
     TODO list:
-        - localy defined structs
         *- clasic for loop: for uint32 i = 0, i < 10, i++ { }
         - for int loop: for 12 { }
         - loop block: loop { } == while (true) { }
@@ -17,13 +16,11 @@
         - explicitly sized enums e.g (enum Type : uint32 {})?
         - unions
         *- fixed sized arrays as struct fields
-        - local consts
         - multi-declare e.g: int i, j = 1, k;
         - let output exe be named the name of the directory
         - it keyword
         - labeled break and continue e.g (for i in 0..count { if a break i; else continue i; }) use the index/item name as the for label
         - global variable runtime expression assignment
-        - localy defined type aliases
         - operator overload
         - capturing locals for localy defined procedures
         - defer statement
@@ -37,6 +34,9 @@
         *- file name in errors
         *- line numbers in validation errors
         - modules or namespaces ?
+        - localy defined structs
+        - localy defined type aliases
+        - local consts
 
 
     DONE list:

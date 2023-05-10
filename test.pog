@@ -52,13 +52,22 @@ type LargeProcPtr = char*(void(int32), float32)(float32)(void());
 
 int32 main() {
 
+    struct LocalStructTest {
+        char* name;
+    }
+
+    type LocalTypedef; // = LocalStructTest;
+
+
+    const LocalConstant = 12;
+    let i = LocalConstant;
+
     OtherNamespace.hello();
 
     {
-        // SomeProc p = SomeProcImpl;
-        // p(SomeProcImplArg, 42);
+        SomeProc p = SomeProcImpl;
+        p(SomeProcImplArg, 42);
 
-        SomeProcImpl(SomeProcImplArg, 42);
         print("\n\n");
     }
 

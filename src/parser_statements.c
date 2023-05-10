@@ -139,12 +139,20 @@ static Statement* expectStatement() {
 
         case Tok_Keyword_Const: {
             Declaration* decl = allocStatement(Statement_Constant);
-            token_index++;
-            decl->name = identifier();
-            expect(Tok_Assign);
-            decl->expr = expectExpression();
-            semicolon();
+            *decl = expectConst();
             return (Statement*)decl;
+        }
+
+        case Tok_Keyword_Struct: {
+            PlangStruct* sp = allocStatement(Statement_Struct);
+            *sp = expectStruct();
+            return (Statement*)sp;
+        }
+
+        case Tok_Keyword_Type: {
+            Typedef* def = allocStatement(Statement_Typedef);
+            *def = expectTypedef();
+            return (Statement*)def;
         }
 
         default: break;

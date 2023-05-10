@@ -50,8 +50,8 @@ static inline bool tok(TokenType type) {
 
 
 static Datatype getType(Namespace* ns, Identifier name) {
-    foreach (alias, ns->aliases) {
-        if (alias->name == name) return (Datatype) { .kind = Typekind_Alias, .data_ptr = alias };
+    foreach (def, ns->type_defs) {
+        if (def->name == name) return (Datatype) { .kind = Typekind_Typedef, .data_ptr = def };
     }
 
     foreach (stru, ns->structs) {
@@ -70,8 +70,9 @@ static Datatype getType(Namespace* ns, Identifier name) {
 
 
 static Type* newTypeNode(TypeNode node_type) {
-    Type* res = malloc(sizeof(Type));
-    *res = (Type) { .node_type = node_type, {0} };
+    Type* res = calloc(1, sizeof(Type));
+    res->nodebase = node_init();
+    res->node_type = node_type;
     return res;
 }
 
@@ -79,7 +80,6 @@ static Type* type_modifier(Type* type);
 
 static Type* parseTypeNode() {
     Type* type = newTypeNode(TypeNode_Normal);
-    type->context = parser.current_file;
 
     if (tok(Tok_Keyword_Let)) {
         type->node_type = TypeNode_MustInfer;
@@ -177,7 +177,7 @@ static Datatype typenode2datatype(Type* type) {
                 else if (type->name == type_name_char) return type_char;
                 else if (type->name == type_name_void) return type_void;
 
-                Datatype res = getType(type->context->namespace, type->name);
+                Datatype res = getType(type->nodebase.file->namespace, type->name);
                 if (res.kind == Typekind_Invalid) res = getType(g_Codebase.namespaces[0], type->name);
 
                 if (res.kind == Typekind_Invalid) goto fail;
@@ -214,7 +214,8 @@ static Datatype typenode2datatype(Type* type) {
     }
 
     fail:
-    error_temp("Failed to resolve type");
+    error_node(type, "Failed to resolve type");
+    printf("    ");
     printType(type);
     printf("\n");
     return type_invalid;
@@ -256,15 +257,14 @@ static ProcArg* expectProcArguments() {
     return res;
 }
 
-#include "parser_expressions.c"
-#include "parser_statements.c"
-
-
 static PlangStruct expectStruct() {
     PlangStruct stru;
-    stru.name = identifier();
+    stru.base.nodebase = node_init();
+    stru.base.statementType = Statement_Struct;
     stru.fields = list_create(Declaration);
 
+    token_index++;
+    stru.name = identifier();
     expect(Tok_OpenCurl);
 
     do {
@@ -288,6 +288,37 @@ static PlangStruct expectStruct() {
 
     return stru;
 }
+
+static Typedef expectTypedef() {
+    Typedef def = {0};
+    def.base.nodebase = node_init();
+    def.base.statementType = Statement_Typedef;
+
+    token_index++;
+    def.name = identifier();
+    if (tok(Tok_Assign)) {
+        def.type = expectType();
+    }
+
+    semicolon();
+    return def;
+}
+
+static Declaration expectConst() {
+    Declaration decl = {0};
+    decl.base.nodebase = node_init();
+    decl.base.statementType = Statement_Constant;
+
+    token_index++;
+    decl.name = identifier();
+    expect(Tok_Assign);
+    decl.expr = expectExpression();
+    semicolon();
+    return decl;
+}
+
+#include "parser_expressions.c"
+#include "parser_statements.c"
 
 
 static void skipBody() {
@@ -371,52 +402,24 @@ static bool parseProgramEntity() {
     switch (tokens[token_index].type) {
 
         case Tok_Keyword_Struct: {
-            // struct
-            u32 lineNum = tokens[token_index].line;
-            token_index++;
             PlangStruct stru = expectStruct();
-            stru.nodebase.lineNumber = lineNum;
-            u32 struLen = list_length(parser.current_file->namespace->structs);
-            for (u32 i = 0; i < struLen; i++) {
-                if (parser.current_file->namespace->structs[i].name == stru.name) {
-                    error_node(&stru, "Struct \"%s\" is already defined.", get_string(stru.name));
-                    break;
-                }
-            }
-
             list_add(parser.current_file->namespace->structs, stru);
-
         } break;
 
         case Tok_Keyword_Type: {
-            u32 lineNum = tokens[token_index].line;
-            token_index++;
-
-            AliasType alias = {0};
-            alias.name = identifier();
-            if (tok(Tok_Assign)) {
-                alias.aliasedType = expectType();
-                list_add(parser.current_file->namespace->aliases, alias);
+            Typedef def = expectTypedef();
+            if (def.type) {
+                list_add(parser.current_file->namespace->type_defs, def);
             } else {
-                list_add(parser.current_file->namespace->opaque_types, alias.name);
+                list_add(parser.current_file->namespace->opaque_types, def.name);
             }
-            semicolon();
-
         } break;
 
         case Tok_Keyword_Let:
         case Tok_Word: proc_or_global(); break;
 
         case Tok_Keyword_Const: {
-            Declaration decl = {0};
-            decl.base.nodebase = node_init();
-            decl.base.statementType = Statement_Constant;
-            token_index++;
-            decl.name = identifier();
-            expect(Tok_Assign);
-            decl.expr = expectExpression();
-            semicolon();
-
+            Declaration decl = expectConst();
             list_add(parser.current_file->namespace->declarations, decl);
         } break;
 
@@ -502,38 +505,7 @@ static void parse(File* files) {
     list_delete(parser.unresolved_types);
     parser.unresolved_types = null;
 
-    /*
-    { // resolve types
-        // TODO: maybe acumulate unresolved types in a list and iterate that, instead of having this much loop nesting
 
-        foreach (nsp, g_Codebase.namespaces) {
-            Namespace* ns = *nsp;
-
-            foreach (alias, ns->aliases) {
-                resolveType(&alias->aliasedType);
-            }
-
-            foreach (proc, ns->procedures) {
-                resolveType(&proc->returnType);
-                if (proc->arguments) {
-                    foreach (arg, proc->arguments) {
-                        resolveType(&arg->type);
-                    }
-                }
-            }
-
-            foreach (glob, ns->global_variables) {
-                resolveType(&glob->type);
-            }
-
-            foreach (stru, ns->structs) {
-                foreach (field, stru->fields) {
-                    resolveType(&field->type);
-                }
-            }
-        }
-    }
-    */
 
     { // overloads
         foreach (nsp, g_Codebase.namespaces) {

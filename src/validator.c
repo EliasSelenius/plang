@@ -9,8 +9,8 @@ static void validateScope(Scope* scope);
 static void validateProcedure(Procedure* proc);
 
 static Datatype dealiasType(Datatype type) {
-    if (type.kind == Typekind_Alias) {
-        Datatype newType = type.alias->aliasedType->solvedstate;
+    if (type.kind == Typekind_Typedef) {
+        Datatype newType = type.type_def->type->solvedstate;
         newType.numPointers += type.numPointers;
         return dealiasType(newType);
     }
@@ -120,7 +120,7 @@ static void constructTypename(char* buffer, u32 size, Datatype type) {
 
         case Typekind_Struct: typename = get_string(type.stru->name); break;
         case Typekind_Enum: typename = null; break;
-        case Typekind_Alias: typename = get_string(type.alias->name); break;
+        case Typekind_Typedef: typename = get_string(type.type_def->name); break;
         case Typekind_Opaque: typename = get_string(type.opaque_name); break;
         case Typekind_Procedure: typename = "(TODO: print proc type name)";
     }
@@ -460,6 +460,21 @@ static void validateDeclaration(Declaration* decl) {
     }
 }
 
+static void validateStruct(PlangStruct* stru) {
+    u32 fieldLen = list_length(stru->fields);
+    for (u32 i = 0; i < fieldLen; i++) {
+        Declaration* field = &stru->fields[i];
+
+        // TODO: field may be an alias
+        if (field->type->solvedstate.kind == Typekind_Struct && field->type->solvedstate.numPointers == 0) {
+            if (stru == field->type->solvedstate.stru) {
+                error_node(field, "Struct \"%s\" self reference by value.", get_string(stru->name));
+            }
+        }
+    }
+}
+
+
 static void validateStatement(Statement* sta) {
     switch (sta->statementType) {
         case Statement_FixedArray_Declaration: {
@@ -487,6 +502,21 @@ static void validateStatement(Statement* sta) {
 
             assertAssignability(toType, fromType, ass->expr);
         } break;
+
+        case Statement_Struct: {
+            validateStruct((PlangStruct*)sta);
+        } break;
+
+        case Statement_Typedef: {
+            Typedef* def = (Typedef*)sta;
+        } break;
+
+        case Statement_Constant: {
+            Declaration* decl = (Declaration*)sta;
+            validateExpression(decl->expr);
+            stack_declare(decl->name, RefType_Constant, decl);
+        } break;
+
 
         case Statement_Scope: {
             Scope* scope = (Scope*)sta;
@@ -616,19 +646,6 @@ static void validateProcedure(Procedure* proc) {
     }
 }
 
-static void validateStruct(PlangStruct* stru) {
-    u32 fieldLen = list_length(stru->fields);
-    for (u32 i = 0; i < fieldLen; i++) {
-        Declaration* field = &stru->fields[i];
-
-        // TODO: field may be an alias
-        if (field->type->solvedstate.kind == Typekind_Struct && field->type->solvedstate.numPointers == 0) {
-            if (stru == field->type->solvedstate.stru) {
-                error_node(field, "Struct \"%s\" self reference by value.", get_string(stru->name));
-            }
-        }
-    }
-}
 
 
 static void validateNamespace(Namespace* ns) {

@@ -7,7 +7,7 @@ typedef struct Namespace Namespace;
 typedef struct Procedure Procedure;
 typedef struct ForStatement ForStatement;
 typedef struct PlangStruct PlangStruct;
-typedef struct AliasType AliasType;
+typedef struct Typedef Typedef;
 typedef struct ProcSignature ProcSignature;
 typedef struct Datatype Datatype;
 typedef struct ProcArg ProcArg;
@@ -44,7 +44,7 @@ typedef enum Typekind {
 
     Typekind_Struct,
     Typekind_Enum,
-    Typekind_Alias,
+    Typekind_Typedef,
     Typekind_Opaque,
     Typekind_Procedure
 } Typekind;
@@ -56,10 +56,19 @@ typedef struct Datatype {
         void* data_ptr;
         Identifier opaque_name;
         PlangStruct* stru;
-        AliasType* alias;
+        Typedef* type_def;
         ProcSignature* procedure;
     };
 } Datatype;
+
+
+
+typedef struct Node {
+    File* file;
+    u32 lineNumber;
+} Node;
+
+
 
 typedef enum TypeNode {
     TypeNode_MustInfer,
@@ -69,13 +78,13 @@ typedef enum TypeNode {
 } TypeNode;
 
 typedef struct Type {
+    Node nodebase;
     TypeNode node_type;
 
     Datatype solvedstate;
 
     union {
         struct {
-            File* context;
             Identifier namespace_name, name;
         };
 
@@ -90,10 +99,6 @@ typedef struct Type {
     struct Type* next;
 } Type;
 
-typedef struct AliasType {
-    Type* aliasedType;
-    Identifier name;
-} AliasType;
 
 #define type_invalid          (Datatype) { .kind = Typekind_Invalid }
 #define type_voidPointer      (Datatype) { .kind = Typekind_void, .numPointers = 1 }
@@ -234,11 +239,6 @@ static Typekind getTypekindOfNumberInfo(NumberInfo info) {
 static Datatype mergeNumberTypes(Datatype a, Datatype b) {
     return (Datatype) { .kind = getTypekindOfNumberInfo(mergeNumberInfos(getNumberInfo(a.kind), getNumberInfo(b.kind))) };
 }
-
-typedef struct Node {
-    File* file;
-    u32 lineNumber;
-} Node;
 
 
 // ----Expressions---------------------------------------------
@@ -460,6 +460,12 @@ typedef struct Declaration {
     Identifier name;
 } Declaration;
 
+typedef struct Typedef {
+    Statement base;
+    Type* type;
+    Identifier name;
+} Typedef;
+
 typedef struct Assignment {
     Statement base;
     Expression* assigneeExpr;
@@ -575,7 +581,7 @@ typedef struct CapturedVariable {
 
 
 typedef struct PlangStruct {
-    Node nodebase;
+    Statement base;
     Identifier name;
     u32 deps; // TODO: temporary, until we figure out a better way of transpiling structs in the correct order
     Declaration* fields; // list
@@ -599,7 +605,7 @@ typedef struct Namespace {
     Declaration* declarations; // list
 
     PlangStruct* structs; // list
-    AliasType* aliases; // list
+    Typedef* type_defs; // list
     Identifier* opaque_types; // list
 
 } Namespace;
@@ -656,7 +662,7 @@ static Namespace* namespace_create() {
     ns->declarations = list_create(Declaration);
 
     ns->structs = list_create(PlangStruct);
-    ns->aliases = list_create(AliasType);
+    ns->type_defs = list_create(Typedef);
     ns->opaque_types = list_create(Identifier);
 
     return ns;

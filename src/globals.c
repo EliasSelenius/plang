@@ -53,6 +53,9 @@ typedef struct Parser {
     // The local declarations of the currently parsed procedure
     LocalDecl* stack;
 
+    // Declaration** stack;
+
+
     Reference last_reference; // used by validateProcCall to get the Procedure that might be overloaded
 
     Type** unresolved_types; // list

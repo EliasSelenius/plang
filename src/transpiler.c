@@ -57,7 +57,7 @@ static char* getTypeCname(Datatype type) {
 
         case Typekind_Struct: return get_string(type.stru->name);
         case Typekind_Enum: return null;
-        case Typekind_Alias: return get_string(type.alias->name);
+        case Typekind_Typedef: return get_string(type.type_def->name);
         case Typekind_Opaque: return get_string(type.opaque_name);
         case Typekind_Procedure: return "/*proc*/void";
     }
@@ -364,14 +364,18 @@ static void transpileExpression(Expression* expr) {
         case ExprType_Variable: {
             VariableExpression* var = (VariableExpression*)expr;
 
-            switch (var->reference.reftype) {
-                default: break;
-                case RefType_Procedure: if (var->reference.procedure->scope); else break;
-                case RefType_Global:
+            if (var->reference.reftype == RefType_Constant) {
+                transpileExpression(var->reference.decl->expr);
+                break;
+            }
+
+            if (var->reference.reftype == RefType_Global
+            || (var->reference.reftype == RefType_Procedure && var->reference.procedure->scope)) {
                 Node* node = (Node*)var->reference.data;
                 sbAppend(sb, get_string(node->file->namespace->name));
                 sbAppend(sb, "_");
             }
+
             sbAppend(sb, get_string(var->name));
         } break;
 
@@ -462,6 +466,41 @@ static void transpileIfStatement(IfStatement* ifst) {
     }
 }
 
+static void transpileStruct(PlangStruct* stru) {
+    sbAppend(sb, "typedef struct ");
+    sbAppend(sb, get_string(stru->name));
+    sbAppend(sb, " {");
+
+    tabing++;
+
+    foreach (field, stru->fields) {
+        newline();
+        _transpileDatatype(field->type->solvedstate, field->name);
+        sbAppend(sb, ";");
+    }
+
+    tabing--;
+    newline();
+
+    sbAppend(sb, "} ");
+    sbAppend(sb, get_string(stru->name));
+    sbAppend(sb, ";");
+}
+
+static void transpileTypedef(Typedef* def) {
+    sbAppend(sb, "typedef ");
+    if (def->type) {
+        _transpileDatatype(def->type->solvedstate, def->name);
+    } else {
+        sbAppend(sb, "struct ");
+        char* name = get_string(def->name);
+        sbAppend(sb, name);
+        sbAppend(sb, " ");
+        sbAppend(sb, name);
+    }
+    sbAppend(sb, ";");
+}
+
 static void transpileVarDecl(Declaration* decl) {
     if (decl->base.statementType == Statement_FixedArray_Declaration) {
 
@@ -490,6 +529,19 @@ static void transpileStatement(Statement* statement) {
             Declaration* decl = (Declaration*)statement;
             transpileVarDecl(decl);
         } break;
+
+        case Statement_Struct: {
+            transpileStruct((PlangStruct*)statement);
+        } break;
+
+        case Statement_Typedef: {
+            transpileTypedef((Typedef*)statement);
+        } break;
+
+        case Statement_Constant: {
+            sbAppend(sb, "// local constant");
+        } break;
+
         case Statement_Assignment: {
             Assignment* ass = (Assignment*)statement;
             transpileExpression(ass->assigneeExpr);
@@ -658,26 +710,7 @@ static void transpileProcedure(Procedure* proc) {
     newline();
 }
 
-static void transpileStruct(PlangStruct* stru) {
-    sbAppend(sb, "typedef struct ");
-    sbAppend(sb, get_string(stru->name));
-    sbAppend(sb, " {");
 
-    tabing++;
-
-    foreach (field, stru->fields) {
-        newline();
-        _transpileDatatype(field->type->solvedstate, field->name);
-        sbAppend(sb, ";");
-    }
-
-    tabing--;
-    newline();
-
-    sbAppend(sb, "} ");
-    sbAppend(sb, get_string(stru->name));
-    sbAppend(sb, ";\n");
-}
 
 static u32 countStructDependencies(PlangStruct* stru) {
     u32 deps = 0;
@@ -760,10 +793,9 @@ static void transpile() {
     });
 
     sbAppend(sb, "\n// Type aliases\n");
-    iterate(aliases, {
-        sbAppend(sb, "typedef ");
-        _transpileDatatype(item->aliasedType->solvedstate, item->name);
-        sbAppend(sb, ";\n");
+    iterate(type_defs, {
+        transpileTypedef(item);
+        sbAppend(sb, "\n");
     });
 
 
@@ -781,6 +813,7 @@ static void transpile() {
             iterate(structs, {
                 if (item->deps == dep) {
                     transpileStruct(item);
+                    sbAppend(sb, "\n");
                     transpiled++;
                 }
             });
@@ -803,24 +836,15 @@ static void transpile() {
     //     sbAppend(sb, "\n");
     // });
 
-    // sbAppend(sb, "\n// Globals\n");
-    // iterate(global_variables, {
-    //     transpileVarDecl(item);
-    //     sbAppend(sb, "\n");
-    // });
-
     sbAppend(sb, "\n// Declarations\n");
     iterate(declarations, {
 
         if (item->base.statementType == Statement_Constant) {
-            sbAppend(sb, "#define ");
-            sbAppend(sb, get_string(item->name));
-            sbAppend(sb, " ");
-            transpileExpression(item->expr);
-        } else
+        } else {
             transpileGlobal(item);
+            sbAppend(sb, "\n");
+        }
 
-        sbAppend(sb, "\n");
     });
 
     sbAppend(sb, "\n// Implementations\n");
