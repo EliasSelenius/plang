@@ -13,10 +13,16 @@ declare void free(void* block);
 declare void* realloc(void* buffer, uint64 size);
 declare void* memcpy(void* dst, void* src, uint64 size);
 
+declare uint64 strlen(char* str);
+
 char* fileread(char* filename) {
+    return fileread(filename, "r");
+}
+
+char* fileread(char* filename, char* mode) {
     void* stream;
-    if (fopen_s(*stream, filename, "r")) {
-        print("Could not open file");
+    if (fopen_s(*stream, filename, mode)) {
+        print("ERROR: Could not open file.");
         return null;
     }
 
