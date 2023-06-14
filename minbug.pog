@@ -1,23 +1,8 @@
 
-void test(opq o) {
-    print("Test ", o, "\n");
+include "../grax/grax.pog";
+
+void main() {
+    void* buffer = malloc(12);
+
+    load_opengl(null);
 }
-
-void exec(void(opq) f) {
-    f();
-}
-
-type opq;
-
-
-int32 main() {
-
-
-    char*(void(int32), float32)(float32)(void()) Hello;
-
-    exec(test);
-
-    print("Minimal bug repruduction, done...\n");
-    return 0;
-}
-

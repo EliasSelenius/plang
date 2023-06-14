@@ -58,6 +58,10 @@ static Datatype getType(Namespace* ns, Identifier name) {
         if (stru->name == name) return (Datatype) { .kind = Typekind_Struct, .data_ptr = stru };
     }
 
+    foreach (en, ns->enums) {
+        if (en->name == name) return (Datatype) { .kind = Typekind_Enum, .data_ptr = en };
+    }
+
     foreach (opaque, ns->opaque_types) {
         if (*opaque == name) {
             Datatype res = { .kind = Typekind_Opaque, .data_ptr = (void*)name };
@@ -68,6 +72,16 @@ static Datatype getType(Namespace* ns, Identifier name) {
     return type_invalid;
 }
 
+static Datatype getLocalType(Identifier name) {
+    Statement* sta = get_local_type(name);
+
+    if (sta == null) return type_invalid;
+    if (sta->statementType == Statement_Struct) return (Datatype) { .kind = Typekind_Struct, .data_ptr = sta };
+    if (sta->statementType == Statement_Enum) return (Datatype) { .kind = Typekind_Enum, .data_ptr = sta };
+    if (sta->statementType == Statement_Typedef) return (Datatype) { .kind = Typekind_Typedef, .data_ptr = sta };
+
+    return type_invalid;
+}
 
 static Type* newTypeNode(TypeNode node_type) {
     Type* res = calloc(1, sizeof(Type));
@@ -95,12 +109,6 @@ static Type* parseTypeNode() {
     Type* mod = type;
     while ( (mod = type_modifier(mod)) ) type = mod;
 
-    return type;
-}
-
-static Type* expectType() {
-    Type* type = parseTypeNode();
-    list_add(parser.unresolved_types, type);
     return type;
 }
 
@@ -158,47 +166,54 @@ static void printType(Type* type) {
     }
 }
 
+
+static bool typenode2datatype_globalcheck = false;
 static Datatype typenode2datatype(Type* type) {
     switch (type->node_type) {
         case TypeNode_MustInfer: return type_invalid;
-        case TypeNode_Normal: {
-            if (type->namespace_name == 0) {
 
-                     if (type->name == type_name_int8) return type_int8;
-                else if (type->name == type_name_uint8) return type_uint8;
-                else if (type->name == type_name_int16) return type_int16;
-                else if (type->name == type_name_uint16) return type_uint16;
-                else if (type->name == type_name_int32) return type_int32;
-                else if (type->name == type_name_uint32) return type_uint32;
-                else if (type->name == type_name_int64) return type_int64;
-                else if (type->name == type_name_uint64) return type_uint64;
-                else if (type->name == type_name_float32) return type_float32;
-                else if (type->name == type_name_float64) return type_float64;
-                else if (type->name == type_name_char) return type_char;
-                else if (type->name == type_name_void) return type_void;
-
-                Datatype res = getType(type->nodebase.file->namespace, type->name);
-                if (res.kind == Typekind_Invalid) res = getType(g_Codebase.namespaces[0], type->name);
-
-                if (res.kind == Typekind_Invalid) goto fail;
-
-                return res;
-            }
-
-            Namespace* ns = getNamespace(type->namespace_name);
-            Datatype res = getType(ns, type->name);
-
-            if (res.kind == Typekind_Invalid) goto fail;
-            return res;
-        } break;
         case TypeNode_Pointer: {
             Datatype res = typenode2datatype(type->pointedto);
             res.numPointers++;
             return res;
-        } break;
+        }
+
+        case TypeNode_Normal: {
+            if (type->namespace_name && typenode2datatype_globalcheck) {
+                Namespace* ns = getNamespace(type->namespace_name);
+                return getType(ns, type->name);
+            }
+
+            if (type->name == type_name_int8) return type_int8;
+            else if (type->name == type_name_uint8) return type_uint8;
+            else if (type->name == type_name_int16) return type_int16;
+            else if (type->name == type_name_uint16) return type_uint16;
+            else if (type->name == type_name_int32) return type_int32;
+            else if (type->name == type_name_uint32) return type_uint32;
+            else if (type->name == type_name_int64) return type_int64;
+            else if (type->name == type_name_uint64) return type_uint64;
+            else if (type->name == type_name_float32) return type_float32;
+            else if (type->name == type_name_float64) return type_float64;
+            else if (type->name == type_name_char) return type_char;
+            else if (type->name == type_name_void) return type_void;
+
+            Datatype res = getLocalType(type->name);
+            if (typenode2datatype_globalcheck) {
+                if (res.kind == Typekind_Invalid) res = getType(get_file(type->nodebase.file_index)->namespace, type->name);
+                if (res.kind == Typekind_Invalid) res = getType(g_Codebase.namespaces[0], type->name);
+            }
+            return res;
+        }
+
         case TypeNode_Procedure: {
 
-            ProcSignature* sig = createSignature(typenode2datatype(type->procedure.return_type));
+            if (!typenode2datatype_globalcheck) return type_invalid;
+
+            Datatype retType = typenode2datatype(type->procedure.return_type);
+            if (retType.kind == Typekind_Invalid) return type_invalid;
+
+            // note that there is a potential memory leak here, but maybe we dont care.
+            ProcSignature* sig = createSignature(retType);
             Type* arg = type->procedure.arguments;
             while (arg) {
                 addArgument(sig, typenode2datatype(arg), 0);
@@ -210,16 +225,23 @@ static Datatype typenode2datatype(Type* type) {
                 .procedure = sig,
                 .numPointers = 1
             };
-        } break;
+        }
+    }
+}
+
+static Type* expectType() {
+    Type* type = parseTypeNode();
+
+    if (type->node_type == TypeNode_MustInfer) return type;
+
+    type->solvedstate = typenode2datatype(type);
+    if (type->solvedstate.kind == Typekind_Invalid) {
+        list_add(parser.unresolved_types, type);
     }
 
-    fail:
-    error_node(type, "Failed to resolve type");
-    printf("    ");
-    printType(type);
-    printf("\n");
-    return type_invalid;
+    return type;
 }
+
 
 static Token* anyof(u32 count, ...) {
     va_list args;
@@ -237,6 +259,28 @@ static Token* anyof(u32 count, ...) {
     return null;
 }
 
+// static bool expectDeclaration(Declaration* decl, Type* type, Identifier name) {
+
+//     decl->base.statementType = Statement_Declaration;
+
+//     decl->type = type;
+//     decl->name = name;
+
+//     if (tok(Tok_Assign)) decl->expr = expectExpression();
+//     else if (tok(Tok_OpenSquare)) {
+//         decl->base.statementType = Statement_FixedArray_Declaration;
+//         decl->expr = expectExpression();
+//         expect(Tok_CloseSquare);
+//     }
+
+//     return tok(Tok_Comma);
+// }
+
+// static Declaration expectDeclarationNext(Declaration* decl) {
+//     Declaration res = {0};
+//     res.
+//     return res;
+// }
 
 static ProcArg* expectProcArguments() {
 
@@ -246,8 +290,10 @@ static ProcArg* expectProcArguments() {
 
     ProcArg* res = list_create(ProcArg);
     ProcArg arg;
+    arg.base.statementType = Statement_Argument;
     do {
         tok(Tok_Keyword_With);
+        arg.base.nodebase = node_init();
         arg.type = expectType();
         arg.name = identifier();
         list_add(res, arg);
@@ -257,8 +303,33 @@ static ProcArg* expectProcArguments() {
     return res;
 }
 
-static PlangStruct expectStruct() {
-    PlangStruct stru;
+static Enum expectEnum() {
+    Enum en = {0};
+    en.base.nodebase = node_init();
+    en.base.statementType = Statement_Enum;
+    en.entries = list_create(EnumEntry);
+
+    token_index++;
+    en.name = identifier();
+
+    expect(Tok_OpenCurl);
+
+    while (!tok(Tok_CloseCurl)) {
+        EnumEntry entry = {0};
+        entry.base.nodebase = node_init();
+        entry.base.statementType = Statement_EnumEntry;
+        entry.name = identifier();
+        if (tok(Tok_Assign)) entry.expr = expectExpression();
+        semicolon();
+
+        list_add(en.entries, entry);
+    }
+
+    return en;
+}
+
+static Struct expectStruct() {
+    Struct stru;
     stru.base.nodebase = node_init();
     stru.base.statementType = Statement_Struct;
     stru.fields = list_create(Declaration);
@@ -271,6 +342,8 @@ static PlangStruct expectStruct() {
         Declaration field;
         field.base.nodebase = node_init();
         field.base.statementType = Statement_Declaration;
+
+        field.include_context = tok(Tok_Keyword_With);
         field.type = expectType();
         field.name = identifier();
         list_add(stru.fields, field);
@@ -332,22 +405,6 @@ static void skipBody() {
     }
 }
 
-/*
-    type var;
-    type var = expr;
-    const var = expr;
-    type var1, var2;
-    type var1 = expr1, var2 = expr2;
-    type var[expr];
-    type var(args...) {scope}
-
-    locals
-    globals
-    fields
-    args
-
-*/
-
 
 static void proc_or_global() {
 
@@ -359,19 +416,20 @@ static void proc_or_global() {
 
         Procedure proc = {0};
         proc.base.nodebase = node;
+        proc.base.statementType = Statement_Procedure;
         proc.returnType = type;
         proc.name = name;
         proc.arguments = expectProcArguments();
         proc.scope = expectScope();
 
-        list_add(parser.current_file->namespace->procedures, proc);
+        list_add(get_current_file()->namespace->procedures, proc);
         return;
     }
 
 
     Declaration decl = {0};
     decl.base.nodebase = node;
-    decl.base.statementType = Statement_Declaration;
+    decl.base.statementType = Statement_GlobalVariable;
     decl.type = type;
     decl.name = name;
 
@@ -385,7 +443,7 @@ static void proc_or_global() {
         if (tok(Tok_Assign)) decl.expr = expectExpression();
     }
 
-    list_add(parser.current_file->namespace->declarations, decl);
+    list_add(get_current_file()->namespace->declarations, decl);
 
     if (tok(Tok_Comma)) {
         decl.base.statementType = Statement_Declaration;
@@ -401,17 +459,31 @@ static bool parseProgramEntity() {
 
     switch (tokens[token_index].type) {
 
+        case Tok_Keyword_Include: {
+            token_index++;
+            expect(Tok_String);
+            Identifier string = tokens[token_index - 1].string;
+            printf("include \"%s\"\n", get_string(string));
+            addFile(get_string(string), null);
+            semicolon();
+        } break;
+
         case Tok_Keyword_Struct: {
-            PlangStruct stru = expectStruct();
-            list_add(parser.current_file->namespace->structs, stru);
+            Struct stru = expectStruct();
+            list_add(get_current_file()->namespace->structs, stru);
+        } break;
+
+        case Tok_Keyword_Enum: {
+            Enum en = expectEnum();
+            list_add(get_current_file()->namespace->enums, en);
         } break;
 
         case Tok_Keyword_Type: {
             Typedef def = expectTypedef();
             if (def.type) {
-                list_add(parser.current_file->namespace->type_defs, def);
+                list_add(get_current_file()->namespace->type_defs, def);
             } else {
-                list_add(parser.current_file->namespace->opaque_types, def.name);
+                list_add(get_current_file()->namespace->opaque_types, def.name);
             }
         } break;
 
@@ -420,7 +492,7 @@ static bool parseProgramEntity() {
 
         case Tok_Keyword_Const: {
             Declaration decl = expectConst();
-            list_add(parser.current_file->namespace->declarations, decl);
+            list_add(get_current_file()->namespace->declarations, decl);
         } break;
 
         case Tok_Keyword_Declare: {
@@ -430,6 +502,7 @@ static bool parseProgramEntity() {
 
             Procedure proc = {0};
             proc.base.nodebase = node_init();
+            proc.base.statementType = Statement_Procedure;
             proc.overload = 0;
             proc.scope = null;
             proc.returnType = expectType();
@@ -438,7 +511,7 @@ static bool parseProgramEntity() {
             proc.arguments = expectProcArguments();
             semicolon();
 
-            list_add(parser.current_file->namespace->procedures, proc);
+            list_add(get_current_file()->namespace->procedures, proc);
         } break;
 
         case Tok_Keyword_Namespace: {
@@ -464,33 +537,36 @@ static void parseFile() {
     if (tok(Tok_Keyword_Namespace)) {
         Identifier name = identifier();
         Namespace* ns = ensureNamespace(name);
-        parser.current_file->namespace = ns;
+        get_current_file()->namespace = ns;
         semicolon();
-    } else parser.current_file->namespace = g_Codebase.namespaces[0];
+    } else get_current_file()->namespace = g_Codebase.namespaces[0];
 
     while (parseProgramEntity());
 }
 
 
-static void parse(File* files) {
+static void parse() {
 
     codebase_init(&g_Codebase);
     initTypenames();
 
-    parser = (Parser){0};
-    parser.src_files = files;
     parser.unresolved_types = list_create(Type*);
+    parser.local_types = list_create(Statement*);
 
 
     tokens = list_create(Token);
 
-    foreach (file, files) {
+    for (u32 i = 0; i < list_length(parser.src_files); i++) {
+        File* file = &parser.src_files[i];
+        parser.current_file_index = i;
+
         u32 file_size = 0;
         char* content = fileread(file->filename, &file_size);
+        if (!content) continue;
+
         lex(content);
         free(content);
 
-        parser.current_file = file;
         parseFile();
         list_clear(tokens);
     }
@@ -498,9 +574,16 @@ static void parse(File* files) {
     list_delete(tokens);
 
 
+    typenode2datatype_globalcheck = true;
     foreach (tp, parser.unresolved_types) {
         Type* type = *tp;
         type->solvedstate = typenode2datatype(type);
+        if (type->solvedstate.kind == Typekind_Invalid) {
+            error_node(type, "Failed to resolve type");
+            printf("    ");
+            printType(type);
+            printf("\n");
+        }
     }
     list_delete(parser.unresolved_types);
     parser.unresolved_types = null;

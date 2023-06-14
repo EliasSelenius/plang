@@ -43,7 +43,8 @@ u32 ExpressionType_Bytesizes[] = {
     [ExprType_Indexing] = sizeof(IndexingExpression),
     [ExprType_Cast] = sizeof(CastExpression),
     [ExprType_Sizeof] = sizeof(SizeofExpression),
-    [ExprType_Parenthesized] = sizeof(ParenthesizedExpression)
+    [ExprType_Parenthesized] = sizeof(ParenthesizedExpression),
+    [ExprType_Compound] = sizeof(CompoundExpression)
 };
 
 u32 StatementType_Bytesizes[] = {
@@ -59,7 +60,8 @@ u32 StatementType_Bytesizes[] = {
     [Statement_For] = sizeof(ForStatement),
     [Statement_Switch] = sizeof(SwitchStatement),
     [Statement_Procedure] = sizeof(Procedure),
-    [Statement_Struct] = sizeof(PlangStruct),
+    [Statement_Struct] = sizeof(Struct),
+    [Statement_Enum] = sizeof(Enum),
     [Statement_Continue] = sizeof(Statement),
     [Statement_Break] = sizeof(Statement),
     [Statement_Return] = sizeof(ReturnStatement),
@@ -71,14 +73,14 @@ u32 StatementType_Bytesizes[] = {
 
 Node node_init() {
     Node node = {0};
-    node.file = parser.current_file;
+    node.file_index = parser.current_file_index;
     node.lineNumber = tokens[token_index].line;
     return node;
 }
 
 void* allocate_node(u32 node_size) {
     Node* node = calloc(1, node_size);
-    node->file = parser.current_file;
+    node->file_index = parser.current_file_index;
     node->lineNumber = tokens[token_index].line;
     return node;
 }

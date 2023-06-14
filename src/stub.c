@@ -22,11 +22,14 @@
 #include "globals.c"
 #include "syntax_tree_allocator.c"
 
+void addFile(char* filename, char* extension);
+
 #include "error_messages.c"
 #include "lexer.c"
 #include "parser.c"
 #include "validator.c"
 #include "transpiler.c"
+#include "interpreter.c"
 
 #include "main.c"
 

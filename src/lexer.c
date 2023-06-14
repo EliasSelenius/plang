@@ -106,8 +106,10 @@ static void lex(char* input) {
 
             // Keywords
             if (spanEquals(word, "struct")) tokType = Tok_Keyword_Struct;
+            else if (spanEquals(word, "enum")) tokType = Tok_Keyword_Enum;
             else if (spanEquals(word, "alloc")) tokType = Tok_Keyword_Alloc;
             else if (spanEquals(word, "let")) tokType = Tok_Keyword_Let;
+            else if (spanEquals(word, "include")) tokType = Tok_Keyword_Include;
             else if (spanEquals(word, "if")) tokType = Tok_Keyword_If;
             else if (spanEquals(word, "else")) tokType = Tok_Keyword_Else;
             else if (spanEquals(word, "while")) tokType = Tok_Keyword_While;
@@ -205,14 +207,14 @@ static void lex(char* input) {
 
 
             if (*cursor > 0x7E || *cursor < 0x20) {
-                error(current_line, g_Filename, "Invalid character.");
+                error(current_line, get_current_file()->filename, "Invalid character.");
             }
 
             char c = *cursor;
 
             cursor++;
             if (*cursor != '\'') {
-                error(current_line, g_Filename, "Missing closing single quote.");
+                error(current_line, get_current_file()->filename, "Missing closing single quote.");
             }
 
             Token token = {
@@ -230,7 +232,7 @@ static void lex(char* input) {
             while ( !(*++cursor == '"' && *(cursor - 1) != '\\') ) {
                 if (*cursor == '\n') {
                     // TODO: consider whether we want to allow multi-line strings
-                    error(current_line, g_Filename, "Strings cannot contain new-lines.");
+                    error(current_line, get_current_file()->filename, "Strings cannot contain new-lines.");
                     current_line++;
                 }
             }
@@ -349,6 +351,6 @@ static void lex(char* input) {
 
 
         // Error: token not recognized
-        error(current_line, g_Filename, "Unknown byte value encountered %d.", *cursor);
+        error(current_line, get_current_file()->filename, "Unknown byte value encountered %d.", *cursor);
     }
 }

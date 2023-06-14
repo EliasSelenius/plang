@@ -10,9 +10,7 @@
         - nested multi-line comments
         - disallow void as variable type in declaration
         *- make assignments be expressions
-        - contextual inclusion (the with keyword on struct fields)
         - member-like functions (the with keyword on function arguments)
-        *- enums
         - explicitly sized enums e.g (enum Type : uint32 {})?
         - unions
         *- fixed sized arrays as struct fields
@@ -27,19 +25,22 @@
         - print structs
         - named arguments e.g foo(arg_name: "daw")
         - single expression body
-        *- array literal
-        *- struct literal
+        - field initializers
 
     InProgress:
         *- file name in errors
         *- line numbers in validation errors
         - modules or namespaces ?
-        - localy defined structs
-        - localy defined type aliases
-        - local consts
+        *- array literal
+        *- struct literal
+        - contextual inclusion (the with keyword on struct fields)
 
 
     DONE list:
+        *- enums
+        - localy defined structs
+        - localy defined type aliases
+        - local consts
         - nesting funcptr types inside funcptrs arguments. void(void*(char*), uint) seems to produce a bug
         - localy defined procedures
         - allow underscores in number literals
@@ -104,7 +105,7 @@ void addFile(char* filename, char* extension) {
     file.filename = malloc(name_size);
     strcpy_s(file.filename, name_size, filename);
 
-    list_add(Files, file);
+    list_add(parser.src_files, file);
 }
 
 int main(int argc, char* argv[]) {
@@ -114,8 +115,8 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
-    Files = list_create(File);
-
+    parser = (Parser) {0};
+    parser.src_files = list_create(File);
 
     startPerf();
 
@@ -136,14 +137,14 @@ int main(int argc, char* argv[]) {
     }
 
     StringBuilder sb = sbCreate();
-    sbAppend(&sb, "clang output.g.c -o output.exe ");
+    sbAppend(&sb, "clang -g output.g.c -o output.exe ");
     while (i < argc) {
         sbAppend(&sb, argv[i++]);
         sbAppendChar(&sb, ' ');
     }
 
 
-    parse(Files);
+    parse();
     if (numberOfErrors) {
         printf("There were %d errors during parsing.\n", numberOfErrors);
         exit(0);

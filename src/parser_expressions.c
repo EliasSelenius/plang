@@ -75,6 +75,35 @@ static Expression* parseLeafExpression() {
             res = (Expression*)p;
         } break;
 
+        case Tok_Period: {
+            DerefOperator* deref = allocExpr(ExprType_Deref);
+            token_index++;
+            deref->name = identifier();
+            res = (Expression*)deref;
+        } break;
+
+        case Tok_OpenCurl: {
+            CompoundExpression* com = allocExpr(ExprType_Compound);
+            token_index++;
+            res = (Expression*)com;
+
+            if (tok(Tok_CloseCurl)) break;
+
+            com->elements = list_create(CompoundElement);
+            do {
+                CompoundElement el = {0};
+                if (tokens[token_index + 1].type == Tok_Assign) {
+                    el.name = identifier();
+                    token_index++;
+                }
+
+                el.expr = expectExpression();
+                list_add(com->elements, el);
+
+            } while (tok(Tok_Comma));
+
+            expect(Tok_CloseCurl);
+        } break;
 
         case Tok_Integer: {
             LiteralExpression* lit = allocExpr(ExprType_Literal_Integer);

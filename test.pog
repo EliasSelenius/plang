@@ -49,6 +49,11 @@ char* (int32) my_proc;
 
 type LargeProcPtr = char*(void(int32), float32)(float32)(void());
 
+enum MyGlobEnum {
+    val1 = 2;
+    val2;
+    val3;
+}
 
 int32 main() {
 
@@ -56,11 +61,24 @@ int32 main() {
         char* name;
     }
 
-    type LocalTypedef; // = LocalStructTest;
+    type LocalTypedef = LocalStructTest;
+
+    type f32 = float32;
+    f32 num = 12;
 
 
     const LocalConstant = 12;
     let i = LocalConstant;
+
+    MyGlobEnum en;
+
+    enum LocalEnum {
+        One;
+        Two;
+        Three;
+    }
+
+    LocalEnum le = LocalEnum.Two;
 
     OtherNamespace.hello();
 

@@ -1,7 +1,4 @@
 
-static File* Files; // list
-
-static char* g_Filename;
 static Token* tokens; // darray
 static u32 token_index = 0;
 
@@ -40,23 +37,16 @@ static void initTypenames() {
     builtin_string_main = register_string(spFrom("main"));
 }
 
-typedef struct LocalDecl {
-    Identifier name;
-    Reference ref;
-} LocalDecl;
 
 typedef struct Parser {
     File* src_files;
-    File* current_file;
+    u32 current_file_index;
     Scope* scope;
 
     // The local declarations of the currently parsed procedure
-    LocalDecl* stack;
+    Statement** stack;
 
-    // Declaration** stack;
-
-
-    Reference last_reference; // used by validateProcCall to get the Procedure that might be overloaded
+    Statement** local_types;
 
     Type** unresolved_types; // list
 
@@ -66,27 +56,60 @@ typedef struct Parser {
 
 static Parser parser;
 
-static Reference stack_get(Identifier name) {
-    if (!parser.stack) return reference_invalid;
+static inline File* get_current_file() { return &parser.src_files[parser.current_file_index]; }
+static inline File* get_file(u32 index) { return &parser.src_files[index]; }
+
+static Identifier getNameOfStatement(Statement* sta) {
+    switch (sta->statementType) {
+        case Statement_FixedArray_Declaration:
+        case Statement_Declaration: return ((Declaration*)sta)->name;
+        case Statement_Constant: return ((Declaration*)sta)->name;
+        case Statement_Argument: return ((ProcArg*)sta)->name;
+        case Statement_For: return ((ForStatement*)sta)->index_name;
+        case Statement_Procedure: return ((Procedure*)sta)->name;
+
+        case Statement_Struct: return ((Struct*)sta)->name;
+        case Statement_Enum: return ((Enum*)sta)->name;
+        case Statement_Typedef: return ((Typedef*)sta)->name;
+
+        default: return 0;
+    }
+}
+
+
+static void declare_local_type(Statement* sta) {
+    list_add(parser.local_types, sta);
+}
+
+static Statement* get_local_type(Identifier name) {
+    i32 len = (i32)list_length(parser.local_types);
+    for (i32 i = len-1; i >= 0; i--) {
+        Statement* sta = parser.local_types[i];
+        if (name == getNameOfStatement(sta)) return sta;
+    }
+
+    return null;
+}
+
+
+static Statement* stack_get(Identifier name) {
+    if (!parser.stack) return null;
 
     i32 len = (i32)list_length(parser.stack);
     for (i32 i = len-1; i >= 0; i--) {
-        LocalDecl local = parser.stack[i];
-        if (local.name == name) return local.ref;
+        Statement* sta = parser.stack[i];
+        if (name == getNameOfStatement(sta)) return sta;
     }
 
-    return reference_invalid;
+    return null;
 }
 
-static void stack_declare(Identifier name, RefType type, void* data) {
 
-    Reference ref = stack_get(name);
-    if (ref.reftype != RefType_Invalid) {
-        // TODO: already declared error
-    }
+static void stack_declare(Statement* sta) {
 
-    LocalDecl local = (LocalDecl) { .name = name, .ref = { .reftype = type, .data = data }};
-    list_add(parser.stack, local);
+    // TODO: already declared error
+
+    list_add(parser.stack, sta);
 }
 
 static void stack_pop(u32 num) {

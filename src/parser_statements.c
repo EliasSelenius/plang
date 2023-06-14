@@ -1,29 +1,38 @@
 
-static bool isBasicType() {
-    if (tok(Tok_Word)) {
-        while (tok(Tok_Mul));
+static bool isBasicType();
+static bool _isBasicType_validModifier() {
 
-        // funcptr
-        if (tok(Tok_OpenParen)) {
-            if (tok(Tok_CloseParen)) return true;
+    u32 ti = token_index;
 
-            do {
-                if (!isBasicType()) return false;
-            } while (tok(Tok_Comma));
+    if (tok(Tok_Mul)) return true;
 
-            if (tok(Tok_CloseParen)) return true;
-            else return false;
-        }
+    if (tok(Tok_OpenParen)) {
+        if (tok(Tok_CloseParen)) return true;
 
-        return true;
+        do {
+            if (!isBasicType()) goto nope;
+        } while (tok(Tok_Comma));
+
+        if (tok(Tok_CloseParen)) return true;
     }
 
+    nope:
+    token_index = ti;
+    return false;
+}
+
+static bool isBasicType() {
+    if (tok(Tok_Word)) {
+        if (tok(Tok_Period)) if (!tok(Tok_Word)) return false;
+        while (_isBasicType_validModifier());
+        return true;
+    }
     return false;
 }
 
 static u32 peekType() {
 
-    if (tokens[token_index].type == Tok_Keyword_Let) return 1;
+    if (tokens[token_index].type == Tok_Keyword_Let) return token_index + 1;
 
     u32 ti = token_index;
     u32 res = 0;
@@ -82,23 +91,33 @@ static Statement* expectStatement() {
             return (Statement*)forsta;
         }
 
-        case Tok_Keyword_Switch: {
-            SwitchStatement* switchStatement = allocStatement(Statement_Switch);
-            token_index++;
+        {
+            static SwitchStatement* current_switch = null;
 
-            switchStatement->expr = expectExpression();
-            switchStatement->scope = expectScope();
+            case Tok_Keyword_Switch: {
+                SwitchStatement* switchStatement = allocStatement(Statement_Switch);
+                token_index++;
 
-            return (Statement*)switchStatement;
+                switchStatement->expr = expectExpression();
+
+                SwitchStatement* temp = current_switch;
+                current_switch = switchStatement;
+                switchStatement->scope = expectScope();
+                current_switch = temp;
+
+                return (Statement*)switchStatement;
+            }
+
+            case Tok_Keyword_Case: {
+                CaseLabelStatement* caseLabel = allocStatement(Statement_CaseLabel);
+                token_index++;
+                caseLabel->expr = expectExpression();
+                caseLabel->switch_statement = current_switch;
+                expect(Tok_Colon);
+                return (Statement*)caseLabel;
+            }
         }
 
-        case Tok_Keyword_Case: {
-            CaseLabelStatement* caseLabel = allocStatement(Statement_CaseLabel);
-            token_index++;
-            caseLabel->expr = expectExpression();
-            expect(Tok_Colon);
-            return (Statement*)caseLabel;
-        }
 
         case Tok_Keyword_Default: {
             Statement* sta = allocStatement(Statement_DefaultLabel);
@@ -144,14 +163,23 @@ static Statement* expectStatement() {
         }
 
         case Tok_Keyword_Struct: {
-            PlangStruct* sp = allocStatement(Statement_Struct);
+            Struct* sp = allocStatement(Statement_Struct);
             *sp = expectStruct();
+            declare_local_type((Statement*)sp);
             return (Statement*)sp;
+        }
+
+        case Tok_Keyword_Enum: {
+            Enum* en = allocStatement(Statement_Enum);
+            *en = expectEnum();
+            declare_local_type((Statement*)en);
+            return (Statement*)en;
         }
 
         case Tok_Keyword_Type: {
             Typedef* def = allocStatement(Statement_Typedef);
             *def = expectTypedef();
+            declare_local_type((Statement*)def);
             return (Statement*)def;
         }
 
@@ -267,6 +295,8 @@ static Scope* expectScope() {
     scope->parentScope = parser.scope;
     parser.scope = scope;
 
+    u32 local_types_count = list_length(parser.local_types);
+
     expect(Tok_OpenCurl);
     while (!tok(Tok_CloseCurl)) {
         Statement* statement = expectStatement();
@@ -276,6 +306,8 @@ static Scope* expectScope() {
             // there must have been an error.
         }
     }
+
+    list_head(parser.local_types)->length = local_types_count;
 
     parser.scope = scope->parentScope;
     return scope;

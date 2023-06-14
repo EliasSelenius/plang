@@ -1,9 +1,10 @@
 
 
 static Procedure* procedure;
-
+static Statement* variable_ref = null;
 
 static Datatype validateExpression(Expression* expr);
+static Datatype validateExpressionEx(Expression* expr, Datatype expected_type);
 static bool typeAssignable(Datatype toType, Datatype fromType);
 static void validateScope(Scope* scope);
 static void validateProcedure(Procedure* proc);
@@ -144,6 +145,66 @@ static void assertAssignability(Datatype toType, Datatype fromType, void* node) 
     }
 }
 
+static Datatype typeofStatement(Statement* sta) {
+
+    if (!sta) return type_invalid;
+
+    switch (sta->statementType) {
+        case Statement_GlobalVariable:
+        case Statement_Declaration: {
+            Declaration* decl = (Declaration*)sta;
+            return decl->type->solvedstate;
+        }
+
+        case Statement_Constant: {
+            Declaration* decl = (Declaration*)sta;
+            return decl->expr->datatype;
+        }
+
+        case Statement_Argument: {
+            ProcArg* arg = (ProcArg*)sta;
+            return arg->type->solvedstate;
+        }
+
+        case Statement_Procedure: {
+            Procedure* proc = (Procedure*)sta;
+            return proc->ptr_type;
+        }
+
+        case Statement_EnumEntry: {
+            EnumEntry* entry = (EnumEntry*)sta;
+            return (Datatype) { .kind = Typekind_Enum, ._enum = entry->_enum };
+        }
+
+        case Statement_For: {
+            ForStatement* forsta = (ForStatement*)sta;
+            return forsta->index_type ? forsta->index_type->solvedstate : type_int32; // NOTE: hardcoded default type here.
+        }
+
+        default: break;
+    }
+
+    return type_invalid;
+}
+
+static Statement* validateVariableExpression(VariableExpression* var) {
+
+    // looking for locals
+    var->ref = stack_get(var->name);
+    if (var->ref) goto done;
+
+    // looking for namespace
+    var->ref = (Statement*)getNamespace(var->name);
+    if (var->ref) goto done;
+
+    // looking for globals
+    var->ref = getFromNamespace(get_file(var->base.nodebase.file_index)->namespace, var->name);
+    if (!var->ref) var->ref = getFromNamespace(g_Codebase.namespaces[0], var->name);
+
+    done:
+    var->base.datatype = typeofStatement(var->ref);
+    return var->ref;
+}
 
 static Procedure* searchMatchingOverload(Procedure* proc, ProcCall* call) {
     u32 argslen = call->args ? list_length(call->args) : 0;
@@ -172,14 +233,11 @@ static Datatype validateProcCall(ProcCall* call) {
         if (var->name == builtin_string_print) return type_void;
     }
 
-    parser.last_reference = reference_invalid;
     Datatype type = validateExpression(call->proc_expr);
-    type = dealiasType(type); // TODO: what if it is a double pointer? Then this shouldnt work.
-
 
     // Special case for overloaded procedures
-    if (parser.last_reference.reftype == RefType_Procedure) {
-        Procedure* proc = parser.last_reference.procedure;
+    if (variable_ref && variable_ref->statementType == Statement_Procedure) {
+        Procedure* proc = (Procedure*)variable_ref;
         Procedure* correct_overload = searchMatchingOverload(proc, call);
         if (correct_overload) {
             call->proc = correct_overload;
@@ -190,45 +248,28 @@ static Datatype validateProcCall(ProcCall* call) {
         return type_invalid;
     }
 
-
+    type = dealiasType(type); // TODO: what if it is a double pointer? Then this shouldnt work.
     if (type.kind == Typekind_Invalid) return type;
 
     if (type.kind != Typekind_Procedure) {
         error_node(call, "Invalid procedurecall. This expression is not a procedure.");
+        return type_invalid;
     }
 
     // TODO: typecheck arguments
     return type.procedure->return_type;
 }
 
-static Datatype _validateExpression(Expression* expr) {
+static Datatype _validateExpression(Expression* expr, Datatype expected_type) {
+
+    variable_ref = null;
+
     switch (expr->expressionType) {
+
         case ExprType_Variable: {
             VariableExpression* var = (VariableExpression*)expr;
-
-            var->reference = stack_get(var->name);
-            if (var->reference.reftype != RefType_Invalid) {
-                return reference2datatype(var->reference);
-            }
-
-            Namespace* ns = getNamespace(var->name);
-            if (ns) {
-                var->reference.reftype = RefType_Namespace;
-                var->reference.namespace = ns;
-                return reference2datatype(var->reference);
-            }
-
-
-            File* context = var->base.nodebase.file;
-            var->reference = getReferenceFromNamespace(context->namespace, var->name);
-            if (var->reference.reftype == RefType_Invalid) {
-                var->reference = getReferenceFromNamespace(g_Codebase.namespaces[0], var->name);
-            }
-
-            if (var->reference.reftype != RefType_Invalid) {
-                parser.last_reference = var->reference;
-                return reference2datatype(var->reference);
-            }
+            variable_ref = validateVariableExpression(var);
+            if (variable_ref) return expr->datatype;
 
             error_node(var, "\"%s\" is not declared.", get_string(var->name));
             return type_invalid;
@@ -236,37 +277,49 @@ static Datatype _validateExpression(Expression* expr) {
 
         case ExprType_Deref: {
             DerefOperator* deref = (DerefOperator*)expr;
-            Datatype datatype = validateExpression(deref->expr);
 
-            if (deref->expr->expressionType == ExprType_Variable) {
-                VariableExpression* var = (VariableExpression*)deref->expr;
-                if (var->reference.reftype == RefType_Namespace) {
-                    Reference ref = getReferenceFromNamespace(var->reference.namespace, deref->name);
-                    parser.last_reference = ref;
-                    return reference2datatype(ref);
+            if (deref->expr == null) {
+                if (expected_type.kind == Typekind_Enum) {
+                    deref->ref = (Statement*)getEnumEntry(expected_type._enum, deref->name);
+                    return typeofStatement(deref->ref);
                 }
-            }
 
-            if (datatype.kind == Typekind_Invalid) return type_invalid;
-
-            if (datatype.numPointers > 1) {
-                error_node(expr, "Attempted to dereference a %dth-degree pointer.", datatype.numPointers);
+                error_node(deref, "Cannot infer implicit dereferencing \".%s\".", get_string(deref->name));
                 return type_invalid;
             }
 
-            if (datatype.kind != Typekind_Struct) {
-                error_node(expr, "Invalid dereferencing.");
+            Datatype inner_expr_type = validateExpression(deref->expr);
+
+
+            if (variable_ref) switch (variable_ref->statementType) {
+                case Statement_Namespace:
+                    variable_ref = getFromNamespace((Namespace*)variable_ref, deref->name);
+                    deref->ref = variable_ref;
+                    return typeofStatement(variable_ref);
+                case Statement_Enum:
+                    variable_ref = (Statement*)getEnumEntry((Enum*)variable_ref, deref->name);
+                    deref->ref = variable_ref;
+                    return typeofStatement(variable_ref);
+                default: break;
+            }
+
+
+            if (inner_expr_type.kind == Typekind_Struct) {
+
+                if (inner_expr_type.numPointers > 1) {
+                    error_node(expr, "Attempted to dereference a %dth-degree pointer.", inner_expr_type.numPointers);
+                    return type_invalid;
+                }
+
+                Declaration* field = (Declaration*)getMember(inner_expr_type.stru, deref->name);
+                if (field) return field->type->solvedstate;
+
+                error_node(expr, "Field \"%s\" does not exist on type \"%s\".", get_string(deref->name), get_string(inner_expr_type.stru->name));
                 return type_invalid;
             }
 
-            Declaration* field = getField(datatype.stru, deref->name);
-            if (!field) {
-                error_node(expr, "Field \"%s\" does not exist on type \"%s\".",
-                        get_string(deref->name),
-                        get_string(datatype.stru->name));
-                return type_invalid;
-            }
-            return field->type->solvedstate;
+            error_node(expr, "Invalid dereferencing.");
+            return type_invalid;
         } break;
 
         case ExprType_Indexing: {
@@ -331,11 +384,6 @@ static Datatype _validateExpression(Expression* expr) {
             return type;
         } break;
 
-        case ExprType_Bitwise_And:
-        case ExprType_Bitwise_Or:
-        case ExprType_Bitwise_Xor:
-        case ExprType_Bitwise_Lshift:
-        case ExprType_Bitwise_Rshift:
         case ExprType_Less:
         case ExprType_Greater:
         case ExprType_LessEquals:
@@ -343,15 +391,30 @@ static Datatype _validateExpression(Expression* expr) {
         case ExprType_Equals:
         case ExprType_NotEquals:
         case ExprType_BooleanAnd:
-        case ExprType_BooleanOr:
+        case ExprType_BooleanOr: {
+            BinaryExpression* bop = (BinaryExpression*)expr;
+            Datatype leftType = validateExpressionEx(bop->left, expected_type);
+            Datatype rightType = validateExpressionEx(bop->right, expected_type);
+
+            (void)leftType;
+            (void)rightType;
+
+            return type_bool;
+        } break;
+
+        case ExprType_Bitwise_And:
+        case ExprType_Bitwise_Or:
+        case ExprType_Bitwise_Xor:
+        case ExprType_Bitwise_Lshift:
+        case ExprType_Bitwise_Rshift:
         case ExprType_Plus:
         case ExprType_Minus:
         case ExprType_Mul:
         case ExprType_Div:
         case ExprType_Mod: {
             BinaryExpression* bop = (BinaryExpression*)expr;
-            Datatype leftType = validateExpression(bop->left);
-            Datatype rightType = validateExpression(bop->right);
+            Datatype leftType = validateExpressionEx(bop->left, expected_type);
+            Datatype rightType = validateExpressionEx(bop->right, expected_type);
 
             // TODO: is a valid operator operands pair?
 
@@ -390,7 +453,7 @@ static Datatype _validateExpression(Expression* expr) {
 
         case ExprType_Sizeof: {
             SizeofExpression* sof = (SizeofExpression*)expr;
-            return type_uint32;
+            return type_uint64;
         } break;
 
         case ExprType_Ternary: {
@@ -424,8 +487,8 @@ static Datatype _validateExpression(Expression* expr) {
             case ExprType_Literal_Decimal: return type_ambiguousDecimal;
             case ExprType_Literal_Char:    return type_char;
             case ExprType_Literal_String:  return type_charPointer;
-            case ExprType_Literal_True:    return type_int32; // TODO: int32? maybe use another type?
-            case ExprType_Literal_False:   return type_int32;
+            case ExprType_Literal_True:    return type_bool;
+            case ExprType_Literal_False:   return type_bool;
             case ExprType_Literal_Null:    return type_voidPointer;
         }
 
@@ -434,6 +497,18 @@ static Datatype _validateExpression(Expression* expr) {
             return validateExpression(p->innerExpr);
         } break;
 
+        case ExprType_Compound: {
+            CompoundExpression* com = (CompoundExpression*)expr;
+
+            if (com->elements) {
+                foreach (el, com->elements) {
+                    validateExpression(el->expr);
+                }
+            }
+
+            // TODO: validate if this compound is compatible with expected_type
+            return expected_type;
+        } break;
     }
 
     // this should never happen
@@ -442,14 +517,24 @@ static Datatype _validateExpression(Expression* expr) {
 }
 
 static Datatype validateExpression(Expression* expr) {
-    expr->datatype = _validateExpression(expr);
+    expr->datatype = _validateExpression(expr, type_invalid);
     return expr->datatype;
 }
+
+static Datatype validateExpressionEx(Expression* expr, Datatype expected_type) {
+    expr->datatype = _validateExpression(expr, expected_type);
+    return expr->datatype;
+}
+
+// static void assignment(Datatype toType, Expression* expr) {
+
+// }
 
 // NOTE: only for Statement_Declaration
 static void validateDeclaration(Declaration* decl) {
     if (decl->expr) {
-        Datatype type = validateExpression(decl->expr);
+
+        Datatype type = validateExpressionEx(decl->expr, decl->type->solvedstate);
         if (type.kind == Typekind_Invalid) return;
 
         if (decl->type->node_type == TypeNode_MustInfer) {
@@ -460,7 +545,7 @@ static void validateDeclaration(Declaration* decl) {
     }
 }
 
-static void validateStruct(PlangStruct* stru) {
+static void validateStruct(Struct* stru) {
     u32 fieldLen = list_length(stru->fields);
     for (u32 i = 0; i < fieldLen; i++) {
         Declaration* field = &stru->fields[i];
@@ -474,6 +559,16 @@ static void validateStruct(PlangStruct* stru) {
     }
 }
 
+static void validateEnum(Enum* en) {
+    u64 entry_value = 0;
+
+    foreach (entry, en->entries) {
+        if (entry->expr) {
+            validateExpression(entry->expr); // TODO: evaluate expression value
+        }
+        entry->value = entry_value++;
+    }
+}
 
 static void validateStatement(Statement* sta) {
     switch (sta->statementType) {
@@ -486,25 +581,32 @@ static void validateStatement(Statement* sta) {
             Datatype sizetype = validateExpression(decl->expr);
             // TODO: is asstype a valid integer expression?
 
-            stack_declare(decl->name, RefType_Local, decl);
+            stack_declare((Statement*)decl);
 
         } break;
+
         case Statement_Declaration: {
             Declaration* decl = (Declaration*)sta;
             validateDeclaration(decl);
-            stack_declare(decl->name, RefType_Local, decl);
+            stack_declare((Statement*)decl);
         } break;
+
         case Statement_Assignment: {
             Assignment* ass = (Assignment*)sta;
 
             Datatype toType = validateExpression(ass->assigneeExpr);
-            Datatype fromType = validateExpression(ass->expr);
+            Datatype fromType = validateExpressionEx(ass->expr, toType);
 
             assertAssignability(toType, fromType, ass->expr);
         } break;
 
         case Statement_Struct: {
-            validateStruct((PlangStruct*)sta);
+            validateStruct((Struct*)sta);
+        } break;
+
+        case Statement_Enum: {
+            validateEnum((Enum*)sta);
+            stack_declare(sta);
         } break;
 
         case Statement_Typedef: {
@@ -514,7 +616,7 @@ static void validateStatement(Statement* sta) {
         case Statement_Constant: {
             Declaration* decl = (Declaration*)sta;
             validateExpression(decl->expr);
-            stack_declare(decl->name, RefType_Constant, decl);
+            stack_declare((Statement*)decl);
         } break;
 
 
@@ -548,7 +650,7 @@ static void validateStatement(Statement* sta) {
                 ? forsta->index_type->solvedstate
                 : type_int32;
 
-            stack_declare(forsta->index_name, RefType_Forloop, forsta);
+            stack_declare((Statement*)forsta);
             validateStatement(forsta->statement);
             stack_pop(1);
 
@@ -565,7 +667,7 @@ static void validateStatement(Statement* sta) {
             Procedure* proc = (Procedure*)sta;
 
             createSignatureFromProcedure(proc);
-            stack_declare(proc->name, RefType_Procedure, proc);
+            stack_declare((Statement*)proc);
             validateProcedure(proc);
         } break;
 
@@ -599,10 +701,16 @@ static void validateStatement(Statement* sta) {
             // TODO: is label already declared?
         } break;
         case Statement_CaseLabel: {
-            // TODO: is inside switch?
             CaseLabelStatement* caseLabel = (CaseLabelStatement*)sta;
+
+            if (caseLabel->switch_statement == null) {
+                error_node(caseLabel, "Case label not declared inside switch.");
+                break;
+            }
+
+            validateExpressionEx(caseLabel->expr, caseLabel->switch_statement->expr->datatype);
+
             // TODO: is compiletime expr?
-            validateExpression(caseLabel->expr);
         } break;
         case Statement_DefaultLabel: {
             // TODO: is inside switch?
@@ -631,7 +739,7 @@ static void validateProcedure(Procedure* proc) {
 
         u32 num_args = 0;
         if (proc->arguments) {
-            foreach (arg, proc->arguments) stack_declare(arg->name, RefType_Argument, arg);
+            foreach (arg, proc->arguments) stack_declare((Statement*)arg);
             num_args = arg_count;
         }
 
@@ -656,6 +764,10 @@ static void validateNamespace(Namespace* ns) {
         validateStruct(&ns->structs[i]);
     }
 
+    foreach (en, ns->enums) {
+        validateEnum(en);
+    }
+
     foreach (decl, ns->declarations) {
         if (decl->base.statementType == Statement_Declaration) {
             validateDeclaration(decl);
@@ -677,7 +789,7 @@ static void validate() {
 
 
     // validate procedure scopes
-    parser.stack = list_create(LocalDecl);
+    parser.stack = list_create(Statement*);
     procedure = null;
     iterate(procedures, validateProcedure(item);)
     list_delete(parser.stack);
