@@ -1,11 +1,13 @@
 
-declare int32 fopen_s(void** stream, char* filename, char* mode);
-declare int32 fclose(void* stream);
+type FILE;
 
-declare int32 fseek(void* stream, int32 offset, int32 origin);
-declare uint64 ftell(void* stream);
-declare void rewind(void* stream);
-declare uint64 fread(void* buffer, uint64 elementSize, uint64 elementCount, void* stream);
+declare int32 fopen_s(FILE** stream, char* filename, char* mode);
+declare int32 fclose(FILE* stream);
+
+declare int32 fseek(FILE* stream, int32 offset, int32 origin);
+declare uint64 ftell(FILE* stream);
+declare void rewind(FILE* stream);
+declare uint64 fread(void* buffer, uint64 elementSize, uint64 elementCount, FILE* stream);
 
 declare void* calloc(uint64 count, uint64 size);
 declare void* malloc(uint64 size);
@@ -20,20 +22,20 @@ char* fileread(char* filename) {
 }
 
 char* fileread(char* filename, char* mode) {
-    void* stream;
-    if (fopen_s(*stream, filename, mode)) {
-        print("ERROR: Could not open file.");
+    FILE* file;
+    if (fopen_s(*file, filename, mode)) {
+        print("ERROR: Could not open file \"", filename, "\".\n");
         return null;
     }
 
-    fseek(stream, 0, 2); // 2 = SEEK_END
-    uint64 len = ftell(stream);
-    rewind(stream);
+    fseek(file, 0, 2); // 2 = SEEK_END
+    uint64 len = ftell(file);
+    rewind(file);
 
-    char* res = calloc(len + 1, 1);
-    fread(res, 1, len, stream);
+    char* buffer = calloc(len + 1, 1);
+    let end = fread(buffer, 1, len, file);
+    buffer[end] = 0 as char; // null-termination
 
-    fclose(stream);
-
-    return res;
+    fclose(file);
+    return buffer;
 }
