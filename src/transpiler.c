@@ -3,6 +3,7 @@
 static void transpileScope(Scope* scope);
 static void transpileExpression(Expression* expr);
 static void transpileStatement(Statement* statement);
+static void transpileProcedure(Procedure* proc);
 
 static StringBuilder* sb;
 static u32 tabing = 0;
@@ -144,12 +145,14 @@ static void transpileLocal(Declaration* decl) {
 
 static void transpileGlobal(Declaration* decl) {
 
+    if (decl->base.statementType == Statement_GlobalFixedArray) decl->type->solvedstate.numPointers--;
+
     transpileTypeStart(decl->type->solvedstate);
 
     sbAppend(sb, " ");
     transpileNamespacedId(get_file(decl->base.nodebase.file_index)->namespace, decl->name);
 
-    if (decl->base.statementType == Statement_FixedArray_Declaration) {
+    if (decl->base.statementType == Statement_GlobalFixedArray) {
         sbAppend(sb, "[");
         transpileExpression(decl->expr);
         sbAppend(sb, "]");
@@ -157,7 +160,7 @@ static void transpileGlobal(Declaration* decl) {
 
     transpileTypeEnd(decl->type->solvedstate);
 
-    if (decl->expr && decl->base.statementType == Statement_Declaration) {
+    if (decl->expr && (decl->base.statementType == Statement_Declaration || decl->base.statementType == Statement_GlobalVariable)) {
         sbAppend(sb, " = ");
         transpileExpression(decl->expr);
     }
@@ -321,15 +324,17 @@ static void transpileExpression(Expression* expr) {
         case ExprType_Variable: {
             VariableExpression* var = (VariableExpression*)expr;
 
-            if (var->ref->statementType == Statement_Constant) {
+            StatementType ref_type = var->ref->statementType;
+
+            if (ref_type == Statement_Constant) {
                 transpileExpression(((Declaration*)var->ref)->expr);
                 break;
             }
 
-            if (var->ref->statementType == Statement_Enum) break;
+            if (ref_type == Statement_Enum) break;
 
-            if (var->ref->statementType == Statement_GlobalVariable
-            || (var->ref->statementType == Statement_Procedure && ((Procedure*)var->ref)->scope)) {
+            if (ref_type == Statement_GlobalVariable || ref_type == Statement_GlobalFixedArray
+            || (ref_type == Statement_Procedure && ((Procedure*)var->ref)->scope)) {
                 sbAppend(sb, get_string(get_file(var->ref->nodebase.file_index)->namespace->name));
                 sbAppend(sb, "_");
             }
@@ -344,6 +349,11 @@ static void transpileExpression(Expression* expr) {
                 if (deref->ref->statementType == Statement_EnumEntry) {
                     EnumEntry* entry = (EnumEntry*)deref->ref;
                     sbAppendSpan(sb, numberToString(entry->value));
+                    break;
+                }
+
+                if (deref->ref->statementType == Statement_Constant) {
+                    transpileExpression(((Declaration*)deref->ref)->expr);
                     break;
                 }
             }
@@ -391,7 +401,18 @@ static void transpileExpression(Expression* expr) {
         case ExprType_Literal_Char: {
             LiteralExpression* lit = (LiteralExpression*)expr;
             sbAppendChar(sb, '\'');
-            sbAppendChar(sb, lit->character);
+
+            switch (lit->character) {
+                case '\n': sbAppend(sb, "\\n"); break;
+                case '\t': sbAppend(sb, "\\t"); break;
+                case '\\': sbAppend(sb, "\\\\"); break;
+                case '\'': sbAppend(sb, "\\'"); break;
+
+                default:
+                    sbAppendChar(sb, lit->character);
+                    break;
+            }
+
             sbAppendChar(sb, '\'');
         } break;
 
@@ -474,17 +495,28 @@ static void transpileExpression(Expression* expr) {
 
         case ExprType_Compound: {
             CompoundExpression* com = (CompoundExpression*)expr;
-            sbAppend(sb, "{");
-            foreach (elm, com->elements) {
-                if (elm->name) {
-                    sbAppend(sb, ".");
-                    sbAppend(sb, get_string(elm->name));
-                    sbAppend(sb, " = ");
-                }
-                transpileExpression(elm->expr);
-                sbAppend(sb, ", ");
+
+            if (com->base.datatype.kind != Typekind_Invalid) {
+                sbAppend(sb, "(");
+                transpileDatatype(com->base.datatype);
+                sbAppend(sb, ") ");
             }
-            sb->length -= 2;
+
+            sbAppend(sb, "{");
+            if (com->elements) {
+                foreach (elm, com->elements) {
+                    if (elm->name) {
+                        sbAppend(sb, ".");
+                        sbAppend(sb, get_string(elm->name));
+                        sbAppend(sb, " = ");
+                    }
+                    transpileExpression(elm->expr);
+                    sbAppend(sb, ", ");
+                }
+                sb->length -= 2;
+            } else {
+                sbAppend(sb, "0");
+            }
             sbAppend(sb, "}");
         } break;
     }
@@ -506,7 +538,8 @@ static void transpileIfStatement(IfStatement* ifst) {
     transpileCondition(ifst->condition);
     sbAppend(sb, " ");
 
-    transpileStatement(ifst->then_statement);
+    if (ifst->then_statement) transpileStatement(ifst->then_statement);
+    else sbAppend(sb, ";");
 
     if (ifst->else_statement) {
         sbAppend(sb, " else ");
@@ -550,7 +583,7 @@ static void transpileTypedef(Typedef* def) {
 }
 
 static void transpileVarDecl(Declaration* decl) {
-    if (decl->base.statementType == Statement_FixedArray_Declaration) {
+    if (decl->base.statementType == Statement_FixedArray) {
 
         decl->type->solvedstate.numPointers--;
         _transpileDatatype(decl->type->solvedstate, decl->name);
@@ -577,7 +610,7 @@ static void transpileVarDecl(Declaration* decl) {
 
 static void transpileStatement(Statement* statement) {
     switch (statement->statementType) {
-        case Statement_FixedArray_Declaration:
+        case Statement_FixedArray:
         case Statement_Declaration: {
             Declaration* decl = (Declaration*)statement;
             transpileVarDecl(decl);
@@ -633,7 +666,8 @@ static void transpileStatement(Statement* statement) {
             sbAppend(sb, "while ");
             transpileCondition(sta->condition);
             sbAppend(sb, " ");
-            transpileStatement(sta->statement);
+            if (sta->statement) transpileStatement(sta->statement);
+            else sbAppend(sb, ";");
         } break;
         case Statement_For: {
             ForStatement* forsta = (ForStatement*)statement;
@@ -753,16 +787,27 @@ static void transpileFunctionSignature(Procedure* proc) {
     sbAppend(sb, ")");
 }
 
-static void transpileProcedure(Procedure* proc) {
-
-    { // transpile local procs first
-        foreach (sta, proc->scope->statements) {
-            if ((*sta)->statementType == Statement_Procedure) {
-                Procedure* local_proc = (Procedure*)(*sta);
-                transpileProcedure(local_proc);
-            }
+static void transpileLocalProcedures(Statement* statement) {
+    if (!statement) return;
+    if (statement->statementType != Statement_Scope) return;
+    Scope* scope = (Scope*)statement;
+    foreach (s, scope->statements) {
+        Statement* sta = *s;
+        switch (sta->statementType) {
+            case Statement_Procedure: transpileProcedure((Procedure*)sta); break;
+            case Statement_Scope:     transpileLocalProcedures(sta); break;
+            case Statement_If:        transpileLocalProcedures(((IfStatement*)sta)->then_statement);
+                                      transpileLocalProcedures(((IfStatement*)sta)->else_statement); break;
+            case Statement_While:     transpileLocalProcedures(((WhileStatement*)sta)->statement); break;
+            case Statement_For:       transpileLocalProcedures(((ForStatement*)sta)->statement); break;
+            default: break;
         }
     }
+}
+
+static void transpileProcedure(Procedure* proc) {
+
+    transpileLocalProcedures((Statement*)proc->scope);
 
     transpileFunctionSignature(proc);
     sbAppend(sb, " ");
@@ -808,16 +853,16 @@ static void transpile() {
         sbAppend(sb, "*/\n");
     }
 
-    { // syntax tree
-        u32 length = list_length(g_Codebase.string_table.byteoffsets);
-        sbAppend(sb, "static char string_table[] = \"");
-        for (u32 i = 0; i < length; i++) {
-            char* str = get_string_byindex(i);
-            sbAppend(sb, str);
-            sbAppend(sb, "\\0");
-        }
-        sbAppend(sb, "\";\n");
-    }
+    // { // syntax tree
+    //     u32 length = list_length(g_Codebase.string_table.byteoffsets);
+    //     sbAppend(sb, "static char string_table[] = \"");
+    //     for (u32 i = 0; i < length; i++) {
+    //         char* str = get_string_byindex(i);
+    //         sbAppend(sb, str);
+    //         sbAppend(sb, "\\0");
+    //     }
+    //     sbAppend(sb, "\";\n");
+    // }
 
 
     sbAppend(sb, "\n// Basics\n");

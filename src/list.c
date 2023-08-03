@@ -40,7 +40,10 @@ void* _list_create(u32 stride) {
     _list_add((void**)&list, &__unique_var_name_to_not_fuck_things_up); \
 }
 
-void _list_add(void** list, void* value) {
+#define list_get_next(list) _list_add((void**)&list, null);
+
+
+void* _list_add(void** list, void* value) {
     ListHead* head = list_head(*list);
 
     if (head->length == head->capacity) {
@@ -52,7 +55,12 @@ void _list_add(void** list, void* value) {
 
     u64 addr = (u64)*list;
     addr += head->length * head->stride;
-    memcpy((void*)addr, value, head->stride);
+    if (value) memcpy((void*)addr, value, head->stride);
 
     head->length++;
+
+    return (void*)addr;
 }
+
+#define list_pop(list) list[--list_head(list)->length];
+

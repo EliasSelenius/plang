@@ -205,17 +205,23 @@ static void lex(char* input) {
         if (*cursor == '\'') {
             char* strStart = cursor++;
 
-
-            if (*cursor > 0x7E || *cursor < 0x20) {
-                error(current_line, get_current_file()->filename, "Invalid character.");
-            }
-
             char c = *cursor;
+            if (c == '\\') {
+                cursor++;
+
+                switch (*cursor) {
+                    case 'n': c = '\n'; break;
+                    case 't': c = '\t'; break;
+                    case '\\': c = '\\'; break;
+                    case '\'': c = '\''; break;
+                }
+
+            } else {
+                if (c > '~' || c < ' ') error(current_line, get_current_file()->filename, "Invalid character.");
+            }
 
             cursor++;
-            if (*cursor != '\'') {
-                error(current_line, get_current_file()->filename, "Missing closing single quote.");
-            }
+            if (*cursor != '\'') error(current_line, get_current_file()->filename, "Missing closing single quote.");
 
             Token token = {
                 .type = Tok_Char,

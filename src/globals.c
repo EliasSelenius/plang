@@ -37,11 +37,43 @@ static void initTypenames() {
     builtin_string_main = register_string(spFrom("main"));
 }
 
+/*
+
+    input -> parser -> unit
+    units will contain syntax tree and arena so it can be freed independently from other units
+    aswell as lists of unresolved symbols in the syntax tree
+
+    units -> binder -> codebase
+    binder will set correct references to variables and types in syntax tree (resolving symbols)
+    then it will construct a Codebase object containing lists of pointers to all the things
+    this process may be redone several times
+
+    codebase -> validator
+    typecheking
+
+*/
+
+typedef struct Unit {
+    Arena arena;
+
+} Unit;
+
+Unit* current_unit;
+
+Codebase bind_units(Unit* units) {
+    // resolves unresolved symbols
+
+    // constructs Codebase that contains lists of all procs/types/globals
+
+    // must be possible to rebind codebase, because units may change
+}
 
 typedef struct Parser {
     File* src_files;
     u32 current_file_index;
     Scope* scope;
+
+    Procedure* procedure; // current procedure that is being parsed
 
     // The local declarations of the currently parsed procedure
     Statement** stack;
@@ -50,7 +82,7 @@ typedef struct Parser {
 
     Type** unresolved_types; // list
 
-    Token* tokens;
+    Token* tokens; // list
     u32 token_index;
 } Parser;
 
@@ -61,7 +93,7 @@ static inline File* get_file(u32 index) { return &parser.src_files[index]; }
 
 static Identifier getNameOfStatement(Statement* sta) {
     switch (sta->statementType) {
-        case Statement_FixedArray_Declaration:
+        case Statement_FixedArray:
         case Statement_Declaration: return ((Declaration*)sta)->name;
         case Statement_Constant: return ((Declaration*)sta)->name;
         case Statement_Argument: return ((ProcArg*)sta)->name;

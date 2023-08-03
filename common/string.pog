@@ -1,0 +1,149 @@
+
+
+struct string {
+    char* chars;
+    uint32 length;
+}
+
+string make_string(char* c_str) {
+    string str = { c_str, strlen(c_str) };
+    return str;
+}
+
+uint64 parse_int(string str) {
+    uint64 res = 0;
+    uint64 place = 1;
+    for i in 0 .. str.length {
+        let c = str.chars[i] as uint8;
+        let p = c % 10;
+        res += p * place;
+        place *= 10;
+    }
+
+    return res;
+}
+
+
+// TODO: make this a local static variable
+char num_str[20]; // 20 is max char size for 64 bit integer
+
+string to_string(uint64 num) {
+    if num == 0 return {"0", 1} as string;
+    uint32 i = 20;
+
+    while num != 0 {
+        let r = (num % 10) as uint8;
+        num /= 10;
+        num_str[--i] = '0' + r as char;
+    }
+
+    return { *num_str[i], 20 - i } as string;
+}
+
+
+// TODO: dont use int32 as boolean, implement bool type in compiler
+int32 string_equals(string a, string b) {
+    if a.length != b.length return false;
+    for i in 0 .. a.length if a.chars[i] != b.chars[i] return false;
+    return true;
+}
+
+int32 is_whitespace(char c) { return c == ' ' or c == @"\n"; } // TODO: escape sequence in char literal;
+int32 is_upper_case_letter(char c) { return c >= 'A' and c <= 'Z'; }
+int32 is_lower_case_letter(char c) { return c >= 'a' and c <= 'z'; }
+int32 is_letter(char c) { return is_lower_case_letter(c) or is_upper_case_letter(c); }
+int32 is_digit(char c) { return c >= '0' and c <= '9'; }
+int32 is_hexdigit(char c) { return is_digit(c) or (c >= 'a' and c <= 'f') or (c >= 'A' and c <= 'F'); }
+int32 is_alphanumeric(char c) { return is_letter(c) or is_digit(c); }
+int32 is_punctuation(char c) {
+    return (c >= '!' and c <= '/')
+        or (c >= ':' and c <= '@')
+        or (c >= '[' and c <= '`')
+        or (c >= '{' and c <= '~');
+}
+
+struct StringBuilder {
+    char* content;
+    uint32 capacity;
+    uint32 length;
+}
+
+StringBuilder sb_create() {
+    StringBuilder sb;
+    sb.length = 0;
+    sb.capacity = 16;
+
+    sb.content = malloc(sb.capacity);
+    sb.content[0] = 0 as char; // TODO: ambint should be assignable to char
+
+    return sb;
+}
+
+void sb_free(StringBuilder sb) {
+    free(sb.content);
+}
+
+void sb_grow(StringBuilder* sb, uint32 len) {
+    len += sb.length;
+
+    // note that the <= here is so that we have space for null termination
+    if sb.capacity <= len {
+        sb.capacity *= 2;
+        while sb.capacity <= len   sb.capacity *= 2;
+
+        sb.content = realloc(sb.content, sb.capacity);
+    }
+}
+
+void sb_append(StringBuilder* sb, string str) {
+    sb_grow(sb, str.length);
+
+    for i in 0 .. str.length  sb.content[sb.length++] = str.chars[i];
+
+    sb.content[sb.length] = 0 as char;
+}
+
+void sb_append(StringBuilder* sb, char* str) {
+    let len = strlen(str) as uint32;
+    sb_grow(sb, len);
+
+    while @str  sb.content[sb.length++] = @(str++);
+
+    sb.content[sb.length] = 0 as char;
+}
+
+void sb_append(StringBuilder* sb, char c) {
+    sb_grow(sb, 1);
+    sb.content[sb.length++] = c;
+    sb.content[sb.length] = 0 as char;
+}
+
+void sb_insert(StringBuilder* sb, int32 loc, string str) {
+    sb_grow(sb, str.length);
+
+    int32 i = sb.length as int32;
+    while i >= loc {
+        sb.content[i + str.length] = sb.content[i];
+        i--;
+    }
+
+    sb.length += str.length;
+
+    for n in 0 .. str.length {
+        sb.content[loc + n] = str.chars[n];
+    }
+}
+
+void sb_remove(StringBuilder* sb, int32 loc, uint32 num_chars) {
+    int32 i = loc;
+    while i <= sb.length {
+        sb.content[i] = sb.content[i + num_chars];
+        i++;
+    }
+
+    sb.length -= num_chars;
+}
+
+void sb_clear(StringBuilder* sb) {
+    sb.length = 0;
+}

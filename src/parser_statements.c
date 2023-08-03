@@ -52,7 +52,7 @@ static Statement* expectStatement() {
             token_index++;
 
             whileStatement->condition = expectExpression();
-            whileStatement->statement = expectStatement();
+            whileStatement->statement = tok(Tok_Semicolon) ? null : expectStatement();
 
             return (Statement*)whileStatement;
         }
@@ -62,7 +62,7 @@ static Statement* expectStatement() {
             token_index++;
 
             res->condition = expectExpression();
-            res->then_statement = expectStatement();
+            res->then_statement = tok(Tok_Semicolon) ? null : expectStatement();
             if (tok(Tok_Keyword_Else)) res->else_statement = expectStatement();
 
             return (Statement*)res;
@@ -171,7 +171,7 @@ static Statement* expectStatement() {
 
         case Tok_Keyword_Enum: {
             Enum* en = allocStatement(Statement_Enum);
-            *en = expectEnum();
+            expectEnum(en);
             declare_local_type((Statement*)en);
             return (Statement*)en;
         }
@@ -220,7 +220,7 @@ static Statement* expectStatement() {
         decl->name = name;
 
         if (tok(Tok_OpenSquare)) {
-            decl->base.statementType = Statement_FixedArray_Declaration;
+            decl->base.statementType = Statement_FixedArray;
             decl->expr = expectExpression();
             expect(Tok_CloseSquare);
         } else {

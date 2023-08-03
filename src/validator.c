@@ -150,6 +150,8 @@ static Datatype typeofStatement(Statement* sta) {
     if (!sta) return type_invalid;
 
     switch (sta->statementType) {
+        case Statement_FixedArray:
+        case Statement_GlobalFixedArray:
         case Statement_GlobalVariable:
         case Statement_Declaration: {
             Declaration* decl = (Declaration*)sta;
@@ -572,7 +574,7 @@ static void validateEnum(Enum* en) {
 
 static void validateStatement(Statement* sta) {
     switch (sta->statementType) {
-        case Statement_FixedArray_Declaration: {
+        case Statement_FixedArray: {
             Declaration* decl = (Declaration*)sta;
 
             decl->type->solvedstate.numPointers++; // because this is a fixed array declaration.
@@ -630,7 +632,7 @@ static void validateStatement(Statement* sta) {
 
             // TODO: check if condition is a boolean expression
             validateExpression(ifsta->condition);
-            validateStatement(ifsta->then_statement);
+            if (ifsta->then_statement) validateStatement(ifsta->then_statement);
             if (ifsta->else_statement) validateStatement(ifsta->else_statement);
 
         } break;
@@ -638,7 +640,7 @@ static void validateStatement(Statement* sta) {
             WhileStatement* whileSta = (WhileStatement*)sta;
             // TODO: check if condition is a boolean expression
             validateExpression(whileSta->condition);
-            validateStatement(whileSta->statement);
+            if (whileSta->statement) validateStatement(whileSta->statement);
         } break;
         case Statement_For: {
             ForStatement* forsta = (ForStatement*)sta;
@@ -773,7 +775,7 @@ static void validateNamespace(Namespace* ns) {
             validateDeclaration(decl);
         } else if (decl->base.statementType == Statement_Constant) {
             validateExpression(decl->expr);
-        } else if (decl->base.statementType == Statement_FixedArray_Declaration) {
+        } else if (decl->base.statementType == Statement_GlobalFixedArray) {
             decl->type->solvedstate.numPointers++;
             Datatype size_type = validateExpression(decl->expr);
         }

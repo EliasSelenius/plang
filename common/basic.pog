@@ -8,6 +8,8 @@ declare int32 fseek(FILE* stream, int32 offset, int32 origin);
 declare uint64 ftell(FILE* stream);
 declare void rewind(FILE* stream);
 declare uint64 fread(void* buffer, uint64 elementSize, uint64 elementCount, FILE* stream);
+declare uint64 fwrite(void* ptr, uint64 size, uint64 nmemb, FILE* stream);
+
 
 declare void* calloc(uint64 count, uint64 size);
 declare void* malloc(uint64 size);
@@ -38,4 +40,16 @@ char* fileread(char* filename, char* mode) {
 
     fclose(file);
     return buffer;
+}
+
+void filewrite(char* filename, char* content) {
+    FILE* file;
+    if fopen_s(*file, filename, "w") {
+        print("ERROR: Could not open file \"", filename, "\".\n");
+        return;
+    }
+
+    fwrite(content, sizeof char, strlen(content), file);
+
+    fclose(file);
 }

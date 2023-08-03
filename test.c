@@ -1,48 +1,122 @@
 
 #include <stdio.h>
+#include <stdlib.h>
 
-void my_proc(int i) {
-    printf("%d\n", i);
+#include <Windows.h>
+
+#include "src/prelude.h"
+#include "src/list.c"
+
+/*
+    D:\Documents\repos\plang\minbug.pog
+        ..\grax\grax.pog        ->      D:\Documents\repos\grax\grax.pog
+        renderer.pog            ->      D:\Documents\repos\grax\renderer.pog
+
+*/
+
+
+typedef unsigned int uint32;
+
+typedef struct string {
+    char* chars;
+    uint32 length;
+} string;
+
+bool string_equals(string a, string b) {
+    if (a.length != b.length) return false;
+    for (u32 i = 0; i < a.length; i++) if (a.chars[i] != b.chars[i]) return false;
+    return true;
 }
 
-int main() {
+string to_string(char* c_str) {
+    return (string) {
+        .chars = c_str,
+        .length = strlen(c_str)
+    };
+}
+
+typedef struct Path {
+    char* source_string;
+    string* dirs; // list
+    string file_name;
+} Path;
 
 
+Path parse_path(char* str) {
 
-    printf("Hello, Mother!\n");
+    Path path = {0};
+    path.source_string = str;
+    path.dirs = list_create(string);
 
-    typedef struct Test {
-        int i;
-    } Test;
+    uint32 i = 0;
+    char* start = str;
 
-    Test test;
-    test.i = 1;
+    bool loop = true;
+    while (loop) {
+        while (start[i] != '\\' && start[i] != '/') {
+            if (start[i] == '\0') loop = false;
+            i++;
+        }
 
-    printf("%d\n", test.i);
+        string dir = { .chars = start, .length = i };
+        list_add(path.dirs, dir);
 
-    // {
-    //     // void(char*)(void(int), float) Hello[16]
+        start = &start[i + 1];
+        i = 0;
+    }
 
-    //     void (*(*Hello[16])(void (*)(int), float))(char*);
+    path.file_name = list_pop(path.dirs);
 
-    //     void (*ret)(char*) = (*Hello)(my_proc, 3.14);
+    return path;
+}
 
-    //     ret("Test");
-    // }
+void mod_path(Path* path, Path* rel_path) {
+    foreach (dir, rel_path->dirs) {
+        if (string_equals(*dir, to_string(".."))) {
+            (void)list_pop(path->dirs);
+        } else {
+            list_add(path->dirs, *dir);
+        }
+    }
+}
 
-    // {
-    //     void (*(*(*p1)(int))(int))(int);
+void print_path(Path path) {
+    foreach (dir, path.dirs) {
+        printf("\"%.*s\" ", dir->length, dir->chars);
+    }
+    printf("\n");
+}
 
-    //     void (*(*p2)(int))(int) = p1(12);
+int main(int argc, char* argv[]) {
 
-    //     void (*p3)(int) = p2(24);
+    {
+        char* rel_path = "../file_that_no_exists";
+        char buf[1024];
+        char* file_name = NULL;
+        GetFullPathName(rel_path, sizeof(buf), buf, &file_name);
 
-    //     p3(48);
-    // }
+        printf("\"%s\", \"%s\"\n", file_name, buf);
 
+        return 0;
+    }
+
+
+    // char buffer[1024];
+    // GetCurrentDirectory(sizeof(buffer), buffer);
+
+    char* buffer = "D:\\Documents\\repos\\plang\\minbug.pog";
+
+
+    printf("\"%s\"\n", buffer);
+    Path path = parse_path(buffer);
+    print_path(path);
+
+    printf("\n%s\n", argv[1]);
+    Path rel_path = parse_path(argv[1]);
+    print_path(rel_path);
+
+    mod_path(&path, &rel_path);
+    print_path(path);
 
     return 0;
-}
-
-void otherProc() {
 }

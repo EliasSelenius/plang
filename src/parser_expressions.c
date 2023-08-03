@@ -227,16 +227,9 @@ static Expression* expectExpression() {
 static u32 operatorPriority(ExprType type) {
     switch (type) {
 
-        case ExprType_Bitwise_Lshift:
-        case ExprType_Bitwise_Rshift:
-        case ExprType_Bitwise_And:
-        case ExprType_Bitwise_Or:
-        case ExprType_Bitwise_Xor:
-            return 1;
-
         case ExprType_BooleanAnd:
         case ExprType_BooleanOr:
-            return 2;
+            return 1;
 
         case ExprType_Less:
         case ExprType_Greater:
@@ -244,6 +237,13 @@ static u32 operatorPriority(ExprType type) {
         case ExprType_GreaterEquals:
         case ExprType_Equals:
         case ExprType_NotEquals:
+            return 2;
+
+        case ExprType_Bitwise_Lshift:
+        case ExprType_Bitwise_Rshift:
+        case ExprType_Bitwise_And:
+        case ExprType_Bitwise_Or:
+        case ExprType_Bitwise_Xor:
             return 3;
 
         case ExprType_Plus:

@@ -55,6 +55,5 @@ static void error_node(void* node, char* format, ...) {
     va_list args;
     va_start(args, format);
     error_v(n->lineNumber, get_file(n->file_index)->filename, format, args);
-    // error_v(0, "", format, args); // TODO: ...
     va_end(args);
 }

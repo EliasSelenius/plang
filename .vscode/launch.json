@@ -46,13 +46,13 @@
         },
 
         {
-            "name": "compile glfw_demo",
+            "name": "compile planetoid",
             "type": "lldb",
             "request": "launch",
             "terminal": "external",
             "program": "${workspaceFolder}/bin/plang.exe",
-            "args": ["build", "../common/OpenGL.pog", "../common/glfw3.pog", "cflags",  "-lglfw3dll"],
-            "cwd": "${workspaceFolder}/glfw_demo",
+            "args": ["build", "cflags",  "-lglfw3dll"],
+            "cwd": "${workspaceFolder}/../planetoid",
         },
         {
             "name": "glfw_demo",

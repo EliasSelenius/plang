@@ -181,6 +181,7 @@ static Datatype typenode2datatype(Type* type) {
         case TypeNode_Normal: {
             if (type->namespace_name && typenode2datatype_globalcheck) {
                 Namespace* ns = getNamespace(type->namespace_name);
+                if (!ns) return type_invalid;
                 return getType(ns, type->name);
             }
 
@@ -268,7 +269,7 @@ static Token* anyof(u32 count, ...) {
 
 //     if (tok(Tok_Assign)) decl->expr = expectExpression();
 //     else if (tok(Tok_OpenSquare)) {
-//         decl->base.statementType = Statement_FixedArray_Declaration;
+//         decl->base.statementType = Statement_FixedArray;
 //         decl->expr = expectExpression();
 //         expect(Tok_CloseSquare);
 //     }
@@ -303,14 +304,15 @@ static ProcArg* expectProcArguments() {
     return res;
 }
 
-static Enum expectEnum() {
-    Enum en = {0};
-    en.base.nodebase = node_init();
-    en.base.statementType = Statement_Enum;
-    en.entries = list_create(EnumEntry);
+static void expectEnum(Enum* en) {
+
+    *en = (Enum) {0};
+    en->base.nodebase = node_init();
+    en->base.statementType = Statement_Enum;
+    en->entries = list_create(EnumEntry);
 
     token_index++;
-    en.name = identifier();
+    en->name = identifier();
 
     expect(Tok_OpenCurl);
 
@@ -318,14 +320,13 @@ static Enum expectEnum() {
         EnumEntry entry = {0};
         entry.base.nodebase = node_init();
         entry.base.statementType = Statement_EnumEntry;
+        entry._enum = en;
         entry.name = identifier();
         if (tok(Tok_Assign)) entry.expr = expectExpression();
         semicolon();
 
-        list_add(en.entries, entry);
+        list_add(en->entries, entry);
     }
-
-    return en;
 }
 
 static Struct expectStruct() {
@@ -423,6 +424,7 @@ static void proc_or_global() {
         proc.scope = expectScope();
 
         list_add(get_current_file()->namespace->procedures, proc);
+
         return;
     }
 
@@ -436,7 +438,7 @@ static void proc_or_global() {
     globvar:
 
     if (tok(Tok_OpenSquare)) {
-        decl.base.statementType = Statement_FixedArray_Declaration;
+        decl.base.statementType = Statement_GlobalFixedArray;
         decl.expr = expectExpression();
         expect(Tok_CloseSquare);
     } else {
@@ -474,8 +476,8 @@ static bool parseProgramEntity() {
         } break;
 
         case Tok_Keyword_Enum: {
-            Enum en = expectEnum();
-            list_add(get_current_file()->namespace->enums, en);
+            Enum* en = list_get_next(get_current_file()->namespace->enums);
+            expectEnum(en);
         } break;
 
         case Tok_Keyword_Type: {
@@ -546,6 +548,9 @@ static void parseFile() {
 
 
 static void parse() {
+
+    Unit unit;
+    current_unit = &unit;
 
     codebase_init(&g_Codebase);
     initTypenames();

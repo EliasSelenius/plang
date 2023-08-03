@@ -65,18 +65,6 @@ typedef struct Datatype {
 } Datatype;
 
 
-/*
-    TODO: possible syntax tree hirarchy:
-    Codebase
-     > Namespace
-      > File
-       > Struct
-       > Enum
-       > Procedure
-        > Scope
-         > Statement
-*/
-
 
 typedef struct Node {
     u32 file_index;
@@ -335,7 +323,7 @@ typedef struct CompoundElement {
 
 typedef struct CompoundExpression {
     Expression base;
-    CompoundElement* elements;
+    CompoundElement* elements; // list, can be null
 } CompoundExpression;
 
 typedef struct LiteralExpression {
@@ -412,12 +400,12 @@ typedef struct TernaryExpression {
 
 // ----Statements----------------------------------------------
 
-
 typedef enum StatementType {
     // Statement_LocalVariable,
     Statement_Declaration,
     Statement_GlobalVariable,
-    Statement_FixedArray_Declaration,
+    Statement_FixedArray,
+    Statement_GlobalFixedArray,
     Statement_Constant,
     Statement_Typedef,
     Statement_Procedure,
@@ -455,12 +443,6 @@ typedef struct StatementExpression {
     Expression* expr;
 } StatementExpression;
 
-
-/*
-    type name = SomeType; // type definition      --
-    const name = expr;    // compiletime constant -- type is null
-    SomeType name = expr; // variable             -- type is not null
-*/
 typedef struct Declaration {
     Statement base;
     Type* type;
@@ -650,7 +632,6 @@ typedef struct Enum {
 static EnumEntry* getEnumEntry(Enum* en, Identifier name) {
     u32 len = list_length(en->entries);
     for (u32 i = 0; i < len; i++) if (en->entries[i].name == name) {
-        en->entries[i]._enum = en; // TODO: sly trick!
         return &en->entries[i];
     }
     return null;

@@ -1,18 +1,54 @@
 
 
 typedef struct Value {
-    void* data;
     Datatype type;
+
+    union {
+        void* pointer;
+        u8 uint8;
+        u16 uint16;
+        u32 uint32;
+        u64 uint64;
+        i8 int8;
+        i16 int16;
+        i32 int32;
+        i64 int64;
+        f32 float32;
+        f64 float64;
+        char character;
+    };
 } Value;
 
 
+typedef union ExprPointer {
+    Expression* expr;
+    BinaryExpression* binary;
+    UnaryExpression* unary;
+    LiteralExpression* literal;
+    ParenthesizedExpression* parenth;
+} ExprPointer;
 
-static void interpretExpression(Expression* expr) {
+
+static Value interpret_expression(Expression* expr) {
+
+    ExprPointer e = (ExprPointer)expr;
+
+
     switch (expr->expressionType) {
-        case ExprType_Plus: break;
-        case ExprType_Minus: break;
-        case ExprType_Mul: break;
-        case ExprType_Div: break;
+
+        #define binary_expr(op) {\
+            Value left = interpret_expression(e.binary->left);\
+            Value right = interpret_expression(e.binary->right);\
+            Value v = { .type = expr->datatype, .int64 = left.int64 op right.int64 };\
+            return v; }\
+
+        case ExprType_Plus: binary_expr(+)
+        case ExprType_Minus: binary_expr(-)
+        case ExprType_Mul: binary_expr(*)
+        case ExprType_Div: binary_expr(/)
+
+        #undef binary_expr
+
         case ExprType_Mod: break;
         case ExprType_Less: break;
         case ExprType_Greater: break;
@@ -36,7 +72,7 @@ static void interpretExpression(Expression* expr) {
         case ExprType_Unary_AddressOf: break;
         case ExprType_Unary_ValueOf: break;
         case ExprType_Unary_Negate: break;
-        case ExprType_Literal_Integer: break;
+        case ExprType_Literal_Integer: return (Value) { .type = (Datatype) {Typekind_AmbiguousInteger}, .uint64 = e.literal->integer };
         case ExprType_Literal_Decimal: break;
         case ExprType_Literal_Char: break;
         case ExprType_Literal_String: break;
@@ -51,6 +87,8 @@ static void interpretExpression(Expression* expr) {
         case ExprType_Indexing: break;
         case ExprType_Cast: break;
         case ExprType_Sizeof: break;
-        case ExprType_Parenthesized: break;
+        case ExprType_Parenthesized: return interpret_expression(e.parenth->innerExpr);
     }
+
+    return (Value) { .type = type_invalid, .pointer = null };
 }

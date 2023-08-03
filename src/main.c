@@ -106,6 +106,8 @@ void addFile(char* filename, char* extension) {
     strcpy_s(file.filename, name_size, filename);
 
     list_add(parser.src_files, file);
+
+    printf("addFile: \"%s\"\n", file.filename);
 }
 
 int main(int argc, char* argv[]) {
@@ -126,13 +128,21 @@ int main(int argc, char* argv[]) {
         if (cstrEquals(argv[1], "build")) {
             foreachFile(".pog", addFile);
             i = 2;
+        } else if (cstrEquals(argv[1], "eval")) {
+            printf("Evaling...\n");
+            tokens = list_create(Token);
+            lex(argv[2]);
+            Expression* expr = expectExpression();
+            Value v = interpret_expression(expr);
+            printf("%d\n", v.int32);
+            return 0;
         }
     }
 
     while (i < argc) {
         char* arg = argv[i++];
         if (spanEquals(spFrom("cflags"), arg)) break;
-        printf("    %d. %s\n", i, arg);
+        // printf("    %d. %s\n", i, arg);
         addFile(arg, null);
     }
 

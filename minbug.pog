@@ -1,8 +1,16 @@
 
-include "../grax/grax.pog";
+struct Test {
+    float32 x, y;
+}
 
 void main() {
-    void* buffer = malloc(12);
 
-    load_opengl(null);
+    Test t = {};
+    do_test(t);
+
+    do_test({12, 42});
+}
+
+void do_test(Test t) {
+    print("x: ", t.x, " y: ", t.y, "\n");
 }
