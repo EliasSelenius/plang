@@ -1,7 +1,5 @@
 
 
-static Procedure* procedure;
-static Statement* variable_ref = null;
 
 static Datatype validateExpression(Expression* expr);
 static Datatype validateExpressionEx(Expression* expr, Datatype expected_type);
@@ -9,33 +7,6 @@ static bool typeAssignable(Datatype toType, Datatype fromType);
 static void validateScope(Scope* scope);
 static void validateProcedure(Procedure* proc);
 
-static Datatype dealiasType(Datatype type) {
-    if (type.kind == Typekind_Typedef) {
-        Datatype newType = type.type_def->type->solvedstate;
-        newType.numPointers += type.numPointers;
-        return dealiasType(newType);
-    }
-    return type;
-}
-
-
-static bool procSignatureAssignable(ProcSignature* to, ProcSignature* from) {
-    if (to->arg_count != from->arg_count) return false;
-
-    if (!typeAssignable(to->return_type, from->return_type)) return false;
-
-    Argument* to_arg = to->arguments;
-    Argument* from_arg = from->arguments;
-
-    while (to_arg) {
-        if (!typeAssignable(to_arg->type, from_arg->type)) return false;
-
-        to_arg = to_arg->next;
-        from_arg = from_arg->next;
-    }
-
-    return true;
-}
 
 static bool typeAssignable(Datatype toType, Datatype fromType) {
     toType = dealiasType(toType);
@@ -54,7 +25,8 @@ static bool typeAssignable(Datatype toType, Datatype fromType) {
         if (toType.kind == Typekind_void || fromType.kind == Typekind_void) return true;
 
         if (toType.kind == Typekind_Procedure && fromType.kind == Typekind_Procedure) {
-            if (procSignatureAssignable(toType.procedure, fromType.procedure)) return true;
+            // if (procSignatureAssignable(toType.procedure, fromType.procedure)) return true;
+            return true; // TODO: ...
         }
 
         return false;
@@ -122,7 +94,6 @@ static void constructTypename(char* buffer, u32 size, Datatype type) {
         case Typekind_Struct: typename = get_string(type.stru->name); break;
         case Typekind_Enum: typename = null; break;
         case Typekind_Typedef: typename = get_string(type.type_def->name); break;
-        case Typekind_Opaque: typename = get_string(type.opaque_name); break;
         case Typekind_Procedure: typename = "(TODO: print proc type name)";
     }
 
@@ -151,8 +122,6 @@ static Datatype typeofStatement(Statement* sta) {
 
     switch (sta->statementType) {
         case Statement_FixedArray:
-        case Statement_GlobalFixedArray:
-        case Statement_GlobalVariable:
         case Statement_Declaration: {
             Declaration* decl = (Declaration*)sta;
             return decl->type->solvedstate;
@@ -170,7 +139,7 @@ static Datatype typeofStatement(Statement* sta) {
 
         case Statement_Procedure: {
             Procedure* proc = (Procedure*)sta;
-            return proc->ptr_type;
+            return proc->type_node->solvedstate;
         }
 
         case Statement_EnumEntry: {
@@ -189,24 +158,6 @@ static Datatype typeofStatement(Statement* sta) {
     return type_invalid;
 }
 
-static Statement* validateVariableExpression(VariableExpression* var) {
-
-    // looking for locals
-    var->ref = stack_get(var->name);
-    if (var->ref) goto done;
-
-    // looking for namespace
-    var->ref = (Statement*)getNamespace(var->name);
-    if (var->ref) goto done;
-
-    // looking for globals
-    var->ref = getFromNamespace(get_file(var->base.nodebase.file_index)->namespace, var->name);
-    if (!var->ref) var->ref = getFromNamespace(g_Codebase.namespaces[0], var->name);
-
-    done:
-    var->base.datatype = typeofStatement(var->ref);
-    return var->ref;
-}
 
 static Procedure* searchMatchingOverload(Procedure* proc, ProcCall* call) {
     u32 argslen = call->args ? list_length(call->args) : 0;
@@ -224,22 +175,60 @@ static Procedure* searchMatchingOverload(Procedure* proc, ProcCall* call) {
     return null;
 }
 
+
+/*
+
+foo()
+foo.bar()
+
+void bar(with Foo foo) {
+
+}
+
+Foo foo;
+foo.bar();
+
+*/
+
+static Procedure* get_possibly_overloaded_proc(Expression* expr) {
+    switch (expr->expressionType) {
+        case ExprType_Variable: {
+            VariableExpression* var = (VariableExpression*)expr;
+            if (var->ref->statementType == Statement_Procedure) return (Procedure*)var->ref;
+            return null;
+        }
+
+
+        // TODO: when contextual-inclusion on arguments are implemented, then this expression may return a Procedure that could be overloaded
+        // case ExprType_Deref: {
+        //     DerefOperator* deref = (DerefOperator*)expr;
+        //     if (deref->expr) 
+        //     return null;
+        // }
+
+        default: return null;
+    }
+}
+
 static Datatype validateProcCall(ProcCall* call) {
 
     // validate passed arguments
     u32 argslength = call->args ? list_length(call->args) : 0;
     for (u32 i = 0; i < argslength; i++) validateExpression(call->args[i]);
 
+    Datatype type = validateExpression(call->proc_expr);
+
+
+    // builtin procedures
     if (call->proc_expr->expressionType == ExprType_Variable) {
         VariableExpression* var = (VariableExpression*)call->proc_expr;
         if (var->name == builtin_string_print) return type_void;
     }
 
-    Datatype type = validateExpression(call->proc_expr);
 
     // Special case for overloaded procedures
-    if (variable_ref && variable_ref->statementType == Statement_Procedure) {
-        Procedure* proc = (Procedure*)variable_ref;
+    Procedure* proc = get_possibly_overloaded_proc(call->proc_expr);
+    if (proc) {
         Procedure* correct_overload = searchMatchingOverload(proc, call);
         if (correct_overload) {
             call->proc = correct_overload;
@@ -250,6 +239,7 @@ static Datatype validateProcCall(ProcCall* call) {
         return type_invalid;
     }
 
+
     type = dealiasType(type); // TODO: what if it is a double pointer? Then this shouldnt work.
     if (type.kind == Typekind_Invalid) return type;
 
@@ -259,31 +249,28 @@ static Datatype validateProcCall(ProcCall* call) {
     }
 
     // TODO: typecheck arguments
-    return type.procedure->return_type;
+    // return type.procedure->return_type;
+    return type.proc_ptr_typenode->procedure.return_type->solvedstate;
 }
 
 static Datatype _validateExpression(Expression* expr, Datatype expected_type) {
-
-    variable_ref = null;
 
     switch (expr->expressionType) {
 
         case ExprType_Variable: {
             VariableExpression* var = (VariableExpression*)expr;
-            variable_ref = validateVariableExpression(var);
-            if (variable_ref) return expr->datatype;
-
-            error_node(var, "\"%s\" is not declared.", get_string(var->name));
-            return type_invalid;
-        } break;
+            var->base.datatype = typeofStatement(var->ref);
+            return var->base.datatype;
+        }
 
         case ExprType_Deref: {
             DerefOperator* deref = (DerefOperator*)expr;
 
+            // implicit derefing:
             if (deref->expr == null) {
                 if (expected_type.kind == Typekind_Enum) {
-                    deref->ref = (Statement*)getEnumEntry(expected_type._enum, deref->name);
-                    return typeofStatement(deref->ref);
+                    EnumEntry* entry = getEnumEntry(expected_type._enum, deref->name);
+                    return (Datatype) { Typekind_Enum, ._enum = entry->_enum };
                 }
 
                 error_node(deref, "Cannot infer implicit dereferencing \".%s\".", get_string(deref->name));
@@ -292,19 +279,14 @@ static Datatype _validateExpression(Expression* expr, Datatype expected_type) {
 
             Datatype inner_expr_type = validateExpression(deref->expr);
 
-
-            if (variable_ref) switch (variable_ref->statementType) {
-                case Statement_Namespace:
-                    variable_ref = getFromNamespace((Namespace*)variable_ref, deref->name);
-                    deref->ref = variable_ref;
-                    return typeofStatement(variable_ref);
-                case Statement_Enum:
-                    variable_ref = (Statement*)getEnumEntry((Enum*)variable_ref, deref->name);
-                    deref->ref = variable_ref;
-                    return typeofStatement(variable_ref);
-                default: break;
+            // when we deref a variable expression
+            if (deref->expr->expressionType == ExprType_Variable) {
+                VariableExpression* var = (VariableExpression*)deref->expr;
+                if (var->ref->statementType == Statement_Enum) {
+                    EnumEntry* entry = getEnumEntry((Enum*)var->ref, deref->name);
+                    return (Datatype) { Typekind_Enum, ._enum = entry->_enum };
+                }
             }
-
 
             if (inner_expr_type.kind == Typekind_Struct) {
 
@@ -398,6 +380,8 @@ static Datatype _validateExpression(Expression* expr, Datatype expected_type) {
             Datatype leftType = validateExpressionEx(bop->left, expected_type);
             Datatype rightType = validateExpressionEx(bop->right, expected_type);
 
+            // TODO: valid operands?
+
             (void)leftType;
             (void)rightType;
 
@@ -419,7 +403,6 @@ static Datatype _validateExpression(Expression* expr, Datatype expected_type) {
             Datatype rightType = validateExpressionEx(bop->right, expected_type);
 
             // TODO: is a valid operator operands pair?
-
 
             if (typeEquals(leftType, rightType)) return leftType;
 
@@ -532,8 +515,15 @@ static Datatype validateExpressionEx(Expression* expr, Datatype expected_type) {
 
 // }
 
-// NOTE: only for Statement_Declaration
 static void validateDeclaration(Declaration* decl) {
+
+    if (decl->base.statementType == Statement_FixedArray) {
+        decl->type->solvedstate.numPointers++; // because this is a fixed array declaration.
+        // NOTE: decl->expr is used as the size expression for this fixed array
+        validateExpression(decl->expr);
+        return;
+    }
+
     if (decl->expr) {
 
         Datatype type = validateExpressionEx(decl->expr, decl->type->solvedstate);
@@ -582,15 +572,11 @@ static void validateStatement(Statement* sta) {
             // NOTE: decl->expr is used as the size expression for this fixed array
             Datatype sizetype = validateExpression(decl->expr);
             // TODO: is asstype a valid integer expression?
-
-            stack_declare((Statement*)decl);
-
         } break;
 
         case Statement_Declaration: {
             Declaration* decl = (Declaration*)sta;
             validateDeclaration(decl);
-            stack_declare((Statement*)decl);
         } break;
 
         case Statement_Assignment: {
@@ -608,7 +594,6 @@ static void validateStatement(Statement* sta) {
 
         case Statement_Enum: {
             validateEnum((Enum*)sta);
-            stack_declare(sta);
         } break;
 
         case Statement_Typedef: {
@@ -618,7 +603,6 @@ static void validateStatement(Statement* sta) {
         case Statement_Constant: {
             Declaration* decl = (Declaration*)sta;
             validateExpression(decl->expr);
-            stack_declare((Statement*)decl);
         } break;
 
 
@@ -649,13 +633,10 @@ static void validateStatement(Statement* sta) {
             validateExpression(forsta->max_expr);
 
             Datatype type = forsta->index_type
-                ? forsta->index_type->solvedstate
-                : type_int32;
+                          ? forsta->index_type->solvedstate
+                          : type_int32;
 
-            stack_declare((Statement*)forsta);
             validateStatement(forsta->statement);
-            stack_pop(1);
-
         } break;
 
         case Statement_Switch: {
@@ -668,8 +649,7 @@ static void validateStatement(Statement* sta) {
         case Statement_Procedure: {
             Procedure* proc = (Procedure*)sta;
 
-            createSignatureFromProcedure(proc);
-            stack_declare((Statement*)proc);
+            init_typenode_for_proc(proc);
             validateProcedure(proc);
         } break;
 
@@ -687,11 +667,11 @@ static void validateStatement(Statement* sta) {
 
             if (type.kind == Typekind_Invalid) break;
 
-            if (procedure->returnType->node_type == TypeNode_MustInfer) {
-                procedure->returnType->solvedstate = resolveTypeAmbiguity(type);
+            if (parser.procedure->returnType->node_type == TypeNode_MustInfer) {
+                parser.procedure->returnType->solvedstate = resolveTypeAmbiguity(type);
             } else {
-                if (!typeAssignable(procedure->returnType->solvedstate, type)) {
-                    error_node(sta, "Return type missmatch in function \"%s\".", get_string(procedure->name));
+                if (!typeAssignable(parser.procedure->returnType->solvedstate, type)) {
+                    error_node(sta, "Return type missmatch in function \"%s\".", get_string(parser.procedure->name));
                 }
             }
         } break;
@@ -726,29 +706,20 @@ static void validateStatement(Statement* sta) {
 }
 
 static void validateScope(Scope* scope) {
-    u32 vars_start_index = list_length(parser.stack);
     for (u32 i = 0; i < list_length(scope->statements); i++) {
         Statement* sta = scope->statements[i];
         validateStatement(sta);
     }
-    list_head(parser.stack)->length = vars_start_index;
 }
 
 static void validateProcedure(Procedure* proc) {
     if (proc->scope) {
-        Procedure* otherproc = procedure;
-        procedure = proc;
-
-        u32 num_args = 0;
-        if (proc->arguments) {
-            foreach (arg, proc->arguments) stack_declare((Statement*)arg);
-            num_args = arg_count;
-        }
+        Procedure* otherproc = parser.procedure;
+        parser.procedure = proc;
 
         validateScope(proc->scope);
-        stack_pop(num_args);
 
-        procedure = otherproc;
+        parser.procedure = otherproc;
     }
 
     if (proc->returnType->node_type == TypeNode_MustInfer) {
@@ -757,42 +728,28 @@ static void validateProcedure(Procedure* proc) {
 }
 
 
-
-static void validateNamespace(Namespace* ns) {
+static void validate(Codebase* cb) {
 
     // validate structs
-    u32 struLen = list_length(ns->structs);
+    u32 struLen = list_length(cb->structs);
     for (u32 i = 0; i < struLen; i++) {
-        validateStruct(&ns->structs[i]);
+        validateStruct(cb->structs[i]);
     }
 
-    foreach (en, ns->enums) {
-        validateEnum(en);
+    foreach (en, cb->enums) {
+        validateEnum(*en);
     }
 
-    foreach (decl, ns->declarations) {
-        if (decl->base.statementType == Statement_Declaration) {
-            validateDeclaration(decl);
-        } else if (decl->base.statementType == Statement_Constant) {
-            validateExpression(decl->expr);
-        } else if (decl->base.statementType == Statement_GlobalFixedArray) {
-            decl->type->solvedstate.numPointers++;
-            Datatype size_type = validateExpression(decl->expr);
-        }
-    }
-}
-
-static void validate() {
-
-    foreach (item, g_Codebase.namespaces) {
-        Namespace* ns = *item;
-        validateNamespace(ns);
+    foreach (decl, cb->global_vars) {
+        validateDeclaration(*decl);
     }
 
+    foreach (con, cb->global_consts) {
+        validateExpression((*con)->expr);
+    }
 
-    // validate procedure scopes
-    parser.stack = list_create(Statement*);
-    procedure = null;
-    iterate(procedures, validateProcedure(item);)
-    list_delete(parser.stack);
+    parser.procedure = null;
+    foreach (proc, cb->procedures) {
+        validateProcedure(*proc);
+    }
 }

@@ -1,16 +1,19 @@
 
-struct Test {
-    float32 x, y;
+struct vec2 { float32 x, y; }
+
+
+int32 is_nan(float32 x) {
+    return x != x;
 }
+
+int32 is_nan(vec2 v) {
+    return is_nan(v.x) or is_nan(v.y);
+}
+
 
 void main() {
 
-    Test t = {};
-    do_test(t);
+    float32 f = 3.14;
+    print("is_nan(f) = ", is_nan(f), "\n");
 
-    do_test({12, 42});
-}
-
-void do_test(Test t) {
-    print("x: ", t.x, " y: ", t.y, "\n");
 }

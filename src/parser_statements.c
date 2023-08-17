@@ -87,7 +87,9 @@ static Statement* expectStatement() {
                 forsta->max_expr = expectExpression();
             }
 
+            declare_symbol((Statement*)forsta);
             forsta->statement = expectStatement();
+            stack_pop(1);
             return (Statement*)forsta;
         }
 
@@ -156,32 +158,10 @@ static Statement* expectStatement() {
             return (Statement*)go;
         }
 
-        case Tok_Keyword_Const: {
-            Declaration* decl = allocStatement(Statement_Constant);
-            *decl = expectConst();
-            return (Statement*)decl;
-        }
-
-        case Tok_Keyword_Struct: {
-            Struct* sp = allocStatement(Statement_Struct);
-            *sp = expectStruct();
-            declare_local_type((Statement*)sp);
-            return (Statement*)sp;
-        }
-
-        case Tok_Keyword_Enum: {
-            Enum* en = allocStatement(Statement_Enum);
-            expectEnum(en);
-            declare_local_type((Statement*)en);
-            return (Statement*)en;
-        }
-
-        case Tok_Keyword_Type: {
-            Typedef* def = allocStatement(Statement_Typedef);
-            *def = expectTypedef();
-            declare_local_type((Statement*)def);
-            return (Statement*)def;
-        }
+        case Tok_Keyword_Struct: return expectStruct();
+        case Tok_Keyword_Enum: return expectEnum();
+        case Tok_Keyword_Type: return expectTypedef();
+        case Tok_Keyword_Const: return expectConst();
 
         default: break;
     }
@@ -189,46 +169,15 @@ static Statement* expectStatement() {
     // label
     if (tokens[token_index].type == Tok_Word && tokens[token_index + 1].type == Tok_Colon) {
         LabelStatement* label = allocStatement(Statement_Label);
-        label->label = tokens[token_index++].string;
+        label->label = tokens[token_index++].data.string;
         token_index++;
         return (Statement*)label;
     }
 
-    // declaration
+    // declaration or procedure
     u32 postType = peekType();
     if (postType && tokens[postType].type == Tok_Word) {
-
-        Node node = node_init();
-        Type* type = expectType();
-        Identifier name = identifier();
-
-        if (tok(Tok_OpenParen)) {
-
-            Procedure* proc = allocStatement(Statement_Procedure);
-            proc->base.nodebase = node;
-            proc->returnType = type;
-            proc->name = name;
-            proc->arguments = expectProcArguments();
-            proc->scope = expectScope();
-
-            return (Statement*)proc;
-        }
-
-        Declaration* decl = allocStatement(Statement_Declaration);
-        decl->base.nodebase = node;
-        decl->type = type;
-        decl->name = name;
-
-        if (tok(Tok_OpenSquare)) {
-            decl->base.statementType = Statement_FixedArray;
-            decl->expr = expectExpression();
-            expect(Tok_CloseSquare);
-        } else {
-            if (tok(Tok_Assign)) decl->expr = expectExpression();
-        }
-
-        semicolon();
-        return (Statement*)decl;
+        return proc_or_var(true);
     }
 
 
@@ -296,18 +245,45 @@ static Scope* expectScope() {
     parser.scope = scope;
 
     u32 local_types_count = list_length(parser.local_types);
+    u32 local_symbols_count = list_length(parser.local_symbols);
 
     expect(Tok_OpenCurl);
     while (!tok(Tok_CloseCurl)) {
         Statement* statement = expectStatement();
         if (statement) {
             list_add(scope->statements, statement);
+
+            switch (statement->statementType) {
+                // case Statement_For: // declare_symbol() is called in expectStatement() for for-loops, because it must be called before we parse inner statement
+                // case Statement_Procedure: // declare_symbol() is called in proc_or_var() for same reason as above
+
+                case Statement_FixedArray:
+                case Statement_Declaration:
+                case Statement_Constant:
+
+                    declare_symbol(statement);
+                    break;
+
+                case Statement_Struct:
+                case Statement_Typedef:
+
+                    declare_local_type(statement);
+                    break;
+
+                case Statement_Enum:
+                    declare_symbol(statement);
+                    declare_local_type(statement);
+
+                default: break;
+            }
+
         } else {
             // there must have been an error.
         }
     }
 
     list_head(parser.local_types)->length = local_types_count;
+    list_head(parser.local_symbols)->length = local_symbols_count;
 
     parser.scope = scope->parentScope;
     return scope;

@@ -1,6 +1,30 @@
 
-static Token* tokens; // darray
-static u32 token_index = 0;
+
+// TODO: might be a good idea to make the string table be a hashmap, every time we append a new string it must go through the entire table
+struct {
+    u32* byteoffsets; // list
+    DynamicBuffer* data;
+} string_table;
+
+static inline char* get_string(Identifier id) { return (char*)(&string_table.data->bytes[id]); }
+static inline char* get_string_byindex(u32 index) { return (char*)(&string_table.data->bytes[string_table.byteoffsets[index]]); }
+
+static Identifier register_string(StrSpan word) {
+    u32 len = list_length(string_table.byteoffsets);
+    for (u32 i = 0; i < len; i++) {
+        u32 byteOffset = string_table.byteoffsets[i];
+        char* s = (char*)(&string_table.data->bytes[byteOffset]);
+        if (spanEquals(word, s)) return byteOffset;
+    }
+
+    u32 byteOffset = dyReserve(&string_table.data, word.length + 1);
+    u8* p = (&string_table.data->bytes[byteOffset]);
+    for (u32 i = 0; i < word.length; i++) p[i] = word.start[i];
+    p[word.length] = '\0';
+
+    list_add(string_table.byteoffsets, byteOffset);
+    return byteOffset;
+}
 
 static Identifier type_name_int8 = 0;
 static Identifier type_name_uint8 = 0;
@@ -15,11 +39,15 @@ static Identifier type_name_float64 = 0;
 static Identifier type_name_char = 0;
 static Identifier type_name_void = 0;
 
-
 static Identifier builtin_string_print = 0;
 static Identifier builtin_string_main = 0;
 
-static void initTypenames() {
+static void init_string_table() {
+
+    string_table.byteoffsets = list_create(u32);
+    string_table.data = dyCreate();
+    register_string(spFrom("")); // empty string
+
     type_name_int8    = register_string(spFrom("int8"));
     type_name_uint8   = register_string(spFrom("uint8"));
     type_name_int16   = register_string(spFrom("int16"));
@@ -37,56 +65,41 @@ static void initTypenames() {
     builtin_string_main = register_string(spFrom("main"));
 }
 
-/*
 
-    input -> parser -> unit
-    units will contain syntax tree and arena so it can be freed independently from other units
-    aswell as lists of unresolved symbols in the syntax tree
+Procedure builtin_print_proc = {0};
 
-    units -> binder -> codebase
-    binder will set correct references to variables and types in syntax tree (resolving symbols)
-    then it will construct a Codebase object containing lists of pointers to all the things
-    this process may be redone several times
+static Token* tokens; // darray
+static u32 token_index = 0;
 
-    codebase -> validator
-    typecheking
-
-*/
-
-typedef struct Unit {
-    Arena arena;
-
-} Unit;
-
-Unit* current_unit;
-
-Codebase bind_units(Unit* units) {
-    // resolves unresolved symbols
-
-    // constructs Codebase that contains lists of all procs/types/globals
-
-    // must be possible to rebind codebase, because units may change
-}
 
 typedef struct Parser {
     File* src_files;
     u32 current_file_index;
     Scope* scope;
 
-    Procedure* procedure; // current procedure that is being parsed
+    Procedure* procedure; // current procedure that is being validated
 
-    // The local declarations of the currently parsed procedure
-    Statement** stack;
-
+    Statement** local_symbols; // all the things a VariableExpression might refer to
     Statement** local_types;
 
+    VariableExpression** unresolved_variables; // list
     Type** unresolved_types; // list
 
-    Token* tokens; // list
-    u32 token_index;
 } Parser;
 
 static Parser parser;
+
+static void init_parser() {
+    parser = (Parser) {0};
+    parser.src_files = list_create(File);
+
+    parser.local_symbols = list_create(Statement*);
+    parser.local_types = list_create(Statement*);
+
+    parser.unresolved_variables = list_create(VariableExpression*);
+    parser.unresolved_types = list_create(Type*);
+
+}
 
 static inline File* get_current_file() { return &parser.src_files[parser.current_file_index]; }
 static inline File* get_file(u32 index) { return &parser.src_files[index]; }
@@ -110,6 +123,7 @@ static Identifier getNameOfStatement(Statement* sta) {
 
 
 static void declare_local_type(Statement* sta) {
+    // TODO: already declared error
     list_add(parser.local_types, sta);
 }
 
@@ -123,27 +137,56 @@ static Statement* get_local_type(Identifier name) {
     return null;
 }
 
+static Statement* get_global_type(Identifier name, Codebase* codebase) {
+    {
+        foreach (item, codebase->structs) {
+            if ((*item)->name == name) return (Statement*)(*item);
+        }
+    }
 
-static Statement* stack_get(Identifier name) {
-    if (!parser.stack) return null;
+    {
+        foreach (item, codebase->type_defs) {
+            if ((*item)->name == name) return (Statement*)(*item);
+        }
+    }
 
-    i32 len = (i32)list_length(parser.stack);
-    for (i32 i = len-1; i >= 0; i--) {
-        Statement* sta = parser.stack[i];
+    {
+        foreach (item, codebase->enums) {
+            if ((*item)->name == name) return (Statement*)(*item);
+        }
+    }
+
+    return null;
+}
+
+static Statement* get_global_symbol(Identifier name, Unit* unit) {
+    foreach (item, unit->top_level_statements) {
+        Statement* sta = *item;
         if (name == getNameOfStatement(sta)) return sta;
     }
 
     return null;
 }
 
+static Statement* get_symbol(Identifier name) {
 
-static void stack_declare(Statement* sta) {
+
+    i32 len = (i32)list_length(parser.local_symbols);
+    for (i32 i = len-1; i >= 0; i--) {
+        Statement* sta = parser.local_symbols[i];
+        if (name == getNameOfStatement(sta)) return sta;
+    }
+
+    return null;
+}
+
+static void declare_symbol(Statement* sta) {
 
     // TODO: already declared error
 
-    list_add(parser.stack, sta);
+    list_add(parser.local_symbols, sta);
 }
 
 static void stack_pop(u32 num) {
-    list_head(parser.stack)->length -= num;
+    list_head(parser.local_symbols)->length -= num;
 }

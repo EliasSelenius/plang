@@ -51,16 +51,18 @@
             "request": "launch",
             "terminal": "external",
             "program": "${workspaceFolder}/bin/plang.exe",
-            "args": ["build", "cflags",  "-lglfw3dll"],
+            "args": ["build", "cflags", "-lglfw3dll"],
             "cwd": "${workspaceFolder}/../planetoid",
         },
+
         {
-            "name": "glfw_demo",
+            "name": "compile textus_quill",
             "type": "lldb",
             "request": "launch",
             "terminal": "external",
-            "program": "${workspaceFolder}/glfw_demo/output.exe",
-            "cwd": "${workspaceFolder}/glfw_demo",
+            "program": "${workspaceFolder}/bin/plang.exe",
+            "args": ["main.pog", "cflags", "-lglfw3dll"],
+            "cwd": "${workspaceFolder}/../textus_quill",
         }
     ]
 }

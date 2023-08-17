@@ -1,23 +1,56 @@
 
 
-// signifies a string thats stored in the string-table
-typedef u32 Identifier;
-
-typedef struct Namespace Namespace;
 typedef struct Procedure Procedure;
 typedef struct ForStatement ForStatement;
 typedef struct Struct Struct;
 typedef struct Enum Enum;
 typedef struct Typedef Typedef;
-typedef struct ProcSignature ProcSignature;
 typedef struct Datatype Datatype;
 typedef struct ProcArg ProcArg;
 typedef struct Declaration Declaration;
 typedef struct Statement Statement;
+typedef struct VariableExpression VariableExpression;
+typedef struct Type Type;
+
+/*
+
+    input -> parser -> unit
+    units will contain syntax tree and arena so it can be freed independently from other units
+    aswell as lists of unresolved symbols in the syntax tree
+
+    units -> binder -> codebase
+    binder will set correct references to variables and types in syntax tree (resolving symbols)
+    then it will construct a Codebase object containing lists of pointers to all the things
+    this process may be redone several times
+
+    codebase -> validator
+    typecheking
+
+*/
+
+typedef struct Unit {
+    Arena arena;
+    Statement** top_level_statements; // list
+    VariableExpression** external_symbols; // list
+    Type** external_types; // list
+} Unit;
+
+static Unit* current_unit;
+
+
+typedef struct Codebase {
+
+    Procedure** procedures; // list
+    Declaration** global_vars; // list
+    Declaration** global_consts; // list
+    Struct** structs; // list
+    Enum** enums; // list
+    Typedef** type_defs; // list
+
+} Codebase;
 
 typedef struct File {
     char* filename;
-    Namespace* namespace;
 } File;
 
 // ----Types---------------------------------------------
@@ -47,20 +80,48 @@ typedef enum Typekind {
     Typekind_Struct,
     Typekind_Enum,
     Typekind_Typedef,
-    Typekind_Opaque,
     Typekind_Procedure
 } Typekind;
+
+/* assignability chart by Typekind
+
+assignable? = yes | no | x
+x = circumstantial
+
+from \ to   Procedure   Opaque  Typedef Enum    Struct  char    void    float64 float32 int64   int32   int16   int8    uint64  uint32  uint16  uint8   AmbDecimal  AmbInteger  Invalid
+Invalid     yes         yes     yes     yes     yes     yes     yes     yes     yes     yes     yes     yes     yes     yes     yes     yes     yes     yes         yes         yes
+AmbInteger  no          no      x
+AmbDecimal
+uint8       no          no      x       *       no      yes     no      yes     yes     yes     yes     yes     no
+uint16
+uint32
+uint64
+int8
+int16
+int32
+int64
+float32
+float64
+void
+char
+Struct
+Enum
+Typedef
+Opaque
+Procedure
+
+
+*/
 
 typedef struct Datatype {
     Typekind kind;
     u32 numPointers;
     union {
         void* data_ptr;
-        Identifier opaque_name;
         Struct* stru;
         Enum* _enum;
         Typedef* type_def;
-        ProcSignature* procedure;
+        Type* proc_ptr_typenode;
     };
 } Datatype;
 
@@ -71,12 +132,9 @@ typedef struct Node {
     u32 lineNumber;
 } Node;
 
-
-
 typedef enum TypeNode {
     TypeNode_MustInfer,
     TypeNode_Normal,
-    TypeNode_Pointer,
     TypeNode_Procedure
 } TypeNode;
 
@@ -87,15 +145,11 @@ typedef struct Type {
     Datatype solvedstate;
 
     union {
-        struct {
-            Identifier namespace_name, name;
-        };
-
-        struct Type* pointedto;
+        Identifier name;
 
         struct {
             struct Type* return_type;
-            struct Type* arguments;
+            struct Type* first_argument;
         } procedure;
     };
 
@@ -328,12 +382,7 @@ typedef struct CompoundExpression {
 
 typedef struct LiteralExpression {
     Expression base;
-    union {
-        Identifier string;
-        u64 integer;
-        f64 decimal;
-        char character;
-    };
+    Tokendata data;
 } LiteralExpression;
 
 typedef struct UnaryExpression {
@@ -367,7 +416,6 @@ typedef struct AllocExpression {
 typedef struct DerefOperator {
     Expression base;
     Expression* expr;
-    Statement* ref;
     Identifier name;
 } DerefOperator;
 
@@ -375,7 +423,7 @@ typedef struct VariableExpression {
     Expression base;
     Identifier name;
 
-    Statement* ref;
+    Statement* ref; // procedure, global, enum
 } VariableExpression;
 
 typedef struct CastExpression {
@@ -396,16 +444,27 @@ typedef struct TernaryExpression {
     Expression* elseExpr;
 } TernaryExpression;
 
-
+typedef union ExprPointer {
+    Expression* expr;
+    VariableExpression* var;
+    DerefOperator* deref;
+    TernaryExpression* ternary;
+    BinaryExpression* binary;
+    UnaryExpression* unary;
+    LiteralExpression* literal;
+    ParenthesizedExpression* parenth;
+    CastExpression* cast;
+    SizeofExpression* size_of;
+    AllocExpression* alloc;
+    CompoundExpression* compound;
+    IndexingExpression* indexing;
+} ExprPointer;
 
 // ----Statements----------------------------------------------
 
 typedef enum StatementType {
-    // Statement_LocalVariable,
-    Statement_Declaration,
-    Statement_GlobalVariable,
     Statement_FixedArray,
-    Statement_GlobalFixedArray,
+    Statement_Declaration,
     Statement_Constant,
     Statement_Typedef,
     Statement_Procedure,
@@ -413,7 +472,6 @@ typedef enum StatementType {
     Statement_Struct,
     Statement_Enum,
     Statement_EnumEntry,
-    Statement_Namespace,
 
     Statement_Assignment,
     Statement_Expression,
@@ -527,18 +585,6 @@ typedef struct ProcArg {
     Identifier name;
 } ProcArg;
 
-typedef struct Argument {
-    Datatype type;
-    Identifier name;
-    struct Argument* next;
-} Argument;
-
-typedef struct ProcSignature {
-    Datatype return_type;
-    u32 arg_count;
-    Argument* arguments;
-} ProcSignature;
-
 typedef struct Procedure {
     Statement base;
     Identifier name;
@@ -554,7 +600,7 @@ typedef struct Procedure {
 
     Scope* scope; // scope can be null
 
-    Datatype ptr_type;
+    Type* type_node;
 } Procedure;
 
 typedef struct ProcCall {
@@ -600,21 +646,6 @@ static Statement* getMember(Struct* stru, Identifier name) {
     return null;
 }
 
-typedef struct Namespace {
-    Statement base;
-    Identifier name;
-
-    Procedure* procedures; // list
-
-    Declaration* declarations; // list
-
-    Struct* structs; // list
-    Enum* enums; // list
-    Typedef* type_defs; // list
-    Identifier* opaque_types; // list
-
-} Namespace;
-
 typedef struct EnumEntry {
     Statement base;
     Enum* _enum;
@@ -637,170 +668,18 @@ static EnumEntry* getEnumEntry(Enum* en, Identifier name) {
     return null;
 }
 
-static Enum* getEnum(Namespace* ns, Identifier name) {
-    foreach (en, ns->enums) {
-        if (en->name == name) return en;
+static Datatype dealiasType(Datatype type) {
+    if (type.kind == Typekind_Typedef) {
+        if (type.type_def->type == null) return type; // opaque types
+        Datatype newType = type.type_def->type->solvedstate;
+        newType.numPointers += type.numPointers;
+        return dealiasType(newType);
     }
-
-    return null;
-}
-
-
-
-typedef struct Codebase {
-
-    Namespace** namespaces; // list
-
-    // DynamicBuffer* procedure_types;
-    Arena arena_procedure_types;
-
-    Arena arena_signatures;
-    ProcSignature* proc_signatures;
-
-    // TODO: might be a good idea to make the string table be a hashmap, every time we append a new string it must go through the entire table
-    struct {
-        u32* byteoffsets; // list
-        DynamicBuffer* data;
-    } string_table;
-
-} Codebase;
-
-static Codebase g_Codebase; // The current codebase that is being parsed/validated/transpiled
-
-#define foreachNamespace(scope) { foreach (nsp, g_Codebase.namespaces) { Namespace* ns = *nsp; scope } }
-#define iterate(collection, scope) foreachNamespace(foreach(item, ns->collection) {scope} )
-
-static inline char* get_string(Identifier id) { return (char*)(&g_Codebase.string_table.data->bytes[id]); }
-static inline char* get_string_byindex(u32 index) { return (char*)(&g_Codebase.string_table.data->bytes[g_Codebase.string_table.byteoffsets[index]]); }
-
-static Identifier register_string(StrSpan word) {
-    u32 len = list_length(g_Codebase.string_table.byteoffsets);
-    for (u32 i = 0; i < len; i++) {
-        u32 byteOffset = g_Codebase.string_table.byteoffsets[i];
-        char* s = (char*)(&g_Codebase.string_table.data->bytes[byteOffset]);
-        if (spanEquals(word, s)) return byteOffset;
-    }
-
-    u32 byteOffset = dyReserve(&g_Codebase.string_table.data, word.length + 1);
-    u8* p = (&g_Codebase.string_table.data->bytes[byteOffset]);
-    for (u32 i = 0; i < word.length; i++) p[i] = word.start[i];
-    p[word.length] = '\0';
-
-    list_add(g_Codebase.string_table.byteoffsets, byteOffset);
-    return byteOffset;
-}
-
-static Namespace* namespace_create() {
-    Namespace* ns = malloc(sizeof(Namespace));
-    ns->name = 0;
-    ns->base.statementType = Statement_Namespace;
-
-    ns->procedures = list_create(Procedure);
-    ns->declarations = list_create(Declaration);
-
-    ns->structs = list_create(Struct);
-    ns->enums = list_create(Enum);
-    ns->type_defs = list_create(Typedef);
-    ns->opaque_types = list_create(Identifier);
-
-    return ns;
-}
-
-static Namespace* ensureNamespace(Identifier name) {
-    foreach (item, g_Codebase.namespaces) {
-        Namespace* ns = *item;
-        if (ns->name == name) return ns;
-    }
-
-    Namespace* ns = namespace_create();
-    ns->name = name;
-    list_add(g_Codebase.namespaces, ns);
-    return ns;
-}
-
-static Namespace* getNamespace(Identifier name) {
-    foreach (item, g_Codebase.namespaces) {
-        Namespace* ns = *item;
-        if (ns->name == name) return ns;
-    }
-
-    return null;
-}
-
-static void codebase_init(Codebase* codebase) {
-    codebase->namespaces = list_create(Namespace*);
-    Namespace* default_ns = namespace_create();
-    list_add(codebase->namespaces, default_ns);
-
-    // codebase->procedure_types = dyCreate();
-    codebase->arena_procedure_types = arena_create();
-    codebase->arena_signatures = arena_create();
-
-
-    codebase->string_table.byteoffsets = list_create(u32);
-    codebase->string_table.data = dyCreate();
-    register_string(spFrom("")); // empty string
-}
-
-static ProcSignature* createSignature(Datatype return_type) {
-    ProcSignature* sig = arena_alloc(&g_Codebase.arena_signatures, sizeof(ProcSignature));
-    sig->return_type = return_type;
-    return sig;
-}
-
-static void addArgument(ProcSignature* sig, Datatype argtype, Identifier argname) {
-    Argument* arg = arena_alloc(&g_Codebase.arena_signatures, sizeof(Argument));
-    arg->name = argname;
-    arg->type = argtype;
-
-    if (sig->arguments) {
-        Argument* last = sig->arguments;
-        while (last->next) last = last->next;
-        last->next = arg;
-    } else {
-        sig->arguments = arg;
-    }
-
-    sig->arg_count++;
-}
-
-static void createSignatureFromProcedure(Procedure* proc) {
-    ProcSignature* sig = createSignature(proc->returnType->solvedstate);
-    if (proc->arguments) {
-        foreach (arg, proc->arguments) {
-            addArgument(sig, arg->type->solvedstate, 0);
-        }
-    }
-
-    proc->ptr_type = (Datatype) { .kind = Typekind_Procedure, .procedure = sig, .numPointers = 1 };
-}
-
-static Statement* getFromNamespace(Namespace* ns, Identifier name) {
-    foreach (proc, ns->procedures) {
-        if (proc->name == name) return (Statement*)proc;
-    }
-
-    foreach (decl, ns->declarations) {
-        if (decl->name == name) return (Statement*)decl;
-    }
-
-    // TODO: opaque types?
-    foreach (def, ns->type_defs) {
-        if (def->name == name) return (Statement*)def;
-    }
-
-    foreach (stru, ns->structs) {
-        if (stru->name == name) return (Statement*)stru;
-    }
-
-    foreach (en, ns->enums) {
-        if (en->name == name) return (Statement*)en;
-    }
-
-    return null;
+    return type;
 }
 
 static bool isCompiletimeExpression(Expression* expr) {
+    ExprPointer e = (ExprPointer)expr;
     switch (expr->expressionType) {
         case ExprType_Plus:
         case ExprType_Minus:
@@ -820,8 +699,7 @@ static bool isCompiletimeExpression(Expression* expr) {
         case ExprType_Bitwise_Xor:
         case ExprType_Bitwise_Lshift:
         case ExprType_Bitwise_Rshift:
-            BinaryExpression* be = (BinaryExpression*)expr;
-            return isCompiletimeExpression(be->left) && isCompiletimeExpression(be->right);
+            return isCompiletimeExpression(e.binary->left) && isCompiletimeExpression(e.binary->right);
 
         case ExprType_Unary_PreIncrement:
         case ExprType_Unary_PostIncrement:
@@ -833,8 +711,7 @@ static bool isCompiletimeExpression(Expression* expr) {
         case ExprType_Unary_BitwiseNot:
         case ExprType_Unary_Negate:
         case ExprType_Unary_ValueOf:
-            UnaryExpression* un = (UnaryExpression*)expr;
-            return isCompiletimeExpression(un->expr);
+            return isCompiletimeExpression(e.unary->expr);
 
         case ExprType_Unary_AddressOf: return false;
 
@@ -847,36 +724,27 @@ static bool isCompiletimeExpression(Expression* expr) {
         case ExprType_Literal_Null:
             return true;
 
-        case ExprType_Variable:
-            VariableExpression* var = (VariableExpression*)expr;
-            // return var->reference.reftype == RefType_Constant;
-            return var->ref->statementType == Statement_Constant;
-
+        case ExprType_Variable: return e.var->ref->statementType == Statement_Constant;
         case ExprType_Alloc: return false;
-
-        case ExprType_Ternary:
-            TernaryExpression* ter = (TernaryExpression*)expr;
-            return isCompiletimeExpression(ter->condition) && isCompiletimeExpression(ter->thenExpr) && isCompiletimeExpression(ter->elseExpr);
-
+        case ExprType_Ternary: return isCompiletimeExpression(e.ternary->condition) && isCompiletimeExpression(e.ternary->thenExpr) && isCompiletimeExpression(e.ternary->elseExpr);
         case ExprType_ProcCall: return false;
 
         case ExprType_Deref:
-            DerefOperator* deref = (DerefOperator*)expr;
+            if (e.deref->base.datatype.kind == Typekind_Enum) return true;
+            return isCompiletimeExpression(e.deref->expr);
 
-            if (deref->ref) {
-                if (deref->ref->statementType == Statement_EnumEntry) return true;
+        case ExprType_Indexing: return isCompiletimeExpression(e.indexing->indexed) && isCompiletimeExpression(e.indexing->index);
+        case ExprType_Cast: return isCompiletimeExpression(e.cast->expr);
+        case ExprType_Sizeof: return true;
+        case ExprType_Parenthesized: return isCompiletimeExpression(e.parenth->innerExpr);
+
+        case ExprType_Compound: {
+            if (!e.compound->elements) return true;
+            foreach (elm, e.compound->elements) {
+                if (!isCompiletimeExpression(elm->expr)) return false;
             }
 
-            return isCompiletimeExpression(deref->expr);
-
-        case ExprType_Indexing:
-            IndexingExpression* ind = (IndexingExpression*)expr;
-            return isCompiletimeExpression(ind->indexed) && isCompiletimeExpression(ind->index);
-
-        case ExprType_Cast: return isCompiletimeExpression(((CastExpression*)expr)->expr);
-
-        case ExprType_Sizeof: return true;
-
-        case ExprType_Parenthesized: return isCompiletimeExpression(((ParenthesizedExpression*)expr)->innerExpr);
+            return true;
+        }
     }
 }

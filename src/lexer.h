@@ -1,193 +1,112 @@
 
+#define DefineTokenList(X)\
+X(EOF)\
+X(Whitespace)\
+X(Word)\
+X(Keyword_Struct)\
+X(Keyword_Enum)\
+X(Keyword_With)\
+X(Keyword_Namespace)\
+X(Keyword_Alloc)\
+X(Keyword_Sizeof)\
+X(Keyword_Let)\
+X(Keyword_Include)\
+X(Keyword_If)\
+X(Keyword_Else)\
+X(Keyword_While)\
+X(Keyword_For)\
+X(Keyword_In)\
+X(Keyword_Switch)\
+X(Keyword_Case)\
+X(Keyword_Default)\
+X(Keyword_Goto)\
+X(Keyword_True)\
+X(Keyword_False)\
+X(Keyword_And)\
+X(Keyword_Or)\
+X(Keyword_Null)\
+X(Keyword_Continue)\
+X(Keyword_Break)\
+X(Keyword_Return)\
+X(Keyword_Declare)\
+X(Keyword_Type)\
+X(Keyword_As)\
+X(Keyword_Const)\
+X(Integer)\
+X(Decimal)\
+X(String)\
+X(Char)\
+X(Comment)\
+X(MultiComment)\
+X(Comma)\
+X(Period)\
+X(Dotdot)\
+X(Semicolon)\
+X(Colon)\
+X(QuestionMark)\
+X(ExclamationMark)\
+X(At)\
+X(Tilde)\
+X(Ampersand)\
+X(Pipe)\
+X(Caret)\
+X(LeftShift)\
+X(RightShift)\
+X(OpenCurl)\
+X(CloseCurl)\
+X(OpenParen)\
+X(CloseParen)\
+X(OpenSquare)\
+X(CloseSquare)\
+X(LessThan)\
+X(GreaterThan)\
+X(LessThanOrEqual)\
+X(GreaterThanOrEqual)\
+X(Equals)\
+X(NotEquals)\
+X(Assign)\
+X(Plus)\
+X(Minus)\
+X(Mul)\
+X(Div)\
+X(Mod)\
+X(PlusPlus)\
+X(MinusMinus)\
+X(PlusAssign)\
+X(MinusAssign)\
+X(MulAssign)\
+X(DivAssign)\
+X(ModAssign)\
+X(BitAndAssign)\
+X(BitOrAssign)\
+X(BitXorAssign)
+
+#define TokenEnumEntry(token) Tok_##token,
 typedef enum TokenType {
-    Tok_EOF,
-    Tok_Whitespace,
-    Tok_Word,
-
-    Tok_Keyword_Struct,
-    Tok_Keyword_Enum,
-    Tok_Keyword_With,
-    Tok_Keyword_Namespace,
-    Tok_Keyword_Alloc,
-    Tok_Keyword_Sizeof,
-    Tok_Keyword_Let,
-    Tok_Keyword_Include,
-
-    Tok_Keyword_If,
-    Tok_Keyword_Else,
-    Tok_Keyword_While,
-    Tok_Keyword_For,
-    Tok_Keyword_In,
-    Tok_Keyword_Switch,
-    Tok_Keyword_Case,
-    Tok_Keyword_Default,
-    Tok_Keyword_Goto,
-
-    Tok_Keyword_True,
-    Tok_Keyword_False,
-    Tok_Keyword_And,
-    Tok_Keyword_Or,
-
-    Tok_Keyword_Null,
-    Tok_Keyword_Continue,
-    Tok_Keyword_Break,
-    Tok_Keyword_Return,
-    Tok_Keyword_Declare,
-    Tok_Keyword_Type,
-    Tok_Keyword_As,
-    Tok_Keyword_Const,
-
-    Tok_Integer,
-    Tok_Decimal,
-    Tok_String,
-    Tok_Char,
-
-    Tok_Comment,
-    Tok_MultiComment,
-
-    Tok_Comma,
-    Tok_Period,
-    Tok_Dotdot,
-    Tok_Semicolon,
-    Tok_Colon,
-    Tok_QuestionMark,
-    Tok_ExclamationMark,
-    Tok_At,
-    Tok_Tilde,
-    Tok_Ampersand,
-    Tok_Pipe,
-    Tok_Caret,
-
-    Tok_LeftShift,
-    Tok_RightShift,
-
-    Tok_OpenCurl,
-    Tok_CloseCurl,
-    Tok_OpenParen,
-    Tok_CloseParen,
-    Tok_OpenSquare,
-    Tok_CloseSquare,
-
-    Tok_LessThan,
-    Tok_GreaterThan,
-    Tok_LessThanOrEqual,
-    Tok_GreaterThanOrEqual,
-    Tok_Equals,
-    Tok_NotEquals,
-    Tok_Assign,
-
-    Tok_Plus,
-    Tok_Minus,
-    Tok_Mul,
-    Tok_Div,
-    Tok_Mod,
-
-    Tok_PlusPlus,
-    Tok_MinusMinus,
-
-    Tok_PlusAssign,
-    Tok_MinusAssign,
-    Tok_MulAssign,
-    Tok_DivAssign,
-    Tok_ModAssign,
-    Tok_BitAndAssign,
-    Tok_BitOrAssign,
-    Tok_BitXorAssign
-
+    DefineTokenList(TokenEnumEntry)
+    TokenType_Count
 } TokenType;
+#undef TokenEnumEntry
 
-char* TokenType_Names[] = {
-    [Tok_EOF]                = "EOF",
-    [Tok_Whitespace]         = "Whitespace",
-    [Tok_Word]               = "Word",
-    [Tok_Keyword_Struct]     = "Keyword_Struct",
-    [Tok_Keyword_Enum]       = "Keyword_Enum",
-    [Tok_Keyword_With]       = "Keyword_With",
-    [Tok_Keyword_Namespace]  = "Keyword_Namespace",
-    [Tok_Keyword_Alloc]      = "Keyword_Alloc",
-    [Tok_Keyword_Sizeof]     = "Keyword_Sizeof",
-    [Tok_Keyword_Let]        = "Keyword_Let",
-    [Tok_Keyword_Include]    = "Keyword_Include",
-    [Tok_Keyword_If]         = "Keyword_If",
-    [Tok_Keyword_Else]       = "Keyword_Else",
-    [Tok_Keyword_While]      = "Keyword_While",
-    [Tok_Keyword_For]        = "Keyword_For",
-    [Tok_Keyword_In]         = "Keyword_In",
-    [Tok_Keyword_Switch]     = "Keyword_Switch",
-    [Tok_Keyword_Case]       = "Keyword_Case",
-    [Tok_Keyword_Default]    = "Keyword_Default",
-    [Tok_Keyword_Goto]       = "Keyword_Goto",
-    [Tok_Keyword_True]       = "Keyword_True",
-    [Tok_Keyword_False]      = "Keyword_False",
-    [Tok_Keyword_And]        = "Keyword_And",
-    [Tok_Keyword_Or]         = "Keyword_Or",
-    [Tok_Keyword_Null]       = "Keyword_Null",
-    [Tok_Keyword_Continue]   = "Keyword_Continue",
-    [Tok_Keyword_Break]      = "Keyword_Break",
-    [Tok_Keyword_Return]     = "Keyword_Return",
-    [Tok_Keyword_Declare]    = "Keyword_Declare",
-    [Tok_Keyword_Type]       = "Keyword_Type",
-    [Tok_Keyword_As]         = "Keyword_As",
-    [Tok_Keyword_Const]      = "Keyword_Const",
-    [Tok_Integer]            = "Integer",
-    [Tok_Decimal]            = "Decimal",
-    [Tok_String]             = "String",
-    [Tok_Char]               = "Char",
-    [Tok_Comment]            = "Comment",
-    [Tok_MultiComment]       = "MultiComment",
-    [Tok_Comma]              = "Comma",
-    [Tok_Period]             = "Period",
-    [Tok_Dotdot]             = "Dotdot",
-    [Tok_Semicolon]          = "Semicolon",
-    [Tok_Colon]              = "Colon",
-    [Tok_QuestionMark]       = "QuestionMark",
-    [Tok_ExclamationMark]    = "ExclamationMark",
-    [Tok_At]                 = "At",
-    [Tok_Tilde]              = "Tilde",
-    [Tok_Ampersand]          = "Ampersand",
-    [Tok_Pipe]               = "Pipe",
-    [Tok_Caret]              = "Caret",
-    [Tok_LeftShift]          = "LeftShift",
-    [Tok_RightShift]         = "RightShift",
-    [Tok_OpenCurl]           = "OpenCurl",
-    [Tok_CloseCurl]          = "CloseCurl",
-    [Tok_OpenParen]          = "OpenParen",
-    [Tok_CloseParen]         = "CloseParen",
-    [Tok_OpenSquare]         = "OpenSquare",
-    [Tok_CloseSquare]        = "CloseSquare",
-    [Tok_LessThan]           = "LessThan",
-    [Tok_GreaterThan]        = "GreaterThan",
-    [Tok_LessThanOrEqual]    = "LessThanOrEqual",
-    [Tok_GreaterThanOrEqual] = "GreaterThanOrEqual",
-    [Tok_Equals]             = "Equals",
-    [Tok_NotEquals]          = "NotEquals",
-    [Tok_Assign]             = "Assign",
-    [Tok_Plus]               = "Plus",
-    [Tok_Minus]              = "Minus",
-    [Tok_Mul]                = "Mul",
-    [Tok_Div]                = "Div",
-    [Tok_Mod]                = "Mod",
-    [Tok_PlusPlus]           = "PlusPlus",
-    [Tok_MinusMinus]         = "MinusMinus",
-    [Tok_PlusAssign]         = "PlusAssign",
-    [Tok_MinusAssign]        = "MinusAssign",
-    [Tok_MulAssign]          = "MulAssign",
-    [Tok_DivAssign]          = "DivAssign",
-    [Tok_ModAssign]          = "ModAssign",
-    [Tok_BitAndAssign]       = "BitAndAssign",
-    [Tok_BitOrAssign]        = "BitOrAssign",
-    [Tok_BitXorAssign]       = "BitXorAssign"
+#define TokenString(token) [Tok_##token] = #token,
+static char* TokenType_Names[] = {
+    DefineTokenList(TokenString)
 };
+#undef TokenEnumEntry
 
+// signifies a string thats stored in the string-table
+typedef u32 Identifier;
+
+typedef union Tokendata {
+    Identifier string;
+    u64 integer;
+    f64 decimal;
+    char character;
+} Tokendata;
 
 typedef struct Token {
     TokenType type;
     u32 line;
-
-    union {
-        u32 string;
-        u64 integer;
-        f64 decimal;
-        char character;
-    };
+    Tokendata data;
 } Token;
+

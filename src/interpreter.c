@@ -20,13 +20,42 @@ typedef struct Value {
 } Value;
 
 
-typedef union ExprPointer {
-    Expression* expr;
-    BinaryExpression* binary;
-    UnaryExpression* unary;
-    LiteralExpression* literal;
-    ParenthesizedExpression* parenth;
-} ExprPointer;
+static void print_value(Value value) {
+
+    if (value.type.numPointers == 1) {
+        if (value.type.kind == Typekind_char) {
+            printf("%s", (char*)value.pointer);
+            return;
+        }
+    }
+
+    if (value.type.numPointers) {
+        printf("%p", value.pointer);
+        return;
+    }
+
+    switch (value.type.kind) {
+        case Typekind_Invalid:          printf("invalid(%p)", value.pointer); break;
+        case Typekind_AmbiguousInteger: printf("%lld", value.int64); break;
+        case Typekind_AmbiguousDecimal: printf("%f", value.float64); break;
+        case Typekind_uint8:            printf("%u", (u32)value.uint8); break;
+        case Typekind_uint16:           printf("%hu", value.uint16); break;
+        case Typekind_uint32:           printf("%u", value.uint32); break;
+        case Typekind_uint64:           printf("%llu", value.uint64); break;
+        case Typekind_int8:             printf("%d", (i32)value.int8); break;
+        case Typekind_int16:            printf("%hd", value.int16); break;
+        case Typekind_int32:            printf("%d", value.int32); break;
+        case Typekind_int64:            printf("%lld", value.int64); break;
+        case Typekind_float32:          printf("%f", value.float32); break;
+        case Typekind_float64:          printf("%f", value.float64); break;
+        case Typekind_void:             printf("void"); break;
+        case Typekind_char:             printf("%c", value.character); break;
+        case Typekind_Struct: break;
+        case Typekind_Enum: break;
+        case Typekind_Typedef: break;
+        case Typekind_Procedure: break;
+    }
+}
 
 
 static Value interpret_expression(Expression* expr) {
@@ -72,7 +101,7 @@ static Value interpret_expression(Expression* expr) {
         case ExprType_Unary_AddressOf: break;
         case ExprType_Unary_ValueOf: break;
         case ExprType_Unary_Negate: break;
-        case ExprType_Literal_Integer: return (Value) { .type = (Datatype) {Typekind_AmbiguousInteger}, .uint64 = e.literal->integer };
+        case ExprType_Literal_Integer: return (Value) { .type = type_ambiguousInteger, .uint64 = e.literal->data.integer };
         case ExprType_Literal_Decimal: break;
         case ExprType_Literal_Char: break;
         case ExprType_Literal_String: break;
@@ -88,6 +117,7 @@ static Value interpret_expression(Expression* expr) {
         case ExprType_Cast: break;
         case ExprType_Sizeof: break;
         case ExprType_Parenthesized: return interpret_expression(e.parenth->innerExpr);
+        case ExprType_Compound: break;
     }
 
     return (Value) { .type = type_invalid, .pointer = null };

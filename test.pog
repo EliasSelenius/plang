@@ -1,5 +1,4 @@
 
-namespace MyTestNamespace;
 
 declare void goo();
 
@@ -57,9 +56,13 @@ enum MyGlobEnum {
 
 int32 main() {
 
+    ProcPtrs() pp_proc;
+
     struct LocalStructTest {
         char* name;
     }
+
+    LocalStructTest() lst_proc;
 
     type LocalTypedef = LocalStructTest;
 
@@ -72,6 +75,7 @@ int32 main() {
 
     MyGlobEnum en;
 
+
     enum LocalEnum {
         One;
         Two;
@@ -80,7 +84,7 @@ int32 main() {
 
     LocalEnum le = LocalEnum.Two;
 
-    OtherNamespace.hello();
+    hello();
 
     {
         SomeProc p = SomeProcImpl;
@@ -101,9 +105,9 @@ int32 main() {
 
     f = 0x;
 
-    // void(func) r = reg;
-    // r(take_opaque);
-    reg(take_opaque);
+    void(func) r = reg;
+    r(take_opaque);
+    // reg(take_opaque);
 
 
     print("Hello, Sailor!\n");
@@ -119,6 +123,17 @@ int32 main() {
             print(i, "\n");
         }
     }
+
+    for my_index in 0 .. 3 {
+        print("my_index: ", my_index, "\n");
+    }
+
+    void local_func(int32 recurse) {
+        print("local_func called! ", recurse, "\n");
+        if recurse > 0 local_func(recurse - 1);
+    }
+
+    local_func(5);
 
     return 0;
 }

@@ -63,7 +63,6 @@ static char* getTypeCname(Datatype type) {
         case Typekind_Struct: return get_string(type.stru->name);
         case Typekind_Enum: return get_string(type._enum->name);
         case Typekind_Typedef: return get_string(type.type_def->name);
-        case Typekind_Opaque: return get_string(type.opaque_name);
         case Typekind_Procedure: return "/*proc*/void";
     }
     return null;
@@ -73,42 +72,42 @@ static void _transpileDatatype(Datatype type, Identifier name);
 static void transpileDatatype(Datatype type);
 static void transpileType(Type* type) { transpileDatatype(type->solvedstate); }
 
-static void transpileProcSigArguments(ProcSignature* sig) {
-    sbAppend(sb, "(");
-    Argument* arg = sig->arguments;
-    while (arg) {
-        transpileDatatype(arg->type);
-        if (arg->next) sbAppend(sb, ", ");
-        arg = arg->next;
-    }
-    sbAppend(sb, ")");
-}
-
-static void transpileProcSigStart(ProcSignature* sig) {
-    if (sig->return_type.kind == Typekind_Procedure) {
-        transpileProcSigStart(sig->return_type.procedure);
+static void transpileProcSigStart(Type* proc_type) {
+    if (proc_type->procedure.return_type->solvedstate.kind == Typekind_Procedure) {
+        transpileProcSigStart(proc_type->procedure.return_type);
     } else {
-        transpileDatatype(sig->return_type);
+        transpileDatatype(proc_type->procedure.return_type->solvedstate);
         sbAppend(sb, " ");
     }
 
     sbAppend(sb, "(*");
 }
 
-static void transpileProcSigEnd(ProcSignature* sig) {
+static void transpileProcArguments(Type* proc_type) {
+    sbAppend(sb, "(");
+    Type* arg = proc_type->procedure.first_argument;
+    while (arg) {
+        transpileDatatype(arg->solvedstate);
+        if (arg->next) sbAppend(sb, ", ");
+        arg = arg->next;
+    }
     sbAppend(sb, ")");
-    transpileProcSigArguments(sig);
+}
 
-    while (sig->return_type.kind == Typekind_Procedure) {
+static void transpileProcSigEnd(Type* proc_type) {
+    sbAppend(sb, ")");
+    transpileProcArguments(proc_type);
+
+    while (proc_type->procedure.return_type->solvedstate.kind == Typekind_Procedure) {
         sbAppend(sb, ")");
-        sig = sig->return_type.procedure;
-        transpileProcSigArguments(sig);
+        proc_type = proc_type->procedure.return_type;
+        transpileProcArguments(proc_type);
     }
 }
 
 static void transpileTypeStart(Datatype type) {
     if (type.kind == Typekind_Procedure) {
-        transpileProcSigStart(type.procedure);
+        transpileProcSigStart(type.proc_ptr_typenode);
     } else {
         sbAppend(sb, getTypeCname(type));
         u32 np = type.numPointers;
@@ -118,7 +117,7 @@ static void transpileTypeStart(Datatype type) {
 }
 
 static void transpileTypeEnd(Datatype type) {
-    if (type.kind == Typekind_Procedure) transpileProcSigEnd(type.procedure);
+    if (type.kind == Typekind_Procedure) transpileProcSigEnd(type.proc_ptr_typenode);
 }
 
 static void transpileDatatype(Datatype type) {
@@ -133,46 +132,59 @@ static void _transpileDatatype(Datatype type, Identifier name) {
     transpileTypeEnd(type);
 }
 
-static void transpileNamespacedId(Namespace* namespace, Identifier name) {
-    sbAppend(sb, get_string(namespace->name));
-    sbAppend(sb, "_");
-    sbAppend(sb, get_string(name));
-}
+// #define pointer(inner) *(inner)
+// #define array(inner, size) (inner)[size]
+// #define proc(inner, ...) (*inner)(__VA_ARGS__)
 
-static void transpileLocal(Declaration* decl) {
-    _transpileDatatype(decl->type->solvedstate, decl->name);
-}
+// int proc(array(pointer(Hello), 123), float array(f,10));
 
-static void transpileGlobal(Declaration* decl) {
+// static void transpile_declarator(Datatype datatype, Identifier name) {
+//     if (datatype.kind == Typekind_Procedure) {
 
-    if (decl->base.statementType == Statement_GlobalFixedArray) decl->type->solvedstate.numPointers--;
+//         sbAppend(sb, "(");
+//         transpile_declarator(datatype.proc_ptr_typenode->procedure.return_type, name);
+//         sbAppend(sb, ")");
 
-    transpileTypeStart(decl->type->solvedstate);
+//         sbAppend(sb, "(");
+//         // args
+//         sbAppend(sb, ")");
+//     } else {
+//         u32 np = datatype.numPointers;
+//         while (np-- > 0) sbAppend(sb, "*");
+//         sbAppend(sb, get_string(name));
+//     }
+// }
 
-    sbAppend(sb, " ");
-    transpileNamespacedId(get_file(decl->base.nodebase.file_index)->namespace, decl->name);
+// static void transpile_procptr(Type* proc_type) {
+//     if (proc_type->procedure.return_type->node_type == TypeNode_Procedure) {
+//         transpile_procptr(proc_type->procedure.return_type);
+//     }
 
-    if (decl->base.statementType == Statement_GlobalFixedArray) {
-        sbAppend(sb, "[");
-        transpileExpression(decl->expr);
-        sbAppend(sb, "]");
-    }
+//     sbAppend(sb, "(*");
+// }
 
-    transpileTypeEnd(decl->type->solvedstate);
+// static void transpile_cdecl(Datatype datatype, Identifier name_or_null) {
 
-    if (decl->expr && (decl->base.statementType == Statement_Declaration || decl->base.statementType == Statement_GlobalVariable)) {
-        sbAppend(sb, " = ");
-        transpileExpression(decl->expr);
-    }
+//     Datatype type_specifier = datatype;
+//     while (true) {
+//         if (type_specifier.kind == Typekind_Procedure) {
+//             type_specifier = type_specifier.proc_ptr_typenode->procedure.return_type->solvedstate;
+//         } else {
+//             sbAppend(sb, getTypeCname(type_specifier));
+//             u32 np = type_specifier.numPointers;
+//             while (np-- > 0) sbAppend(sb, "*");
+//             break;
+//         }
+//     }
 
-    sbAppend(sb, ";");
-}
 
+
+// }
 
 static void transpileFuncCall(ProcCall* call) {
 
     transpileExpression(call->proc_expr);
-    if (call->proc && call->proc->overload) sbAppendChar(sb, getCharFromU32(call->proc->overload));
+    if (call->proc && call->proc->overload) sbAppendChar(sb, getCharFromU32(call->proc->overload)); // TODO: transpile overload number correctly
 
     sbAppend(sb, "(");
     if (call->args) {
@@ -189,19 +201,19 @@ static void transpileFuncCall(ProcCall* call) {
 
 
 static void transpilePrintFormat(Datatype type) {
-    Datatype datatype = dealiasType(type);
+    type = dealiasType(type);
 
-    if (datatype.numPointers == 1) {
-        if (datatype.kind == Typekind_char) sbAppend(sb, "%s"); return;
+    if (type.numPointers == 1) {
+        if (type.kind == Typekind_char) { sbAppend(sb, "%s"); return; }
     }
 
-    if (datatype.numPointers) {
+    if (type.numPointers) {
         sbAppend(sb, "%p");
         return;
     }
 
 
-    switch (datatype.kind) {
+    switch (type.kind) {
         case Typekind_AmbiguousDecimal: sbAppend(sb, "%f"); return;
         case Typekind_AmbiguousInteger: sbAppend(sb, "%d"); return;
 
@@ -325,7 +337,6 @@ static void transpileExpression(Expression* expr) {
             VariableExpression* var = (VariableExpression*)expr;
 
             StatementType ref_type = var->ref->statementType;
-
             if (ref_type == Statement_Constant) {
                 transpileExpression(((Declaration*)var->ref)->expr);
                 break;
@@ -333,47 +344,35 @@ static void transpileExpression(Expression* expr) {
 
             if (ref_type == Statement_Enum) break;
 
-            if (ref_type == Statement_GlobalVariable || ref_type == Statement_GlobalFixedArray
-            || (ref_type == Statement_Procedure && ((Procedure*)var->ref)->scope)) {
-                sbAppend(sb, get_string(get_file(var->ref->nodebase.file_index)->namespace->name));
-                sbAppend(sb, "_");
-            }
-
             sbAppend(sb, get_string(var->name));
         } break;
 
         case ExprType_Deref: {
             DerefOperator* deref = (DerefOperator*)expr;
 
-            if (deref->ref) {
-                if (deref->ref->statementType == Statement_EnumEntry) {
-                    EnumEntry* entry = (EnumEntry*)deref->ref;
+            if (deref->base.datatype.kind == Typekind_Enum) {
+                EnumEntry* entry = getEnumEntry(deref->base.datatype._enum, deref->name);
+                if (entry) { // TODO: this introduces a bug if there is an enumentry that coincidentaly has the same name as a struct field, solution: use deref->ref
                     sbAppendSpan(sb, numberToString(entry->value));
-                    break;
-                }
-
-                if (deref->ref->statementType == Statement_Constant) {
-                    transpileExpression(((Declaration*)deref->ref)->expr);
                     break;
                 }
             }
 
             transpileExpression(deref->expr);
 
-            VariableExpression* var = (VariableExpression*)deref->expr;
-            if (deref->expr->expressionType == ExprType_Variable && var->ref->statementType == Statement_Namespace) sbAppend(sb, "_");
-            else if (deref->expr->datatype.numPointers) sbAppend(sb, "->");
+            if (deref->expr->datatype.numPointers) sbAppend(sb, "->");
             else sbAppend(sb, ".");
 
 
 
-            if (deref->expr->datatype.kind == Typekind_Struct) {
-                Struct* stru = deref->expr->datatype.stru;
-                foreach (field, stru->fields) {
-                    if (field->name == deref->name) goto done;
+            // I belive this had to do with contextual inclusion of fields
+            // if (deref->expr->datatype.kind == Typekind_Struct) {
+            //     Struct* stru = deref->expr->datatype.stru;
+            //     foreach (field, stru->fields) {
+            //         if (field->name == deref->name) goto done;
                     
-                }
-            }
+            //     }
+            // }
 
             done:
             sbAppend(sb, get_string(deref->name));
@@ -394,7 +393,7 @@ static void transpileExpression(Expression* expr) {
         case ExprType_Literal_String: {
             LiteralExpression* lit = (LiteralExpression*)expr;
             sbAppend(sb, "\"");
-            sbAppend(sb, get_string(lit->string));
+            sbAppend(sb, get_string(lit->data.string));
             sbAppend(sb, "\"");
         } break;
 
@@ -402,14 +401,14 @@ static void transpileExpression(Expression* expr) {
             LiteralExpression* lit = (LiteralExpression*)expr;
             sbAppendChar(sb, '\'');
 
-            switch (lit->character) {
+            switch (lit->data.character) {
                 case '\n': sbAppend(sb, "\\n"); break;
                 case '\t': sbAppend(sb, "\\t"); break;
                 case '\\': sbAppend(sb, "\\\\"); break;
                 case '\'': sbAppend(sb, "\\'"); break;
 
                 default:
-                    sbAppendChar(sb, lit->character);
+                    sbAppendChar(sb, lit->data.character);
                     break;
             }
 
@@ -421,13 +420,13 @@ static void transpileExpression(Expression* expr) {
 
         case ExprType_Literal_Integer: {
             LiteralExpression* lit = (LiteralExpression*)expr;
-            sbAppendSpan(sb, numberToString(lit->integer));
+            sbAppendSpan(sb, numberToString(lit->data.integer));
         } break;
 
         case ExprType_Literal_Decimal: {
             LiteralExpression* lit = (LiteralExpression*)expr;
             char temp_buffer[24];
-            u32 i = snprintf(temp_buffer, 23, "%f", lit->decimal);
+            u32 i = snprintf(temp_buffer, 23, "%f", lit->data.decimal);
             temp_buffer[i] = '\0';
             sbAppend(sb, temp_buffer);
         } break;
@@ -768,11 +767,11 @@ static void transpileScope(Scope* scope) {
 }
 
 static void transpileFunctionSignature(Procedure* proc) {
+    if (proc->name != builtin_string_main && proc->scope) sbAppend(sb, "static ");
     transpileType(proc->returnType);
     sbAppend(sb, " ");
 
-    if (proc->scope && (proc->name != builtin_string_main)) transpileNamespacedId(get_file(proc->base.nodebase.file_index)->namespace, proc->name);
-    else sbAppend(sb, get_string(proc->name));
+    sbAppend(sb, get_string(proc->name));
 
     if (proc->overload) sbAppendChar(sb, getCharFromU32(proc->overload));
 
@@ -832,7 +831,7 @@ static u32 countStructDependencies(Struct* stru) {
     return deps;
 }
 
-static void transpile() {
+static void transpile(Codebase* codebase) {
     // TODO: use a higer initial capacity for the string builder
     StringBuilder builder = sbCreate();
     sb = &builder;
@@ -840,30 +839,6 @@ static void transpile() {
     // sbAppend(sb, "#include <stdlib.h>\n"); // malloc
     // sbAppend(sb, "#include <stdio.h>\n"); // printf
     // sbAppend(sb, "#define true 1\n#define false 0\n");
-
-    { // namespaces
-        sbAppend(sb, "/* Namespaces\n");
-        foreach(item, g_Codebase.namespaces) {
-            Namespace* ns = *item;
-            sbAppend(sb, "item: ");
-            sbAppend(sb, get_string(ns->name));
-            sbAppend(sb, "\n");
-        }
-
-        sbAppend(sb, "*/\n");
-    }
-
-    // { // syntax tree
-    //     u32 length = list_length(g_Codebase.string_table.byteoffsets);
-    //     sbAppend(sb, "static char string_table[] = \"");
-    //     for (u32 i = 0; i < length; i++) {
-    //         char* str = get_string_byindex(i);
-    //         sbAppend(sb, str);
-    //         sbAppend(sb, "\\0");
-    //     }
-    //     sbAppend(sb, "\";\n");
-    // }
-
 
     sbAppend(sb, "\n// Basics\n");
     sbAppend(sb, "typedef signed char int8;\n");
@@ -879,93 +854,75 @@ static void transpile() {
     sbAppend(sb, "int printf(const char* format, ...);\n");
 
 
-    sbAppend(sb, "\n// Opaque types\n");
-    iterate(opaque_types, {
-        char* typename = get_string(*item);
-        sbAppend(sb, "typedef struct ");
-        sbAppend(sb, typename);
-        sbAppend(sb, " ");
-        sbAppend(sb, typename);
-        sbAppend(sb, ";\n");
-    });
-
     sbAppend(sb, "\n// Structs forward declarations\n");
-    iterate(structs, {
-        char* name = get_string(item->name);
+    u32 structs_count = list_length(codebase->structs);
+    for (u32 i = 0; i < structs_count; i++) {
+        Struct* s = codebase->structs[i];
+        char* name = get_string(s->name);
         sbAppend(sb, "typedef struct ");
         sbAppend(sb, name);
         sbAppend(sb, " ");
         sbAppend(sb, name);
         sbAppend(sb, ";\n");
-    });
+    }
 
     sbAppend(sb, "\n// Enums\n");
-    iterate(enums, {
+    foreach (enu, codebase->enums) {
+        Enum* en = *enu;
         sbAppend(sb, "typedef uint32 ");
-        sbAppend(sb, get_string(item->name));
+        sbAppend(sb, get_string(en->name));
         sbAppend(sb, ";\n");
-    });
+    }
+
 
     sbAppend(sb, "\n// Type aliases\n");
-    iterate(type_defs, {
-        transpileTypedef(item);
+    foreach (type_def, codebase->type_defs) {
+        transpileTypedef(*type_def);
         sbAppend(sb, "\n");
-    });
+    }
 
 
     {
         sbAppend(sb, "\n// Structs\n");
-        u32 structs_count = 0;
-        iterate(structs, {
-            item->deps = countStructDependencies(item);
-            structs_count++;
-        });
+        for (u32 i = 0; i < structs_count; i++) {
+            codebase->structs[i]->deps = countStructDependencies(codebase->structs[i]);
+        }
 
         u32 dep = 0;
         u32 transpiled = 0;
         while (transpiled < structs_count) {
-            iterate(structs, {
-                if (item->deps == dep) {
-                    transpileStruct(item);
+            for (u32 i = 0; i < structs_count; i++) {
+                Struct* stru = codebase->structs[i];
+                if (stru->deps == dep) {
+                    transpileStruct(stru);
                     sbAppend(sb, "\n");
                     transpiled++;
                 }
-            });
+            }
             dep++;
         }
     }
 
     sbAppend(sb, "\n// Forward declarations\n");
-    iterate(procedures, {
-        transpileFunctionSignature(item);
+    u32 procs_count = list_length(codebase->procedures);
+    for (u32 i = 0; i < procs_count; i++) {
+        transpileFunctionSignature(codebase->procedures[i]);
         sbAppend(sb, ";\n");
-    });
-
-    // sbAppend(sb, "\n// Constants\n");
-    // iterate(constants, {
-    //     sbAppend(sb, "#define ");
-    //     sbAppend(sb, get_string(item->name));
-    //     sbAppend(sb, " ");
-    //     transpileExpression(item->expr);
-    //     sbAppend(sb, "\n");
-    // });
+    }
 
     sbAppend(sb, "\n// Declarations\n");
-    iterate(declarations, {
-
-        if (item->base.statementType == Statement_Constant) {
-        } else {
-            transpileGlobal(item);
-            sbAppend(sb, "\n");
-        }
-
-    });
+    foreach (global_var, codebase->global_vars) {
+        sbAppend(sb, "static ");
+        transpileVarDecl(*global_var);
+        sbAppend(sb, "\n");
+    }
 
     sbAppend(sb, "\n// Implementations\n");
-    iterate(procedures, {
-        if (!item->scope) continue;
-        transpileProcedure(item);
-    });
+    for (u32 i = 0; i < procs_count; i++) {
+        Procedure* proc = codebase->procedures[i];
+        if (proc->scope == null) continue;
+        transpileProcedure(proc);
+    }
 
 
     FILE* file;

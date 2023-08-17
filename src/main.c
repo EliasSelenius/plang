@@ -117,8 +117,8 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
-    parser = (Parser) {0};
-    parser.src_files = list_create(File);
+    init_parser();
+    init_string_table();
 
     startPerf();
 
@@ -134,7 +134,7 @@ int main(int argc, char* argv[]) {
             lex(argv[2]);
             Expression* expr = expectExpression();
             Value v = interpret_expression(expr);
-            printf("%d\n", v.int32);
+            print_value(v);
             return 0;
         }
     }
@@ -154,21 +154,10 @@ int main(int argc, char* argv[]) {
     }
 
 
-    parse();
-    if (numberOfErrors) {
-        printf("There were %d errors during parsing.\n", numberOfErrors);
-        exit(0);
-    }
-
-    printf("Validate...\n");
-    validate();
-    if (numberOfErrors) {
-        printf("There were %d errors during validation.\n", numberOfErrors);
-        return 0;
-    }
+    Codebase cb = parse();
 
     printf("Transpile...\n");
-    transpile();
+    transpile(&cb);
 
     i64 t = endPerf();
     printf("Done in %lldus.\n", t);

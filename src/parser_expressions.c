@@ -19,6 +19,12 @@ static void expectProcCallArgs(ProcCall* proc, Expression* proc_expr) {
     expect(Tok_CloseParen);
 }
 
+static Expression* literal_expr(ExprType expr_type) {
+    LiteralExpression* lit = allocExpr(expr_type);
+    lit->data = tokens[token_index++].data;
+    return (Expression*)lit;
+}
+
 static Expression* parseLeafExpression() {
     Expression* res = null;
 
@@ -37,7 +43,13 @@ static Expression* parseLeafExpression() {
     switch (tokens[token_index].type) {
         case Tok_Word: {
             VariableExpression* ve = allocExpr(ExprType_Variable);
-            ve->name = tokens[token_index++].string;
+            ve->name = tokens[token_index++].data.string;
+
+            if (ve->name != builtin_string_print) {
+                ve->ref = get_symbol(ve->name);
+                if (!ve->ref) list_add(parser.unresolved_variables, ve);
+            }
+
             res = (Expression*)ve;
         } break;
 
@@ -105,27 +117,10 @@ static Expression* parseLeafExpression() {
             expect(Tok_CloseCurl);
         } break;
 
-        case Tok_Integer: {
-            LiteralExpression* lit = allocExpr(ExprType_Literal_Integer);
-            lit->integer = tokens[token_index++].integer;
-            res = (Expression*)lit;
-        } break;
-        case Tok_Decimal: {
-            LiteralExpression* lit = allocExpr(ExprType_Literal_Decimal);
-            lit->decimal = tokens[token_index++].decimal;
-            res = (Expression*)lit;
-        } break;
-        case Tok_String: {
-            LiteralExpression* lit = allocExpr(ExprType_Literal_String);
-            lit->string = tokens[token_index++].string;
-            res = (Expression*)lit;
-        } break;
-        case Tok_Char: {
-            LiteralExpression* lit = allocExpr(ExprType_Literal_Char);
-            lit->character = tokens[token_index++].character;
-            res = (Expression*)lit;
-        } break;
-
+        case Tok_Integer:       res = literal_expr(ExprType_Literal_Integer); break;
+        case Tok_Decimal:       res = literal_expr(ExprType_Literal_Decimal); break;
+        case Tok_String:        res = literal_expr(ExprType_Literal_String); break;
+        case Tok_Char:          res = literal_expr(ExprType_Literal_Char); break;
         case Tok_Keyword_True:  res = allocExpr(ExprType_Literal_True); token_index++; break;
         case Tok_Keyword_False: res = allocExpr(ExprType_Literal_False); token_index++; break;
         case Tok_Keyword_Null:  res = allocExpr(ExprType_Literal_Null); token_index++; break;

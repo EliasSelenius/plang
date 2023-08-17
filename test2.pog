@@ -1,12 +1,35 @@
 
-namespace OtherNamespace;
 
-// MyTestNamespace.Test test;
 
 void hello() {
     print("Hello from OtherNamespace\n");
-
     // test.x = 10;
+
+    void*() proc;
+
 }
 
 const ThisIsConst = 123;
+
+
+// enable when we get fixed arrays
+// struct Foo {
+
+//     // float32 pos[3]
+//     float32[3] pos;
+
+//     // uint8 (*buffer)[1024]
+//     uint8[1024]* buffer;
+
+//     // uint8 *buffer2[1024]
+//     uint8*[1024] buffer2;
+
+//     // void (*func[10])()
+//     void()[10] func;
+
+//     // void (*(*func2)(int)[10])()
+//     void()[10](int32) func2;
+
+//     // void (*(*(*func3)(int))[10])()
+//     void()[10]*(int32) func3;
+// }

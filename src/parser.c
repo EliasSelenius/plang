@@ -4,9 +4,14 @@ static Scope* expectScope();
 static Expression* parseExpression();
 static Expression* expectExpression();
 static Statement* expectStatement();
+static void validate(Codebase* cb);
 
-static inline Token token() {
-    return parser.tokens[parser.token_index];
+static inline Token peek() {
+    return tokens[token_index];
+}
+
+static inline Token peek_at(i32 offset) {
+    return tokens[token_index + offset];
 }
 
 // asserts the existence of a semicolon
@@ -25,7 +30,7 @@ static Identifier identifier() {
         return -1;
     }
     token_index++;
-    return token.string;
+    return token.data.string;
 }
 
 static void expect(TokenType type) {
@@ -48,202 +53,6 @@ static inline bool tok(TokenType type) {
     return false;
 }
 
-
-static Datatype getType(Namespace* ns, Identifier name) {
-    foreach (def, ns->type_defs) {
-        if (def->name == name) return (Datatype) { .kind = Typekind_Typedef, .data_ptr = def };
-    }
-
-    foreach (stru, ns->structs) {
-        if (stru->name == name) return (Datatype) { .kind = Typekind_Struct, .data_ptr = stru };
-    }
-
-    foreach (en, ns->enums) {
-        if (en->name == name) return (Datatype) { .kind = Typekind_Enum, .data_ptr = en };
-    }
-
-    foreach (opaque, ns->opaque_types) {
-        if (*opaque == name) {
-            Datatype res = { .kind = Typekind_Opaque, .data_ptr = (void*)name };
-            return res;
-        }
-    }
-
-    return type_invalid;
-}
-
-static Datatype getLocalType(Identifier name) {
-    Statement* sta = get_local_type(name);
-
-    if (sta == null) return type_invalid;
-    if (sta->statementType == Statement_Struct) return (Datatype) { .kind = Typekind_Struct, .data_ptr = sta };
-    if (sta->statementType == Statement_Enum) return (Datatype) { .kind = Typekind_Enum, .data_ptr = sta };
-    if (sta->statementType == Statement_Typedef) return (Datatype) { .kind = Typekind_Typedef, .data_ptr = sta };
-
-    return type_invalid;
-}
-
-static Type* newTypeNode(TypeNode node_type) {
-    Type* res = calloc(1, sizeof(Type));
-    res->nodebase = node_init();
-    res->node_type = node_type;
-    return res;
-}
-
-static Type* type_modifier(Type* type);
-
-static Type* parseTypeNode() {
-    Type* type = newTypeNode(TypeNode_Normal);
-
-    if (tok(Tok_Keyword_Let)) {
-        type->node_type = TypeNode_MustInfer;
-        return type;
-    }
-
-    type->name = identifier();
-    if (tok(Tok_Period)) {
-        type->namespace_name = type->name;
-        type->name = identifier();
-    }
-
-    Type* mod = type;
-    while ( (mod = type_modifier(mod)) ) type = mod;
-
-    return type;
-}
-
-static Type* type_modifier(Type* type) {
-    if (tok(Tok_OpenParen)) {
-        Type* mod = newTypeNode(TypeNode_Procedure);
-        mod->procedure.return_type = type;
-        if (tok(Tok_CloseParen)) return mod;
-
-        Type* arg = parseTypeNode();
-        mod->procedure.arguments = arg;
-        while (tok(Tok_Comma)) {
-            arg->next = parseTypeNode();
-            arg = arg->next;
-        }
-        expect(Tok_CloseParen);
-        return mod;
-    }
-
-    if (tok(Tok_Mul)) {
-        Type* mod = newTypeNode(TypeNode_Pointer);
-        mod->pointedto = type;
-        return mod;
-    }
-
-    return null;
-}
-
-static void printType(Type* type) {
-    switch (type->node_type) {
-        case TypeNode_MustInfer: printf("let"); break;
-        case TypeNode_Normal: {
-            if (type->namespace_name) printf("%s.%s", get_string(type->namespace_name), get_string(type->name));
-            else printf("%s", get_string(type->name));
-        } break;
-        case TypeNode_Pointer: {
-            printType(type->pointedto);
-            printf("*");
-        } break;
-        case TypeNode_Procedure: {
-            printType(type->procedure.return_type);
-            printf("(");
-            Type* arg = type->procedure.arguments;
-            if (arg) {
-                printType(arg);
-                arg = arg->next;
-                while (arg) {
-                    printf(", ");
-                    printType(arg);
-                    arg = arg->next;
-                }
-            }
-            printf(")");
-        } break;
-    }
-}
-
-
-static bool typenode2datatype_globalcheck = false;
-static Datatype typenode2datatype(Type* type) {
-    switch (type->node_type) {
-        case TypeNode_MustInfer: return type_invalid;
-
-        case TypeNode_Pointer: {
-            Datatype res = typenode2datatype(type->pointedto);
-            res.numPointers++;
-            return res;
-        }
-
-        case TypeNode_Normal: {
-            if (type->namespace_name && typenode2datatype_globalcheck) {
-                Namespace* ns = getNamespace(type->namespace_name);
-                if (!ns) return type_invalid;
-                return getType(ns, type->name);
-            }
-
-            if (type->name == type_name_int8) return type_int8;
-            else if (type->name == type_name_uint8) return type_uint8;
-            else if (type->name == type_name_int16) return type_int16;
-            else if (type->name == type_name_uint16) return type_uint16;
-            else if (type->name == type_name_int32) return type_int32;
-            else if (type->name == type_name_uint32) return type_uint32;
-            else if (type->name == type_name_int64) return type_int64;
-            else if (type->name == type_name_uint64) return type_uint64;
-            else if (type->name == type_name_float32) return type_float32;
-            else if (type->name == type_name_float64) return type_float64;
-            else if (type->name == type_name_char) return type_char;
-            else if (type->name == type_name_void) return type_void;
-
-            Datatype res = getLocalType(type->name);
-            if (typenode2datatype_globalcheck) {
-                if (res.kind == Typekind_Invalid) res = getType(get_file(type->nodebase.file_index)->namespace, type->name);
-                if (res.kind == Typekind_Invalid) res = getType(g_Codebase.namespaces[0], type->name);
-            }
-            return res;
-        }
-
-        case TypeNode_Procedure: {
-
-            if (!typenode2datatype_globalcheck) return type_invalid;
-
-            Datatype retType = typenode2datatype(type->procedure.return_type);
-            if (retType.kind == Typekind_Invalid) return type_invalid;
-
-            // note that there is a potential memory leak here, but maybe we dont care.
-            ProcSignature* sig = createSignature(retType);
-            Type* arg = type->procedure.arguments;
-            while (arg) {
-                addArgument(sig, typenode2datatype(arg), 0);
-                arg = arg->next;
-            }
-
-            return (Datatype) {
-                .kind = Typekind_Procedure,
-                .procedure = sig,
-                .numPointers = 1
-            };
-        }
-    }
-}
-
-static Type* expectType() {
-    Type* type = parseTypeNode();
-
-    if (type->node_type == TypeNode_MustInfer) return type;
-
-    type->solvedstate = typenode2datatype(type);
-    if (type->solvedstate.kind == Typekind_Invalid) {
-        list_add(parser.unresolved_types, type);
-    }
-
-    return type;
-}
-
-
 static Token* anyof(u32 count, ...) {
     va_list args;
     va_start(args, count);
@@ -260,28 +69,178 @@ static Token* anyof(u32 count, ...) {
     return null;
 }
 
-// static bool expectDeclaration(Declaration* decl, Type* type, Identifier name) {
 
-//     decl->base.statementType = Statement_Declaration;
+static Datatype get_type_from_statement(Statement* sta) {
 
-//     decl->type = type;
-//     decl->name = name;
+    if (sta == null) return type_invalid;
+    if (sta->statementType == Statement_Struct) return (Datatype) { .kind = Typekind_Struct, .data_ptr = sta };
+    if (sta->statementType == Statement_Enum) return (Datatype) { .kind = Typekind_Enum, .data_ptr = sta };
+    if (sta->statementType == Statement_Typedef) return (Datatype) { .kind = Typekind_Typedef, .data_ptr = sta };
 
-//     if (tok(Tok_Assign)) decl->expr = expectExpression();
-//     else if (tok(Tok_OpenSquare)) {
-//         decl->base.statementType = Statement_FixedArray;
-//         decl->expr = expectExpression();
-//         expect(Tok_CloseSquare);
-//     }
+    return type_invalid;
+}
 
-//     return tok(Tok_Comma);
-// }
+static Type* newTypeNode(TypeNode node_type) {
+    Type* res = calloc(1, sizeof(Type)); // TODO: use arena allocator
+    res->nodebase = node_init();
+    res->node_type = node_type;
+    return res;
+}
 
-// static Declaration expectDeclarationNext(Declaration* decl) {
-//     Declaration res = {0};
-//     res.
-//     return res;
-// }
+static Type* type_modifier(Type* type);
+
+static Type* parseTypeNode() {
+    Type* type = newTypeNode(TypeNode_Normal);
+
+    if (tok(Tok_Keyword_Let)) {
+        type->node_type = TypeNode_MustInfer;
+        return type;
+    }
+
+    type->name = identifier();
+
+    Type* mod = type;
+    while ( (mod = type_modifier(mod)) ) type = mod;
+
+    return type;
+}
+
+static Type* type_modifier(Type* type) {
+    if (tok(Tok_OpenParen)) {
+        Type* mod = newTypeNode(TypeNode_Procedure);
+        mod->procedure.return_type = type;
+        mod->solvedstate.numPointers = 1;
+        if (tok(Tok_CloseParen)) return mod;
+
+        Type* arg = parseTypeNode();
+        mod->procedure.first_argument = arg;
+        while (tok(Tok_Comma)) {
+            arg->next = parseTypeNode();
+            arg = arg->next;
+        }
+        expect(Tok_CloseParen);
+        return mod;
+    }
+
+    if (tok(Tok_Mul)) {
+        type->solvedstate.numPointers++;
+        return type;
+    }
+
+    return null;
+}
+
+static void printType(Type* type) {
+    switch (type->node_type) {
+        case TypeNode_MustInfer: printf("let"); break;
+        case TypeNode_Normal: {
+            printf("%s", get_string(type->name));
+            printf("%.*s", type->solvedstate.numPointers, "***********");
+        } break;
+
+        case TypeNode_Procedure: {
+            printType(type->procedure.return_type);
+            printf("(");
+            Type* arg = type->procedure.first_argument;
+            if (arg) {
+                printType(arg);
+                arg = arg->next;
+                while (arg) {
+                    printf(", ");
+                    printType(arg);
+                    arg = arg->next;
+                }
+            }
+            printf(")");
+        } break;
+    }
+}
+
+
+static void resolve_typenode(Type* type, Codebase* codebase) {
+
+    Datatype datatype = type_invalid;
+
+    switch (type->node_type) {
+
+        case TypeNode_Normal: {
+
+            if (codebase) {
+                datatype = get_type_from_statement(get_global_type(type->name, codebase));
+                break;
+            }
+
+            if (type->name == type_name_int8)    { datatype = type_int8; break; }
+            if (type->name == type_name_uint8)   { datatype = type_uint8; break; }
+            if (type->name == type_name_int16)   { datatype = type_int16; break; }
+            if (type->name == type_name_uint16)  { datatype = type_uint16; break; }
+            if (type->name == type_name_int32)   { datatype = type_int32; break; }
+            if (type->name == type_name_uint32)  { datatype = type_uint32; break; }
+            if (type->name == type_name_int64)   { datatype = type_int64; break; }
+            if (type->name == type_name_uint64)  { datatype = type_uint64; break; }
+            if (type->name == type_name_float32) { datatype = type_float32; break; }
+            if (type->name == type_name_float64) { datatype = type_float64; break; }
+            if (type->name == type_name_char)    { datatype = type_char; break; }
+            if (type->name == type_name_void)    { datatype = type_void; break; }
+
+            datatype = get_type_from_statement(get_local_type(type->name));
+        } break;
+
+        case TypeNode_Procedure: {
+
+            resolve_typenode(type->procedure.return_type, codebase);
+
+            Type* arg = type->procedure.first_argument;
+            while (arg) {
+                resolve_typenode(arg, codebase);
+                arg = arg->next;
+            }
+
+            datatype.kind = Typekind_Procedure;
+            datatype.proc_ptr_typenode = type;
+        } break;
+
+        case TypeNode_MustInfer:
+        default: datatype = type_invalid;
+    }
+
+    if (datatype.kind == Typekind_Invalid) {
+        list_add(parser.unresolved_types, type);
+    } else {
+        u32 np = type->solvedstate.numPointers;
+        type->solvedstate = datatype;
+        type->solvedstate.numPointers = np;
+    }
+}
+
+static Type* expectType() {
+    Type* type = parseTypeNode();
+
+    if (type->node_type == TypeNode_MustInfer) return type;
+
+    resolve_typenode(type, null);
+
+    return type;
+}
+
+static void init_typenode_for_proc(Procedure* proc) {
+    Type* type = newTypeNode(TypeNode_Procedure);
+    type->nodebase = proc->base.nodebase;
+    type->procedure.return_type = proc->returnType;
+    type->solvedstate.proc_ptr_typenode = type;
+
+    if (proc->arguments) {
+        Type* type_arg = proc->arguments[0].type;
+        type->procedure.first_argument = type_arg;
+        u32 arg_count = list_length(proc->arguments);
+        for (u32 i = 1; i < arg_count; i++) {
+            type_arg->next = proc->arguments[i].type;
+            type_arg = type_arg->next;
+        }
+    }
+
+    proc->type_node = type;
+}
 
 static ProcArg* expectProcArguments() {
 
@@ -304,11 +263,9 @@ static ProcArg* expectProcArguments() {
     return res;
 }
 
-static void expectEnum(Enum* en) {
+static Statement* expectEnum() {
 
-    *en = (Enum) {0};
-    en->base.nodebase = node_init();
-    en->base.statementType = Statement_Enum;
+    Enum* en = allocStatement(Statement_Enum);
     en->entries = list_create(EnumEntry);
 
     token_index++;
@@ -327,16 +284,16 @@ static void expectEnum(Enum* en) {
 
         list_add(en->entries, entry);
     }
+
+    return (Statement*)en;
 }
 
-static Struct expectStruct() {
-    Struct stru;
-    stru.base.nodebase = node_init();
-    stru.base.statementType = Statement_Struct;
-    stru.fields = list_create(Declaration);
+static Statement* expectStruct() {
+    Struct* stru = allocStatement(Statement_Struct);
+    stru->fields = list_create(Declaration);
 
     token_index++;
-    stru.name = identifier();
+    stru->name = identifier();
     expect(Tok_OpenCurl);
 
     do {
@@ -347,12 +304,12 @@ static Struct expectStruct() {
         field.include_context = tok(Tok_Keyword_With);
         field.type = expectType();
         field.name = identifier();
-        list_add(stru.fields, field);
+        list_add(stru->fields, field);
 
         while (tok(Tok_Comma)) {
             field.base.nodebase.lineNumber = tokens[token_index].line;
             field.name = identifier();
-            list_add(stru.fields, field);
+            list_add(stru->fields, field);
         }
 
         semicolon();
@@ -360,35 +317,80 @@ static Struct expectStruct() {
 
     token_index++;
 
-    return stru;
+    return (Statement*)stru;
 }
 
-static Typedef expectTypedef() {
-    Typedef def = {0};
-    def.base.nodebase = node_init();
-    def.base.statementType = Statement_Typedef;
-
+static Statement* expectTypedef() {
+    Typedef* def = allocStatement(Statement_Typedef);
     token_index++;
-    def.name = identifier();
-    if (tok(Tok_Assign)) {
-        def.type = expectType();
+    def->name = identifier();
+    if (tok(Tok_Assign)) def->type = expectType();
+    semicolon();
+    return (Statement*)def;
+}
+
+static Statement* expectConst() {
+    Declaration* decl = allocStatement(Statement_Constant);
+    token_index++;
+    decl->name = identifier();
+    expect(Tok_Assign);
+    decl->expr = expectExpression();
+    semicolon();
+    return (Statement*)decl;
+}
+
+
+static Statement* proc_or_var(bool declare_localy) {
+
+    Node node = node_init();
+    Type* type = expectType();
+    Identifier name = identifier();
+
+    if (tok(Tok_OpenParen)) {
+
+        Procedure* proc = allocStatement(Statement_Procedure);
+        proc->base.nodebase = node;
+        proc->returnType = type;
+        proc->name = name;
+        proc->arguments = expectProcArguments();
+
+        if (declare_localy) declare_symbol((Statement*)proc);
+
+        if (tok(Tok_Semicolon)) {
+            proc->scope = null;
+        } else {
+
+            u32 num_args = 0;
+            if (proc->arguments) {
+                foreach (arg, proc->arguments) {
+                    declare_symbol((Statement*)arg);
+                }
+                num_args = arg_count;
+            }
+
+            proc->scope = expectScope();
+            stack_pop(num_args);
+        }
+
+        return (Statement*)proc;
+    }
+
+
+    Declaration* decl = allocStatement(Statement_Declaration);
+    decl->base.nodebase = node;
+    decl->type = type;
+    decl->name = name;
+
+    if (tok(Tok_OpenSquare)) {
+        decl->base.statementType = Statement_FixedArray;
+        decl->expr = expectExpression();
+        expect(Tok_CloseSquare);
+    } else if (tok(Tok_Assign)) {
+        decl->expr = expectExpression();
     }
 
     semicolon();
-    return def;
-}
-
-static Declaration expectConst() {
-    Declaration decl = {0};
-    decl.base.nodebase = node_init();
-    decl.base.statementType = Statement_Constant;
-
-    token_index++;
-    decl.name = identifier();
-    expect(Tok_Assign);
-    decl.expr = expectExpression();
-    semicolon();
-    return decl;
+    return (Statement*)decl;
 }
 
 #include "parser_expressions.c"
@@ -406,226 +408,231 @@ static void skipBody() {
     }
 }
 
-
-static void proc_or_global() {
-
-    Node node = node_init();
-    Type* type = expectType();
-    Identifier name = identifier();
-
-    if (tok(Tok_OpenParen)) {
-
-        Procedure proc = {0};
-        proc.base.nodebase = node;
-        proc.base.statementType = Statement_Procedure;
-        proc.returnType = type;
-        proc.name = name;
-        proc.arguments = expectProcArguments();
-        proc.scope = expectScope();
-
-        list_add(get_current_file()->namespace->procedures, proc);
-
-        return;
-    }
-
-
-    Declaration decl = {0};
-    decl.base.nodebase = node;
-    decl.base.statementType = Statement_GlobalVariable;
-    decl.type = type;
-    decl.name = name;
-
-    globvar:
-
-    if (tok(Tok_OpenSquare)) {
-        decl.base.statementType = Statement_GlobalFixedArray;
-        decl.expr = expectExpression();
-        expect(Tok_CloseSquare);
-    } else {
-        if (tok(Tok_Assign)) decl.expr = expectExpression();
-    }
-
-    list_add(get_current_file()->namespace->declarations, decl);
-
-    if (tok(Tok_Comma)) {
-        decl.base.statementType = Statement_Declaration;
-        decl.name = identifier();
-        decl.expr = null;
-        goto globvar;
-    }
-
-    semicolon();
-}
-
-static bool parseProgramEntity() {
+static Statement* parse_top_level_statement() {
 
     switch (tokens[token_index].type) {
 
         case Tok_Keyword_Include: {
             token_index++;
             expect(Tok_String);
-            Identifier string = tokens[token_index - 1].string;
+            Identifier string = tokens[token_index - 1].data.string;
             printf("include \"%s\"\n", get_string(string));
             addFile(get_string(string), null);
             semicolon();
         } break;
 
-        case Tok_Keyword_Struct: {
-            Struct stru = expectStruct();
-            list_add(get_current_file()->namespace->structs, stru);
-        } break;
+        case Tok_Keyword_Struct: return expectStruct();
+        case Tok_Keyword_Enum: return expectEnum();
+        case Tok_Keyword_Type: return expectTypedef();
+        case Tok_Keyword_Const: return expectConst();
 
-        case Tok_Keyword_Enum: {
-            Enum* en = list_get_next(get_current_file()->namespace->enums);
-            expectEnum(en);
-        } break;
-
-        case Tok_Keyword_Type: {
-            Typedef def = expectTypedef();
-            if (def.type) {
-                list_add(get_current_file()->namespace->type_defs, def);
-            } else {
-                list_add(get_current_file()->namespace->opaque_types, def.name);
-            }
-        } break;
-
+        case Tok_Keyword_Declare: token_index++;
         case Tok_Keyword_Let:
-        case Tok_Word: proc_or_global(); break;
+        case Tok_Word: return proc_or_var(false);
 
-        case Tok_Keyword_Const: {
-            Declaration decl = expectConst();
-            list_add(get_current_file()->namespace->declarations, decl);
-        } break;
-
-        case Tok_Keyword_Declare: {
-            // function declaration
-
-            token_index++;
-
-            Procedure proc = {0};
-            proc.base.nodebase = node_init();
-            proc.base.statementType = Statement_Procedure;
-            proc.overload = 0;
-            proc.scope = null;
-            proc.returnType = expectType();
-            proc.name = identifier();
-            expect(Tok_OpenParen);
-            proc.arguments = expectProcArguments();
-            semicolon();
-
-            list_add(get_current_file()->namespace->procedures, proc);
-        } break;
-
-        case Tok_Keyword_Namespace: {
-            error_token("Namespace must be the first thing declared in a file.");
-            token_index++;
-            tok(Tok_Word);
-            tok(Tok_Semicolon);
-        } break;
-
-        case Tok_EOF: token_index++; return false;
+        case Tok_EOF: return null;
 
         default: {
             unexpectedToken();
         } break;
     }
 
-    return true;
+    return null;
 }
 
-static void parseFile() {
-    token_index = 0;
-
-    if (tok(Tok_Keyword_Namespace)) {
-        Identifier name = identifier();
-        Namespace* ns = ensureNamespace(name);
-        get_current_file()->namespace = ns;
-        semicolon();
-    } else get_current_file()->namespace = g_Codebase.namespaces[0];
-
-    while (parseProgramEntity());
-}
-
-
-static void parse() {
-
-    Unit unit;
+static Unit parse_unit() {
+    Unit unit = {0};
     current_unit = &unit;
 
-    codebase_init(&g_Codebase);
-    initTypenames();
+    unit.arena = arena_create();
+    unit.top_level_statements = list_create(Statement*);
+    unit.external_symbols = list_create(VariableExpression*);
+    unit.external_types = list_create(Type*);
 
-    parser.unresolved_types = list_create(Type*);
-    parser.local_types = list_create(Statement*);
+    list_clear(parser.unresolved_variables);
+
+    token_index = 0;
+    while (peek().type != Tok_EOF) {
+        list_clear(parser.local_symbols);
+        Statement* top_lvl_sta = parse_top_level_statement();
+        if (top_lvl_sta) list_add(unit.top_level_statements, top_lvl_sta);
+    }
+
+    foreach (item, parser.unresolved_variables) {
+        VariableExpression* var = *item;
+        var->ref = get_global_symbol(var->name, current_unit);
+
+        if (!var->ref) list_add(current_unit->external_symbols, var);
+    }
+
+    {
+        printf("Unresolved: (external symbols)\n");
+        foreach (item, current_unit->external_symbols) {
+            VariableExpression* var = *item;
+            printf("    \"%s\" at line %d\n", get_string(var->name), var->base.nodebase.lineNumber);
+        }
+    }
 
 
-    tokens = list_create(Token);
+    return unit;
+}
+
+static Unit parse_file(char* file_name) {
+    u32 content_len = 0;
+    char* content = fileread(file_name, &content_len);
+    lex(content);
+    free(content);
+
+    Unit u = parse_unit();
+    return u;
+}
+
+
+// must be possible to rebind codebase several times, because units may change
+void bind_units(Unit* units, Codebase* cb) {
+
+    // construct Codebase that contains lists of all procs/types/globals
+    #define ensure_list(list) if (list) list_clear(list); else list = list_create(typeof(*list))
+    ensure_list(cb->procedures);
+    ensure_list(cb->global_vars);
+    ensure_list(cb->global_consts);
+    ensure_list(cb->structs);
+    ensure_list(cb->enums);
+    ensure_list(cb->type_defs);
+    #undef ensure_list
+
+    foreach (unit, units) {
+        foreach (top_lvl_sta, unit->top_level_statements) {
+            Statement* sta = *top_lvl_sta;
+
+            switch (sta->statementType) {
+                case Statement_Procedure: list_add(cb->procedures, sta); break;
+
+                case Statement_Constant: list_add(cb->global_consts, sta); break;
+                case Statement_FixedArray:
+                case Statement_Declaration: list_add(cb->global_vars, sta); break;
+                case Statement_Struct: list_add(cb->structs, sta); break;
+                case Statement_Enum: list_add(cb->enums, sta); break;
+                case Statement_Typedef: list_add(cb->type_defs, sta); break;
+
+                default: break;
+            }
+        }
+    }
+
+    // resolve types
+    foreach (tp, parser.unresolved_types) {
+        Type* type = *tp;
+        resolve_typenode(type, cb);
+        if (type->solvedstate.kind == Typekind_Invalid) {
+            error_node(type, "Failed to resolve type");
+            printf("    "); printType(type); printf("\n");
+        }
+    }
+
+    // resolve external symbols
+    u32 units_length = list_length(units);
+    for (u32 i = 0; i < units_length; i++) {
+        Unit* u1 = &units[i];
+        for (u32 j = 0; j < units_length; j++) {
+            Unit* u2 = &units[j];
+            if (u1 == u2) continue;
+
+            foreach (item, u1->external_symbols) {
+                VariableExpression* var = *item;
+                if (var->ref) continue;
+                var->ref = get_global_symbol(var->name, u2);
+            }
+        }
+    }
+
+    for (u32 i = 0; i < units_length; i++) {
+        Unit* u = &units[i];
+
+        foreach (item, u->external_symbols) {
+            VariableExpression* var = *item;
+            if (var->ref == null) error_node(var, "Undeclared symbol \"%s\".", get_string(var->name));
+        }
+    }
+
+    { // overloads
+
+        u32 procs_length = list_length(cb->procedures);
+
+        // clear (in case this is rebinding a previously bound codebase)
+        // for (u32 i = 0; i < procs_length; i++) {
+        //     Procedure* p = cb->procedures[i];
+        //     p->next_overload = null;
+        //     p->overload = 0;
+        // }
+
+
+        for (u32 i = 0; i < procs_length; i++) {
+            Procedure* p1 = cb->procedures[i];
+
+            init_typenode_for_proc(p1);
+
+            if (p1->overload) continue;
+
+            u32 overload_count = 1;
+            Procedure* it = p1;
+
+            // for each subsequent procedure
+            for (u32 j = i + 1; j < procs_length; j++) {
+                Procedure* p2 = cb->procedures[j];
+                if (it->name != p2->name) continue;
+
+                p2->overload = ++overload_count;
+                it->next_overload = p2;
+                it = p2;
+
+                // TODO: check if it is a valid overload pair
+            }
+
+            if (overload_count != 1) p1->overload = 1;
+        }
+    }
+}
+
+static void print_codebase(Codebase* cb) {
+    printf("Globals:\n");
+    foreach (g, cb->global_vars) {
+        printf("    %d. %s\n", g_index, get_string((*g)->name));
+    }
+}
+
+static Codebase parse() {
+
+    Unit* units = list_create(Unit);
 
     for (u32 i = 0; i < list_length(parser.src_files); i++) {
         File* file = &parser.src_files[i];
         parser.current_file_index = i;
 
-        u32 file_size = 0;
-        char* content = fileread(file->filename, &file_size);
-        if (!content) continue;
-
-        lex(content);
-        free(content);
-
-        parseFile();
-        list_clear(tokens);
+        Unit u = parse_file(file->filename);
+        list_add(units, u);
     }
 
-    list_delete(tokens);
+    Codebase cb = {0};
+    bind_units(units, &cb);
 
+    list_delete(units);
 
-    typenode2datatype_globalcheck = true;
-    foreach (tp, parser.unresolved_types) {
-        Type* type = *tp;
-        type->solvedstate = typenode2datatype(type);
-        if (type->solvedstate.kind == Typekind_Invalid) {
-            error_node(type, "Failed to resolve type");
-            printf("    ");
-            printType(type);
-            printf("\n");
-        }
-    }
-    list_delete(parser.unresolved_types);
-    parser.unresolved_types = null;
-
-
-
-    { // overloads
-        foreach (nsp, g_Codebase.namespaces) {
-            Namespace* ns = *nsp;
-
-            u32 procs_length = list_length(ns->procedures);
-            for (u32 i = 0; i < procs_length; i++) {
-                Procedure* p1 = &ns->procedures[i];
-
-                createSignatureFromProcedure(p1);
-
-                if (p1->overload) continue;
-
-                u32 overload_count = 1;
-                Procedure* it = p1;
-
-                // for each subsequent procedure
-                for (u32 j = i + 1; j < procs_length; j++) {
-                    Procedure* p2 = &ns->procedures[j];
-                    if (it->name != p2->name) continue;
-
-                    p2->overload = ++overload_count;
-                    it->next_overload = p2;
-                    it = p2;
-
-                    // TODO: check if it is a valid overload pair
-                }
-
-                if (overload_count != 1) p1->overload = 1;
-            }
-        }
+    // TODO: we may want to run the validator even if the parser made errors,
+    // its just that we dont want to validate if there was a syntax error, but parser may produce errors that are not syntax errors
+    if (numberOfErrors) {
+        printf("There were %d errors during parsing.\n", numberOfErrors);
+        exit(0);
     }
 
+    printf("Validate...\n");
+    validate(&cb);
+    if (numberOfErrors) {
+        printf("There were %d errors during validation.\n", numberOfErrors);
+        exit(0);
+    }
 
+    print_codebase(&cb);
+
+    return cb;
 }

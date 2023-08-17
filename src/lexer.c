@@ -64,8 +64,10 @@ static u64 number(u32* numDigits) {
 
 static void lex(char* input) {
 
-    cursor = input - 1;
+    if (tokens) list_clear(tokens);
+    else tokens = list_create(Token);
 
+    cursor = input - 1;
     current_line = 1;
 
     while (true) {
@@ -140,7 +142,7 @@ static void lex(char* input) {
             token.line = current_line;
 
             if (token.type == Tok_Word) {
-                token.string = register_string(word);
+                token.data.string = register_string(word);
             }
 
             list_add(tokens, token);
@@ -157,7 +159,7 @@ static void lex(char* input) {
             token.type = Tok_Integer;
 
             u32 numDigits;
-            token.integer = hex_number(&numDigits);
+            token.data.integer = hex_number(&numDigits);
             cursor--;
 
             list_add(tokens, token);
@@ -172,7 +174,7 @@ static void lex(char* input) {
 
             u32 numDigits;
             u64 num = number(&numDigits);
-            token.integer = num;
+            token.data.integer = num;
 
             if (*cursor == '.' && isDigit(*(cursor+1))) {
                 cursor++;
@@ -184,7 +186,7 @@ static void lex(char* input) {
                 f64 value = (f64)num + (fraction / denom);
 
                 token.type = Tok_Decimal;
-                token.decimal = value;
+                token.data.decimal = value;
             }
 
             switch (*cursor) {
@@ -226,7 +228,7 @@ static void lex(char* input) {
             Token token = {
                 .type = Tok_Char,
                 .line = current_line,
-                .character = c
+                .data.character = c
             };
             list_add(tokens, token);
             continue;
@@ -251,7 +253,7 @@ static void lex(char* input) {
             Token token = {
                 .type = Tok_String,
                 .line = current_line,
-                .string = register_string(str)
+                .data.string = register_string(str)
             };
 
             list_add(tokens, token);
