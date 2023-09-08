@@ -15,7 +15,6 @@ X(Keyword_If)\
 X(Keyword_Else)\
 X(Keyword_While)\
 X(Keyword_For)\
-X(Keyword_In)\
 X(Keyword_Switch)\
 X(Keyword_Case)\
 X(Keyword_Default)\
@@ -28,7 +27,6 @@ X(Keyword_Null)\
 X(Keyword_Continue)\
 X(Keyword_Break)\
 X(Keyword_Return)\
-X(Keyword_Declare)\
 X(Keyword_Type)\
 X(Keyword_As)\
 X(Keyword_Const)\

@@ -17,10 +17,6 @@ static inline void newline() {
     while (t--) sbAppend(sb, "    ");
 }
 
-static char getCharFromU32(u32 num) {
-    // TODO: do better than this...
-    return '0' + num;
-}
 
 static char number_string[20]; // 20 is max char size for 64 bit integer
 static StrSpan numberToString(u64 num) {
@@ -184,7 +180,7 @@ static void _transpileDatatype(Datatype type, Identifier name) {
 static void transpileFuncCall(ProcCall* call) {
 
     transpileExpression(call->proc_expr);
-    if (call->proc && call->proc->overload) sbAppendChar(sb, getCharFromU32(call->proc->overload)); // TODO: transpile overload number correctly
+    if (call->proc && call->proc->overload) sbAppendSpan(sb, numberToString((u64)call->proc->overload));
 
     sbAppend(sb, "(");
     if (call->args) {
@@ -767,13 +763,16 @@ static void transpileScope(Scope* scope) {
 }
 
 static void transpileFunctionSignature(Procedure* proc) {
+
+
     if (proc->name != builtin_string_main && proc->scope) sbAppend(sb, "static ");
     transpileType(proc->returnType);
     sbAppend(sb, " ");
 
-    sbAppend(sb, get_string(proc->name));
+    if (proc->name == builtin_string_main) sbAppend(sb, "__main");
+    else sbAppend(sb, get_string(proc->name));
 
-    if (proc->overload) sbAppendChar(sb, getCharFromU32(proc->overload));
+    if (proc->overload) sbAppendSpan(sb, numberToString((u64)proc->overload));
 
     sbAppend(sb, "(");
     if (proc->arguments) {
@@ -924,6 +923,13 @@ static void transpile(Codebase* codebase) {
         transpileProcedure(proc);
     }
 
+    char* c_main_code =
+        "int main(int argc, char** argv) {\n"
+        "    __main();\n"
+        "    return 0;\n"
+        "}";
+
+    sbAppend(sb, c_main_code);
 
     FILE* file;
     if ( !fopen_s(&file, "output.g.c", "w") ) {

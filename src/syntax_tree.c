@@ -80,7 +80,11 @@ typedef enum Typekind {
     Typekind_Struct,
     Typekind_Enum,
     Typekind_Typedef,
-    Typekind_Procedure
+    Typekind_Procedure,
+
+    Typekind_Array,
+    Typekind_Fixed_Array,
+    Typekind_Dynamic_Array
 } Typekind;
 
 /* assignability chart by Typekind
@@ -88,27 +92,27 @@ typedef enum Typekind {
 assignable? = yes | no | x
 x = circumstantial
 
-from \ to   Procedure   Opaque  Typedef Enum    Struct  char    void    float64 float32 int64   int32   int16   int8    uint64  uint32  uint16  uint8   AmbDecimal  AmbInteger  Invalid
-Invalid     yes         yes     yes     yes     yes     yes     yes     yes     yes     yes     yes     yes     yes     yes     yes     yes     yes     yes         yes         yes
-AmbInteger  no          no      x
-AmbDecimal
-uint8       no          no      x       *       no      yes     no      yes     yes     yes     yes     yes     no
-uint16
-uint32
-uint64
-int8
-int16
-int32
-int64
-float32
-float64
-void
-char
-Struct
-Enum
-Typedef
-Opaque
-Procedure
+from \ to   Invalid AmbInteger  AmbDecimal  uint8   uint16  uint32  uint64  int8    int16   int32   int64   float32 float64 void    char    Struct  Enum    Typedef Opaque  Procedure
+Invalid     yes     yes         yes         yes     yes     yes     yes     yes     yes     yes     yes     yes     yes     yes     yes     yes     yes     yes     yes     yes
+AmbInteger  yes     yes         yes         yes     yes     yes     yes     yes     yes     yes     yes     yes     yes     no      yes     no      no      x       no      no
+AmbDecimal  yes     no          yes         no      no      no      no      no      no      no      no      yes     yes     no      no      no      no      x       no      no
+uint8       yes     yes         no          yes     yes     yes     yes     no      yes     yes     yes     yes     yes     no      yes     no      no      x       no      no
+uint16      yes     yes         no          no      yes     yes     yes     no      no      yes     yes     yes     yes     no      no      no      no      x       no      no
+uint32      yes     yes         no          no      no      yes     yes     no      no      no      yes     yes     yes     no      no      no      no      x       no      no
+uint64      yes     yes         no          no      no      no      yes     no      no      no      no      yes     yes     no      no      no      no      x       no      no
+int8        yes     yes         no          no      no      no      no      yes     yes     yes     yes     yes     yes     no      yes     no      no      x       no      no
+int16       yes     yes         no          no      no      no      no      no      yes     yes     yes     yes     yes     no      no      no      no      x       no      no
+int32       yes     yes         no          no      no      no      no      no      no      yes     yes     yes     yes     no      no      no      no      x       no      no
+int64       yes     yes         no          no      no      no      no      no      no      no      yes     yes     yes     no      no      no      no      x       no      no
+float32     yes     no          yes         no      no      no      no      no      no      no      no      yes     yes     no      no      no      no      x       no      no
+float64     yes     no          yes         no      no      no      no      no      no      no      no      no      yes     no      no      no      no      x       no      no
+void        yes     no          no          no      no      no      no      no      no      no      no      no      no      yes     no      no      no      x       no      no
+char        yes     yes         no          yes     yes     yes     yes     yes     yes     yes     yes     no      no      no      yes     no      no      x       no      no
+Struct      yes     no          no          no      no      no      no      no      no      no      no      no      no      no      no      yes     no      x       no      no
+Enum        yes     yes         no          yes     yes     yes     yes     yes     yes     yes     yes     no      no      no      no      no      yes     x       no      no
+Typedef     yes
+Opaque      yes
+Procedure   yes
 
 
 */
@@ -135,7 +139,10 @@ typedef struct Node {
 typedef enum TypeNode {
     TypeNode_MustInfer,
     TypeNode_Normal,
-    TypeNode_Procedure
+    TypeNode_Procedure,
+    TypeNode_Array,
+    TypeNode_Fixed_Array,
+    TypeNode_Dynamic_Array
 } TypeNode;
 
 typedef struct Type {
@@ -151,6 +158,11 @@ typedef struct Type {
             struct Type* return_type;
             struct Type* first_argument;
         } procedure;
+
+        struct {
+            struct Type* element_type;
+            struct Expression* size_expr;
+        } array;
     };
 
     struct Type* next;

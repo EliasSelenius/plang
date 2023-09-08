@@ -7,6 +7,13 @@ void hello() {
 
     void*() proc;
 
+    float32[..] my_list;
+
+    my_list.add(1.3);
+    add(my_list, 2.5);
+
+    let item = my_list[0];
+
 }
 
 const ThisIsConst = 123;

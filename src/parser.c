@@ -127,6 +127,23 @@ static Type* type_modifier(Type* type) {
         return type;
     }
 
+    if (tok(Tok_OpenSquare)) {
+        Type* mod = newTypeNode(TypeNode_Array);
+        mod->array.element_type = type;
+
+        if (tok(Tok_CloseSquare)) return mod;
+
+        if (tok(Tok_Dotdot)) {
+            mod->node_type = TypeNode_Dynamic_Array;
+        } else {
+            mod->node_type = TypeNode_Fixed_Array;
+            mod->array.size_expr = expectExpression();
+        }
+
+        expect(Tok_CloseSquare);
+        return mod;
+    }
+
     return null;
 }
 
@@ -198,6 +215,11 @@ static void resolve_typenode(Type* type, Codebase* codebase) {
 
             datatype.kind = Typekind_Procedure;
             datatype.proc_ptr_typenode = type;
+        } break;
+
+        case TypeNode_Array: {
+            resolve_typenode(type->array.element_type, codebase);
+            datatype.kind = Typekind_Array;
         } break;
 
         case TypeNode_MustInfer:
@@ -416,7 +438,7 @@ static Statement* parse_top_level_statement() {
             token_index++;
             expect(Tok_String);
             Identifier string = tokens[token_index - 1].data.string;
-            printf("include \"%s\"\n", get_string(string));
+            // printf("include \"%s\"\n", get_string(string));
             addFile(get_string(string), null);
             semicolon();
         } break;
@@ -426,7 +448,6 @@ static Statement* parse_top_level_statement() {
         case Tok_Keyword_Type: return expectTypedef();
         case Tok_Keyword_Const: return expectConst();
 
-        case Tok_Keyword_Declare: token_index++;
         case Tok_Keyword_Let:
         case Tok_Word: return proc_or_var(false);
 
@@ -465,13 +486,13 @@ static Unit parse_unit() {
         if (!var->ref) list_add(current_unit->external_symbols, var);
     }
 
-    {
-        printf("Unresolved: (external symbols)\n");
-        foreach (item, current_unit->external_symbols) {
-            VariableExpression* var = *item;
-            printf("    \"%s\" at line %d\n", get_string(var->name), var->base.nodebase.lineNumber);
-        }
-    }
+    // {
+    //     printf("Unresolved: (external symbols)\n");
+    //     foreach (item, current_unit->external_symbols) {
+    //         VariableExpression* var = *item;
+    //         printf("    \"%s\" at line %d\n", get_string(var->name), var->base.nodebase.lineNumber);
+    //     }
+    // }
 
 
     return unit;
@@ -632,7 +653,7 @@ static Codebase parse() {
         exit(0);
     }
 
-    print_codebase(&cb);
+    // print_codebase(&cb);
 
     return cb;
 }

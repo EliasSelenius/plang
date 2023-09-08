@@ -35,9 +35,8 @@ for decl, expr, expr {
 }
 
 int32 i;
-for i = 0, i < 100, i++ {
-
-}
+for i = 0, i < 100, i++ {}
+for i = 0 : i < 100 : i++ {}
 
 for expr, expr {
 
@@ -45,5 +44,54 @@ for expr, expr {
 
 int32 i = 0;
 for i < 100, i++ {
-    
+
 }
+
+for : i < 100 : i++ {
+
+}
+
+
+
+for expr                // loop iterator
+for name : expr         // loop iterator with explicit name
+for expr .. expr        // loop range
+for name : expr .. expr // loop range with explicit name
+for init : expr : expr  // traditional for
+
+
+first = type? name ("=" expr)?
+loop  = "for" (first ":")? expr (":" expr)?
+
+for expr
+for expr : expr
+for first : expr
+
+
+
+type[] normal_array; // a pointer and a length field
+type[N] fixed_array; // exists inline where it is declared for example: on the stack or inside a struct, it is not a pointer
+type[..] dynamic_array; // a list that you can add values to
+
+both fixed and dynamic arrays can implicitly cast to normal arrays
+this is so that your function can be indiferent about the type of the array that it is working on, like so:
+
+void print_array(float32[] array) {
+    for array print(it);
+}
+
+void main() {
+
+    float32[3] a1 = { 1, 0, 0 };
+    float32[..] a2 = alloc;
+
+    print_array(a1);
+    print_array(a2);
+
+    // if you want a stack allocated array of a non-compiletime value then you do this:
+
+    float32[] a3 = stackalloc float32[12];
+    print_array(a3);
+}
+
+

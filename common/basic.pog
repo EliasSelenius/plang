@@ -1,23 +1,23 @@
 
 type FILE;
 
-declare int32 fopen_s(FILE** stream, char* filename, char* mode);
-declare int32 fclose(FILE* stream);
+int32 fopen_s(FILE** stream, char* filename, char* mode);
+int32 fclose(FILE* stream);
 
-declare int32 fseek(FILE* stream, int32 offset, int32 origin);
-declare uint64 ftell(FILE* stream);
-declare void rewind(FILE* stream);
-declare uint64 fread(void* buffer, uint64 elementSize, uint64 elementCount, FILE* stream);
-declare uint64 fwrite(void* ptr, uint64 size, uint64 nmemb, FILE* stream);
+int32 fseek(FILE* stream, int32 offset, int32 origin);
+uint64 ftell(FILE* stream);
+void rewind(FILE* stream);
+uint64 fread(void* buffer, uint64 elementSize, uint64 elementCount, FILE* stream);
+uint64 fwrite(void* ptr, uint64 size, uint64 nmemb, FILE* stream);
 
 
-declare void* calloc(uint64 count, uint64 size);
-declare void* malloc(uint64 size);
-declare void free(void* block);
-declare void* realloc(void* buffer, uint64 size);
-declare void* memcpy(void* dst, void* src, uint64 size);
+void* calloc(uint64 count, uint64 size);
+void* malloc(uint64 size);
+void free(void* block);
+void* realloc(void* buffer, uint64 size);
+void* memcpy(void* dst, void* src, uint64 size);
 
-declare uint64 strlen(char* str);
+uint64 strlen(char* str);
 
 char* fileread(char* filename) {
     return fileread(filename, "r");

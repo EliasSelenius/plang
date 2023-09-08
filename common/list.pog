@@ -1,0 +1,50 @@
+
+// Temp list implementation until we make language integrated lists
+
+const ListStartingCapacity = 2;
+
+struct List {
+    uint32 stride;
+    uint32 capacity;
+    uint32 length;
+}
+
+void* list_create(uint32 stride) {
+    List* head = malloc(sizeof List + stride * ListStartingCapacity);
+    head.stride = stride;
+    head.capacity = ListStartingCapacity;
+    head.length = 0;
+    return *head[1];
+}
+
+List* list_head(void* list) {
+    return *(list as List*)[-1];
+}
+
+void list_clear(void* list) {
+    list_head(list).length = 0;
+}
+
+void list_add(void** list, void* data) {
+    List* head = list_head(@list);
+
+    if head.capacity == head.length {
+        head.capacity *= 2;
+        head = realloc(head, sizeof List + head.capacity * head.stride);
+        @list = *head[1];
+    }
+
+    uint64 dst = @list as uint64;
+    dst += head.length * head.stride;
+    memcpy(dst as void*, data, head.stride);
+
+    head.length++;
+}
+
+uint32 list_length(void* list) {
+    return list_head(list).length;
+}
+
+void list_delete(void* list) {
+    free(list_head(list));
+}

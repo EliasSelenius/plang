@@ -41,6 +41,8 @@ static Identifier type_name_void = 0;
 
 static Identifier builtin_string_print = 0;
 static Identifier builtin_string_main = 0;
+static Identifier builtin_string_it = 0;
+static Identifier builtin_string_it_index = 0;
 
 static void init_string_table() {
 
@@ -63,6 +65,8 @@ static void init_string_table() {
 
     builtin_string_print = register_string(spFrom("print"));
     builtin_string_main = register_string(spFrom("main"));
+    builtin_string_it = register_string(spFrom("it"));
+    builtin_string_it_index = register_string(spFrom("it_index"));
 }
 
 

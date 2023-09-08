@@ -663,7 +663,7 @@ static void validateStatement(Statement* sta) {
             ReturnStatement* retSta = (ReturnStatement*)sta;
 
             Datatype type = type_void;
-            if (retSta->returnExpr) type = validateExpression(retSta->returnExpr);
+            if (retSta->returnExpr) type = validateExpressionEx(retSta->returnExpr, parser.procedure->returnType->solvedstate);
 
             if (type.kind == Typekind_Invalid) break;
 

@@ -1,6 +1,6 @@
 
 
-declare void goo();
+void goo();
 
 OpaqueType* ot;
 
@@ -119,12 +119,12 @@ int32 main() {
 
     {
         print("\n\n");
-        for uint32 i in 0 .. 10 {
+        for uint32 i : 0 .. 10 {
             print(i, "\n");
         }
     }
 
-    for my_index in 0 .. 3 {
+    for my_index : 0 .. 3 {
         print("my_index: ", my_index, "\n");
     }
 

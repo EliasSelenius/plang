@@ -72,13 +72,15 @@ static Statement* expectStatement() {
             ForStatement* forsta = allocStatement(Statement_For);
             token_index++;
 
-            if (tokens[token_index + 1].type == Tok_Keyword_In) {
+            if (tokens[token_index + 1].type == Tok_Colon) {
                 forsta->index_name = identifier();
                 token_index++;
-            } else if (tokens[peekType() + 1].type == Tok_Keyword_In) {
+            } else if (tokens[peekType() + 1].type == Tok_Colon) {
                 forsta->index_type = expectType();
                 forsta->index_name = identifier();
                 token_index++;
+            } else {
+                forsta->index_name = builtin_string_it;
             }
 
             forsta->min_expr = expectExpression();
