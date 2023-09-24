@@ -71,47 +71,104 @@ static bool typeAssignable(Datatype toType, Datatype fromType) {
     return false;
 }
 
-static void constructTypename(char* buffer, u32 size, Datatype type) {
-    char* typename = null;
+
+static char* get_basic_type_string(Datatype type) {
     switch (type.kind) {
-        case Typekind_Invalid: typename = "error_invalid"; break;
-        case Typekind_AmbiguousInteger: typename = "error_ambint"; break;
-        case Typekind_AmbiguousDecimal: typename = "error_ambdec"; break;
+        case Typekind_Invalid:          return "Invalid-Type";
+        case Typekind_AmbiguousInteger: return "Ambiguous-Integer";
+        case Typekind_AmbiguousDecimal: return "Ambiguous-Decimal";
 
-        case Typekind_uint8: typename = "uint8"; break;
-        case Typekind_uint16: typename = "uint16"; break;
-        case Typekind_uint32: typename = "uint32"; break;
-        case Typekind_uint64: typename = "uint64"; break;
-        case Typekind_int8: typename = "int8"; break;
-        case Typekind_int16: typename = "int16"; break;
-        case Typekind_int32: typename = "int32"; break;
-        case Typekind_int64: typename = "int64"; break;
-        case Typekind_float32: typename = "float32"; break;
-        case Typekind_float64: typename = "float64"; break;
-        case Typekind_void: typename = "void"; break;
-        case Typekind_char: typename = "char"; break;
+        case Typekind_uint8:            return "uint8";
+        case Typekind_uint16:           return "uint16";
+        case Typekind_uint32:           return "uint32";
+        case Typekind_uint64:           return "uint64";
+        case Typekind_int8:             return "int8";
+        case Typekind_int16:            return "int16";
+        case Typekind_int32:            return "int32";
+        case Typekind_int64:            return "int64";
+        case Typekind_float32:          return "float32";
+        case Typekind_float64:          return "float64";
+        case Typekind_void:             return "void";
+        case Typekind_char:             return "char";
 
-        case Typekind_Struct: typename = get_string(type.stru->name); break;
-        case Typekind_Enum: typename = null; break;
-        case Typekind_Typedef: typename = get_string(type.type_def->name); break;
-        case Typekind_Procedure: typename = "(TODO: print proc type name)";
+        case Typekind_Struct:           return get_string(type.stru->name);
+        case Typekind_Enum:             return get_string(type._enum->name);
+        case Typekind_Typedef:          return get_string(type.type_def->name);
+
+        default: return null;
+    }
+}
+
+static void construct_type_string(Datatype type, StringBuilder* sb) {
+
+    Type* typenode = type.array_typenode; // same as proc_ptr_typenode
+
+    switch (type.kind) {
+        case Typekind_Procedure: {
+            construct_type_string(typenode->procedure.return_type->solvedstate, sb);
+            sbAppend(sb, "(");
+            Type* arg = typenode->procedure.first_argument;
+            if (arg) {
+                do {
+                    construct_type_string(arg->solvedstate, sb);
+                    sbAppend(sb, ", ");
+                    arg = arg->next;
+                } while (arg);
+                sb->length -= 2; // trim of trailing comma: ", "
+            }
+            sbAppend(sb, ")");
+
+            type.numPointers--; // proc pointers have an implicit asterix
+        } break;
+
+
+        case Typekind_Array:         construct_type_string(typenode->array.element_type->solvedstate, sb); sbAppend(sb, "[]"); break;
+        case Typekind_Fixed_Array:   construct_type_string(typenode->array.element_type->solvedstate, sb);
+                                     sbAppend(sb, "[0]");//  sbAppend(sb, numberToString()) // TODO: append array size
+                                     break;
+        case Typekind_Dynamic_Array: construct_type_string(typenode->array.element_type->solvedstate, sb); sbAppend(sb, "[..]"); break;
+
+        default:
+            char* typename = get_basic_type_string(type);
+            sbAppend(sb, typename);
+            break;
     }
 
-    snprintf(buffer, size, "%s%.*s", typename, type.numPointers, "**********");
+    u32 np = type.numPointers;
+    while (np-- != 0) sbAppendChar(sb, '*');
+}
+
+static StringBuilder* temp_builder() {
+
+    static u32 calls = 0;
+    static const u32 builders_count = 2;
+    static StringBuilder builders[builders_count] = {0};
+
+    StringBuilder* sb = &builders[calls++ % builders_count];
+
+    if (sb->content == null) {
+        *sb = sbCreate();
+        printf("[DEBUG]: Initialized temporary string builder. This should only happen %u times.\n", builders_count);
+    }
+
+    sbClear(sb);
+    return sb;
 }
 
 static void assertAssignability(Datatype toType, Datatype fromType, void* node) {
     if (!typeAssignable(toType, fromType)) {
 
-        char toTypeName[50];
-        char fromTypeName[50];
-        constructTypename(toTypeName, sizeof(toTypeName), toType);
-        constructTypename(fromTypeName, sizeof(fromTypeName), fromType);
+        StringBuilder *to_sb, *from_sb;
+        to_sb = temp_builder();
+        from_sb = temp_builder();
+
+        construct_type_string(toType, to_sb);
+        construct_type_string(fromType, from_sb);
 
         if (node) {
-            error_node(node, "Type missmatch. \"%s\" is not assignable to \"%s\".", fromTypeName, toTypeName);
+            error_node(node, "Type missmatch. \"%s\" is not assignable to \"%s\".", from_sb->content, to_sb->content);
         } else {
-            error_temp("Type missmatch. \"%s\" is not assignable to \"%s\".", fromTypeName, toTypeName);
+            error_temp("Type missmatch. \"%s\" is not assignable to \"%s\".", from_sb->content, to_sb->content);
         }
     }
 }
@@ -308,13 +365,25 @@ static Datatype _validateExpression(Expression* expr, Datatype expected_type) {
 
         case ExprType_Indexing: {
             IndexingExpression* ind = (IndexingExpression*)expr;
+
             Datatype indexedType = validateExpression(ind->indexed);
-            if (indexedType.numPointers == 0) {
-                error_node(expr, "Attempted to index something that isnt a pointer.");
-                return type_invalid;
-            }
             Datatype indexType = validateExpression(ind->index);
             // TODO: is indexType a valid integer expression
+
+
+            if (indexedType.numPointers == 0) {
+
+                if ((indexedType.kind == Typekind_Array) ||
+                    (indexedType.kind == Typekind_Fixed_Array) ||
+                    (indexedType.kind == Typekind_Dynamic_Array)) {
+
+                    return indexedType.array_typenode->array.element_type->solvedstate;
+                }
+
+                error_node(expr, "Attempted to index an expression that is not indexable.");
+                return type_invalid;
+            }
+
 
             Datatype resType = indexedType;
             resType.numPointers--;

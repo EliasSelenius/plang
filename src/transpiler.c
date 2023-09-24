@@ -18,19 +18,6 @@ static inline void newline() {
 }
 
 
-static char number_string[20]; // 20 is max char size for 64 bit integer
-static StrSpan numberToString(u64 num) {
-    if (num == 0) return (StrSpan) { "0", 1 };
-    u32 strIndex = 20;
-
-    while (num != 0) {
-        u64 r = num % 10; num /= 10;
-        number_string[--strIndex] = r + '0';
-    }
-
-    return (StrSpan) { &number_string[strIndex], 20 - strIndex };
-}
-
 static char* getTypeCname(Datatype type) {
     switch (type.kind) {
 
@@ -59,7 +46,11 @@ static char* getTypeCname(Datatype type) {
         case Typekind_Struct: return get_string(type.stru->name);
         case Typekind_Enum: return get_string(type._enum->name);
         case Typekind_Typedef: return get_string(type.type_def->name);
-        case Typekind_Procedure: return "/*proc*/void";
+        case Typekind_Procedure: return null;
+
+        case Typekind_Array: return null;
+        case Typekind_Fixed_Array: return null;
+        case Typekind_Dynamic_Array: return null;
     }
     return null;
 }
@@ -102,6 +93,17 @@ static void transpileProcSigEnd(Type* proc_type) {
 }
 
 static void transpileTypeStart(Datatype type) {
+
+    if ((type.kind == Typekind_Array) ||
+        (type.kind == Typekind_Fixed_Array) ||
+        (type.kind == Typekind_Dynamic_Array)) {
+
+        transpileTypeStart(type.array_typenode->array.element_type->solvedstate);
+        sbAppend(sb, "*");
+        return;
+    }
+
+
     if (type.kind == Typekind_Procedure) {
         transpileProcSigStart(type.proc_ptr_typenode);
     } else {
@@ -543,7 +545,7 @@ static void transpileIfStatement(IfStatement* ifst) {
 }
 
 static void transpileStruct(Struct* stru) {
-    sbAppend(sb, "typedef struct ");
+    sbAppend(sb, "struct ");
     sbAppend(sb, get_string(stru->name));
     sbAppend(sb, " {");
 
@@ -558,9 +560,7 @@ static void transpileStruct(Struct* stru) {
     tabing--;
     newline();
 
-    sbAppend(sb, "} ");
-    sbAppend(sb, get_string(stru->name));
-    sbAppend(sb, ";");
+    sbAppend(sb, "};");
 }
 
 static void transpileTypedef(Typedef* def) {

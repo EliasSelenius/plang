@@ -14,6 +14,13 @@ static bool _isBasicType_validModifier() {
         } while (tok(Tok_Comma));
 
         if (tok(Tok_CloseParen)) return true;
+        else goto nope;
+    }
+
+    if (tok(Tok_OpenSquare)) {
+        if (tok(Tok_CloseSquare)) return true;
+        if (tok(Tok_Dotdot) && tok(Tok_CloseSquare)) return true;
+        if (tok(Tok_Integer) && tok(Tok_CloseSquare)) return true;
     }
 
     nope:

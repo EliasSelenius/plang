@@ -33,6 +33,8 @@ bool spanEqualsSpan(StrSpan span1, StrSpan span2);
 
 bool cstrEquals(char* a, char* b);
 
+StrSpan numberToString(u64 num);
+
 // --------StringBuilder------------------
 
 typedef struct StringBuilder {

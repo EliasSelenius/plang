@@ -85,6 +85,20 @@ bool cstrEquals(char* a, char* b) {
     }
 }
 
+static char number_string[20]; // 20 is max char size for 64 bit integer
+StrSpan numberToString(u64 num) {
+    if (num == 0) return (StrSpan) { "0", 1 };
+    u32 strIndex = 20;
+
+    while (num != 0) {
+        u64 r = num % 10; num /= 10;
+        number_string[--strIndex] = r + '0';
+    }
+
+    return (StrSpan) { &number_string[strIndex], 20 - strIndex };
+}
+
+
 // ----------StringBuilder----------------
 
 StringBuilder sbCreateWithCapacity(u32 initialCapacity) {

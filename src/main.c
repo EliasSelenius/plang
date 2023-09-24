@@ -9,7 +9,7 @@
         - loop block: loop { } == while (true) { }
         - nested multi-line comments
         - disallow void as variable type in declaration
-        *- make assignments be expressions
+        - make assignments be expressions
         - member-like functions (the with keyword on function arguments)
         - explicitly sized enums e.g (enum Type : uint32 {})?
         - unions

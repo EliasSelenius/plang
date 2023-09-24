@@ -126,6 +126,7 @@ typedef struct Datatype {
         Enum* _enum;
         Typedef* type_def;
         Type* proc_ptr_typenode;
+        Type* array_typenode;
     };
 } Datatype;
 

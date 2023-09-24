@@ -220,6 +220,19 @@ static void resolve_typenode(Type* type, Codebase* codebase) {
         case TypeNode_Array: {
             resolve_typenode(type->array.element_type, codebase);
             datatype.kind = Typekind_Array;
+            datatype.array_typenode = type;
+        } break;
+
+        case TypeNode_Fixed_Array: {
+            resolve_typenode(type->array.element_type, codebase);
+            datatype.kind = Typekind_Fixed_Array;
+            datatype.array_typenode = type;
+        } break;
+
+        case TypeNode_Dynamic_Array: {
+            resolve_typenode(type->array.element_type, codebase);
+            datatype.kind = Typekind_Dynamic_Array;
+            datatype.array_typenode = type;
         } break;
 
         case TypeNode_MustInfer:
