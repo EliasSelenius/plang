@@ -519,7 +519,8 @@ typedef struct Declaration {
     Type* type;
     Expression* expr; // if this is a fixed sized array expr is the size expression for the array
     Identifier name;
-    bool include_context;
+    bool include_context; // TODO: flags
+    bool is_static;
 } Declaration;
 
 typedef struct Typedef {

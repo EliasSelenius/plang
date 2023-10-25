@@ -4,7 +4,12 @@
 struct {
     u32* byteoffsets; // list
     DynamicBuffer* data;
+
+    // Identifier* identifiers; // list
+    // Arena arena;
+
 } string_table;
+
 
 static inline char* get_string(Identifier id) { return (char*)(&string_table.data->bytes[id]); }
 static inline char* get_string_byindex(u32 index) { return (char*)(&string_table.data->bytes[string_table.byteoffsets[index]]); }
@@ -43,8 +48,17 @@ static Identifier builtin_string_print = 0;
 static Identifier builtin_string_main = 0;
 static Identifier builtin_string_it = 0;
 static Identifier builtin_string_it_index = 0;
+static Identifier builtin_string_length = 0;
+static Identifier builtin_string_capacity = 0;
+static Identifier builtin_string_elements = 0;
+static Identifier builtin_string_add = 0;
+static Identifier builtin_string_static_init = 0;
+
 
 static void init_string_table() {
+
+    // string_table.identifiers = list_create(Identifier);
+    // string_table.arena = arena_create();
 
     string_table.byteoffsets = list_create(u32);
     string_table.data = dyCreate();
@@ -67,6 +81,12 @@ static void init_string_table() {
     builtin_string_main = register_string(spFrom("main"));
     builtin_string_it = register_string(spFrom("it"));
     builtin_string_it_index = register_string(spFrom("it_index"));
+    builtin_string_length = register_string(spFrom("length"));
+    builtin_string_capacity = register_string(spFrom("capacity"));
+    builtin_string_elements = register_string(spFrom("elements"));
+    builtin_string_add = register_string(spFrom("add"));
+
+    builtin_string_static_init = register_string(spFrom("__static_init"));
 }
 
 

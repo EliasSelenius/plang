@@ -30,6 +30,7 @@ X(Keyword_Return)\
 X(Keyword_Type)\
 X(Keyword_As)\
 X(Keyword_Const)\
+X(Keyword_Static)\
 X(Integer)\
 X(Decimal)\
 X(String)\

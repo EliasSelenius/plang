@@ -134,6 +134,8 @@ static void lex(char* input) {
             else if (spanEquals(word, "with")) tokType = Tok_Keyword_With;
             else if (spanEquals(word, "namespace")) tokType = Tok_Keyword_Namespace;
             else if (spanEquals(word, "sizeof")) tokType = Tok_Keyword_Sizeof;
+            else if (spanEquals(word, "static")) tokType = Tok_Keyword_Static;
+
 
             Token token;
             token.type = tokType;

@@ -16,6 +16,7 @@
 #include "list.c"
 #include "dynamic_buffer.c"
 #include "arena.c"
+#include "hashtable.c"
 
 #include "lexer.h"
 #include "syntax_tree.c"
@@ -30,6 +31,6 @@ void addFile(char* filename, char* extension);
 #include "validator.c"
 #include "transpiler.c"
 #include "interpreter.c"
+#include "glsl_transpiler.c"
 
-#include "main.c"
 

@@ -68,6 +68,15 @@ static bool typeAssignable(Datatype toType, Datatype fromType) {
 
     if (fromType.kind == Typekind_float32 && toType.kind == Typekind_float64) return true;
 
+
+    if (toType.kind == Typekind_Array) {
+        if (fromType.kind == Typekind_Dynamic_Array
+         || fromType.kind == Typekind_Fixed_Array
+         || fromType.kind == Typekind_Array) {
+            return typeAssignable(toType.array_typenode->array.element_type->solvedstate, fromType.array_typenode->array.element_type->solvedstate);
+        }
+    }
+
     return false;
 }
 
@@ -357,6 +366,10 @@ static Datatype _validateExpression(Expression* expr, Datatype expected_type) {
 
                 error_node(expr, "Field \"%s\" does not exist on type \"%s\".", get_string(deref->name), get_string(inner_expr_type.stru->name));
                 return type_invalid;
+            }
+
+            if (inner_expr_type.kind == Typekind_Array) {
+                if (deref->name == builtin_string_length) return type_uint32; // TODO: hardcoded type of length field
             }
 
             error_node(expr, "Invalid dereferencing.");

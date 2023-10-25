@@ -16,18 +16,16 @@
         *- fixed sized arrays as struct fields
         - multi-declare e.g: int i, j = 1, k;
         - let output exe be named the name of the directory
-        - it keyword
         - labeled break and continue e.g (for i in 0..count { if a break i; else continue i; }) use the index/item name as the for label
-        - global variable runtime expression assignment
         - operator overload
         - capturing locals for localy defined procedures
         - defer statement
-        - print structs
         - named arguments e.g foo(arg_name: "daw")
         - single expression body
         - field initializers
 
     InProgress:
+        - print structs
         *- file name in errors
         *- line numbers in validation errors
         - modules or namespaces ?
@@ -37,6 +35,8 @@
 
 
     DONE list:
+        - global variable runtime expression assignment
+        - it keyword
         *- enums
         - localy defined structs
         - localy defined type aliases
@@ -155,6 +155,18 @@ int main(int argc, char* argv[]) {
 
 
     Codebase cb = parse();
+
+
+    if (false) { // hash test
+        foreach (index, string_table.byteoffsets) {
+            char* str = &string_table.data->bytes[*index];
+
+            printf("%s -> %llu\n", str, string_hash(str));
+        }
+
+        return 1;
+    }
+
 
     printf("Transpile...\n");
     transpile(&cb);

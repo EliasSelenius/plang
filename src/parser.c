@@ -574,7 +574,7 @@ void bind_units(Unit* units, Codebase* cb) {
 
             foreach (item, u1->external_symbols) {
                 VariableExpression* var = *item;
-                if (var->ref) continue;
+                if (var->ref) continue; // TODO: why am I doing this? figure out and leave a comment
                 var->ref = get_global_symbol(var->name, u2);
             }
         }

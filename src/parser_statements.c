@@ -172,6 +172,17 @@ static Statement* expectStatement() {
         case Tok_Keyword_Type: return expectTypedef();
         case Tok_Keyword_Const: return expectConst();
 
+        case Tok_Keyword_Static: {
+            token_index++;
+            Declaration* decl = allocStatement(Statement_Declaration);
+            decl->type = expectType();
+            decl->name = identifier();
+            decl->is_static = true;
+            if (tok(Tok_Assign)) decl->expr = expectExpression();
+            semicolon();
+            return (Statement*)decl;
+        }
+
         default: break;
     }
 

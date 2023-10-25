@@ -5,7 +5,10 @@ static void transpileExpression(Expression* expr);
 static void transpileStatement(Statement* statement);
 static void transpileProcedure(Procedure* proc);
 
+static Declaration** static_decls; // list
+
 static StringBuilder* sb;
+
 static u32 tabing = 0;
 static inline void newline() {
 
@@ -67,7 +70,9 @@ static void transpileProcSigStart(Type* proc_type) {
         sbAppend(sb, " ");
     }
 
-    sbAppend(sb, "(*");
+    sbAppend(sb, "(");
+    u32 np = proc_type->solvedstate.numPointers;
+    while (np-- > 0) sbAppend(sb, "*");
 }
 
 static void transpileProcArguments(Type* proc_type) {
@@ -94,8 +99,15 @@ static void transpileProcSigEnd(Type* proc_type) {
 
 static void transpileTypeStart(Datatype type) {
 
-    if ((type.kind == Typekind_Array) ||
-        (type.kind == Typekind_Fixed_Array) ||
+    if (type.kind == Typekind_Array) {
+        sbAppend(sb, "Array");
+
+        u32 np = type.numPointers;
+        while (np-- > 0) sbAppend(sb, "*");
+        return;
+    }
+
+    if ((type.kind == Typekind_Fixed_Array) ||
         (type.kind == Typekind_Dynamic_Array)) {
 
         transpileTypeStart(type.array_typenode->array.element_type->solvedstate);
@@ -238,6 +250,7 @@ static void transpilePrintFormat(Datatype type) {
             transpilePrintFormat(field->type->solvedstate);
             sbAppend(sb, ", ");
         }
+        sb->length -= 2;
         sbAppend(sb, "}");
         return;
     }
@@ -259,8 +272,20 @@ static void transpilePrint(Expression** args) {
     foreach (item, args) {
         Expression* arg = *item;
         sbAppend(sb, ", ");
-        // TODO: fix transpilation of structs here:
-        transpileExpression(arg);
+        if (arg->datatype.kind == Typekind_Struct && arg->datatype.numPointers == 0) {
+            foreach (field, arg->datatype.stru->fields) {
+
+                if (field->type->solvedstate.kind == Typekind_Struct && field->type->solvedstate.numPointers == 0) {
+                    // TODO: print struct inside struct
+                }
+
+                transpileExpression(arg);
+                sbAppend(sb, ".");
+                sbAppend(sb, get_string(field->name));
+                sbAppend(sb, ", ");
+            }
+            sb->length -= 2;
+        } else transpileExpression(arg);
     }
 
     sbAppend(sb, ")");
@@ -378,7 +403,19 @@ static void transpileExpression(Expression* expr) {
 
         case ExprType_Indexing: {
             IndexingExpression* ind = (IndexingExpression*)expr;
-            transpileExpression(ind->indexed);
+
+            if (ind->indexed->datatype.kind == Typekind_Array) {
+                sbAppend(sb, "((");
+                Datatype elm_type = ind->indexed->datatype.array_typenode->array.element_type->solvedstate;
+                elm_type.numPointers++;
+                transpileDatatype(elm_type);
+                sbAppend(sb, ")");
+                transpileExpression(ind->indexed);
+                sbAppend(sb, ".data)");
+            } else {
+                transpileExpression(ind->indexed);
+            }
+
             sbAppend(sb, "[");
             transpileExpression(ind->index);
             sbAppend(sb, "]");
@@ -497,6 +534,15 @@ static void transpileExpression(Expression* expr) {
                 sbAppend(sb, "(");
                 transpileDatatype(com->base.datatype);
                 sbAppend(sb, ") ");
+
+                if (com->base.datatype.kind == Typekind_Array) {
+                    sbAppend(sb, "{ .length = ");
+                    u32 len = com->elements ? list_length(com->elements) : 0;
+                    sbAppendSpan(sb, numberToString(len));
+                    sbAppend(sb, ", .data = (");
+                    transpileDatatype(com->base.datatype.array_typenode->array.element_type->solvedstate);
+                    sbAppend(sb, "[])");
+                }
             }
 
             sbAppend(sb, "{");
@@ -515,6 +561,8 @@ static void transpileExpression(Expression* expr) {
                 sbAppend(sb, "0");
             }
             sbAppend(sb, "}");
+
+            if (com->base.datatype.kind == Typekind_Array) sbAppend(sb, "}");
         } break;
     }
 
@@ -578,6 +626,13 @@ static void transpileTypedef(Typedef* def) {
 }
 
 static void transpileVarDecl(Declaration* decl) {
+
+    if (decl->is_static) {
+        list_add(static_decls, decl);
+        sbAppend(sb, "// static decl");
+        return;
+    }
+
     if (decl->base.statementType == Statement_FixedArray) {
 
         decl->type->solvedstate.numPointers--;
@@ -612,7 +667,14 @@ static void transpileStatement(Statement* statement) {
         } break;
 
         case Statement_Struct: {
-            transpileStruct((Struct*)statement);
+            Struct* stru = (Struct*)statement;
+            sbAppend(sb, "typedef struct ");
+            sbAppend(sb, get_string(stru->name));
+            sbAppend(sb, " ");
+            sbAppend(sb, get_string(stru->name));
+            sbAppend(sb, ";");
+            newline();
+            transpileStruct(stru);
         } break;
 
         case Statement_Enum: {
@@ -835,6 +897,9 @@ static void transpile(Codebase* codebase) {
     StringBuilder builder = sbCreate();
     sb = &builder;
 
+    if (static_decls == null) static_decls = list_create(Declaration*);
+    else list_clear(static_decls);
+
     // sbAppend(sb, "#include <stdlib.h>\n"); // malloc
     // sbAppend(sb, "#include <stdio.h>\n"); // printf
     // sbAppend(sb, "#define true 1\n#define false 0\n");
@@ -851,6 +916,7 @@ static void transpile(Codebase* codebase) {
     sbAppend(sb, "typedef float float32;\n");
     sbAppend(sb, "typedef double float64;\n");
     sbAppend(sb, "int printf(const char* format, ...);\n");
+    sbAppend(sb, "typedef struct Array { void* data; uint32 length; } Array;\n");
 
 
     sbAppend(sb, "\n// Structs forward declarations\n");
@@ -911,25 +977,75 @@ static void transpile(Codebase* codebase) {
 
     sbAppend(sb, "\n// Declarations\n");
     foreach (global_var, codebase->global_vars) {
+        Declaration* decl = *global_var;
+
+        if (decl->expr && !isCompiletimeExpression(decl->expr)) {
+            list_add(static_decls, decl);
+            continue;
+        }
+
         sbAppend(sb, "static ");
-        transpileVarDecl(*global_var);
-        sbAppend(sb, "\n");
+        _transpileDatatype(decl->type->solvedstate, decl->name);
+        if (decl->expr) {
+            sbAppend(sb, " = ");
+            transpileExpression(decl->expr);
+        }
+        sbAppend(sb, ";\n");
     }
 
-    sbAppend(sb, "\n// Implementations\n");
-    for (u32 i = 0; i < procs_count; i++) {
-        Procedure* proc = codebase->procedures[i];
-        if (proc->scope == null) continue;
-        transpileProcedure(proc);
+    {
+        StringBuilder impl_sb = sbCreate(); // I am such a dirty trickster
+        StringBuilder* temp = sb;
+        sb = &impl_sb;
+
+        sbAppend(sb, "\n// Implementations\n");
+        for (u32 i = 0; i < procs_count; i++) {
+            Procedure* proc = codebase->procedures[i];
+            if (proc->scope == null) continue;
+            transpileProcedure(proc);
+        }
+
+        sb = temp;
+
+        foreach (static_decl, static_decls) {
+            Declaration* decl = *static_decl;
+            sbAppend(sb, "static ");
+            _transpileDatatype(decl->type->solvedstate, decl->name);
+            if (decl->expr && isCompiletimeExpression(decl->expr)) {
+                sbAppend(sb, " = ");
+                transpileExpression(decl->expr);
+            }
+            sbAppend(sb, ";\n");
+        }
+
+        sbAppend(sb, impl_sb.content);
+        sbDestroy(&impl_sb);
     }
+
+    sbAppend(sb, "static void __static_init() {");
+    tabing++;
+    foreach (static_decl, static_decls) {
+        Declaration* decl = *static_decl;
+        if (decl->expr && isCompiletimeExpression(decl->expr)) continue;
+        newline();
+        sbAppend(sb, get_string(decl->name));
+        sbAppend(sb, " = ");
+        transpileExpression(decl->expr);
+        sbAppend(sb, ";");
+    }
+    tabing--;
+    newline();
+    sbAppend(sb, "}\n");
 
     char* c_main_code =
         "int main(int argc, char** argv) {\n"
+        "    __static_init();\n"
         "    __main();\n"
         "    return 0;\n"
         "}";
 
     sbAppend(sb, c_main_code);
+
 
     FILE* file;
     if ( !fopen_s(&file, "output.g.c", "w") ) {
