@@ -1,0 +1,53 @@
+
+void* malloc(uint64 size);
+
+void print_array(uint32[] array) {
+    print("Printing\n");
+    for 0 .. array.length {
+        print("    [", it, "] -> ");
+        print(array[it], "\n");
+    }
+}
+
+void main() {
+
+
+    uint32 numba = 666;
+    uint32[] span = {6, 1, numba, 12, 34, 4, 255, 66, 69, 420};
+
+    // let l = span.length;
+    // let e = span[0];
+
+    print_array(span);
+    span[1] = 7;
+    print_array(span);
+
+    // void()[] proc_array;
+    // let e1 = proc_array[0];
+
+    // char[][] array_2D;
+    // let e2 = array_2D[0];
+
+    char*[] names = {"awd", "daw", "Elis", "Jack", "Foo"};
+    print("Names\n");
+    for 0 .. names.length {
+        print("    [", it, "] -> ");
+        print(names[it], "\n");
+    }
+
+}
+
+void dyn_array_test() {
+    print("Dynamic Array:\n");
+
+    uint32[..] list;
+
+    print_array(list);
+
+}
+
+void func_ptr() {
+    void() f;
+    void()* pf;
+    void()[]*() ff;
+}

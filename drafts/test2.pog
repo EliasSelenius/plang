@@ -19,7 +19,7 @@ void hello() {
 const ThisIsConst = 123;
 
 
-// enable when we get fixed arrays
+// TODO: enable when we get fixed arrays
 // struct Foo {
 
 //     // float32 pos[3]

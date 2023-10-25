@@ -88,9 +88,10 @@ void main() {
     print_array(a1);
     print_array(a2);
 
-    // if you want a stack allocated array of a non-compiletime value then you do this:
+    // if you want a stack allocated array of a non-compiletime size then you do this:
 
-    float32[] a3 = stackalloc float32[12];
+    uint32 size = 12;
+    float32[] a3 = stackalloc float32[size];
     print_array(a3);
 }
 

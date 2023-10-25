@@ -2,17 +2,17 @@
 namespace builtin;
 
 struct Field {
-    char* name;
+    string name;
 }
 
 struct Struct {
-    char* name;
+    string name;
     Field* fields;
     uint32 fields_count;
 }
 
 struct Procedure {
-    char* name;
+    string name;
     void* code;
 }
 

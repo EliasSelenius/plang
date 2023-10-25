@@ -1,0 +1,20 @@
+
+type proc = void();
+
+void() getProcAddress(char* name) {
+
+}
+
+
+type func = void();
+
+void load(func(char*) getAdr) {
+
+}
+
+int main() {
+
+    load(getProcAddress);
+
+    return 0;
+}
