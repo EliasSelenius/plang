@@ -42,7 +42,7 @@ void dyn_array_test() {
 
     uint32[..] list;
 
-    print_array(list);
+    // print_array(list);
 
 }
 

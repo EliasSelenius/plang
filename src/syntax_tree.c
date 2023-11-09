@@ -29,7 +29,7 @@ typedef struct Type Type;
 */
 
 typedef struct Unit {
-    Arena arena;
+    Arena arena; // TODO: make use of this arena
     Statement** top_level_statements; // list
     VariableExpression** external_symbols; // list
     Type** external_types; // list
@@ -476,7 +476,6 @@ typedef union ExprPointer {
 // ----Statements----------------------------------------------
 
 typedef enum StatementType {
-    Statement_FixedArray,
     Statement_Declaration,
     Statement_Constant,
     Statement_Typedef,

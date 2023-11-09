@@ -24,10 +24,12 @@ uint64 parse_int(string str) {
 }
 
 
-// TODO: make this a local static variable
-char num_str[20]; // 20 is max char size for 64 bit integer
 
 string to_string(uint64 num) {
+
+    // TODO: make this a fixed array, so we dont have to malloc
+    static char* num_str = malloc(20); // 20 is max char size for 64 bit integer
+
     if num == 0 return {"0", 1} as string;
     uint32 i = 20;
 

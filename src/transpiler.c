@@ -142,11 +142,7 @@ static void _transpileDatatype(Datatype type, Identifier name) {
     transpileTypeEnd(type);
 }
 
-// #define pointer(inner) *(inner)
-// #define array(inner, size) (inner)[size]
-// #define proc(inner, ...) (*inner)(__VA_ARGS__)
 
-// int proc(array(pointer(Hello), 123), float array(f,10));
 
 // static void transpile_declarator(Datatype datatype, Identifier name) {
 //     if (datatype.kind == Typekind_Procedure) {
@@ -186,9 +182,6 @@ static void _transpileDatatype(Datatype type, Identifier name) {
 //             break;
 //         }
 //     }
-
-
-
 // }
 
 static void transpileFuncCall(ProcCall* call) {
@@ -396,8 +389,8 @@ static void transpileExpression(Expression* expr) {
                     
             //     }
             // }
+            // done:
 
-            done:
             sbAppend(sb, get_string(deref->name));
         } break;
 
@@ -633,26 +626,10 @@ static void transpileVarDecl(Declaration* decl) {
         return;
     }
 
-    if (decl->base.statementType == Statement_FixedArray) {
-
-        decl->type->solvedstate.numPointers--;
-        _transpileDatatype(decl->type->solvedstate, decl->name);
-        sbAppend(sb, "[");
+    _transpileDatatype(decl->type->solvedstate, decl->name);
+    if (decl->expr) {
+        sbAppend(sb, " = ");
         transpileExpression(decl->expr);
-        sbAppend(sb, "]");
-
-    } else {
-
-        _transpileDatatype(decl->type->solvedstate, decl->name);
-        if (decl->expr) {
-            sbAppend(sb, " = ");
-            transpileExpression(decl->expr);
-            if (isCompiletimeExpression(decl->expr)) {
-                sbAppend(sb, "/*constant*/");
-            } else {
-                sbAppend(sb, "/*not constant*/");
-            }
-        }
     }
 
     sbAppend(sb, ";");
@@ -660,7 +637,6 @@ static void transpileVarDecl(Declaration* decl) {
 
 static void transpileStatement(Statement* statement) {
     switch (statement->statementType) {
-        case Statement_FixedArray:
         case Statement_Declaration: {
             Declaration* decl = (Declaration*)statement;
             transpileVarDecl(decl);
@@ -805,6 +781,11 @@ static void transpileStatement(Statement* statement) {
             transpileExpression(staExpr->expr);
             sbAppend(sb, ";");
         } break;
+
+        case Statement_Argument:
+        case Statement_EnumEntry: {
+            error(0, "internal(transpiler)", "Unreachable code. This is a bug!");
+        } break;
     }
 }
 
@@ -892,7 +873,7 @@ static u32 countStructDependencies(Struct* stru) {
     return deps;
 }
 
-static void transpile(Codebase* codebase) {
+void transpile(Codebase* codebase) {
     // TODO: use a higer initial capacity for the string builder
     StringBuilder builder = sbCreate();
     sb = &builder;

@@ -55,7 +55,7 @@ static Identifier builtin_string_add = 0;
 static Identifier builtin_string_static_init = 0;
 
 
-static void init_string_table() {
+void init_string_table() {
 
     // string_table.identifiers = list_create(Identifier);
     // string_table.arena = arena_create();
@@ -90,7 +90,7 @@ static void init_string_table() {
 }
 
 
-Procedure builtin_print_proc = {0};
+static Procedure builtin_print_proc = {0};
 
 static Token* tokens; // darray
 static u32 token_index = 0;
@@ -113,7 +113,7 @@ typedef struct Parser {
 
 static Parser parser;
 
-static void init_parser() {
+void init_parser() {
     parser = (Parser) {0};
     parser.src_files = list_create(File);
 
@@ -130,7 +130,6 @@ static inline File* get_file(u32 index) { return &parser.src_files[index]; }
 
 static Identifier getNameOfStatement(Statement* sta) {
     switch (sta->statementType) {
-        case Statement_FixedArray:
         case Statement_Declaration: return ((Declaration*)sta)->name;
         case Statement_Constant: return ((Declaration*)sta)->name;
         case Statement_Argument: return ((ProcArg*)sta)->name;

@@ -4,7 +4,8 @@
         {
             "label": "c_project_build",
             "type": "shell",
-            "command": "clang -Wall -g src/stub.c src/platform_win32.c -o bin/plang.exe",
+            // "command": "clang -Wall -Wno-unused-variable -Wno-unused-function -g -shared src/stub.c src/platform_win32.c -o bin/plang.dll",
+            "command": "./build.bat",
             "options": {
                 "cwd": "${workspaceFolder}",
             },

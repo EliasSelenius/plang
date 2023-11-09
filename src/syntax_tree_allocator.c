@@ -49,7 +49,6 @@ u32 ExpressionType_Bytesizes[] = {
 
 u32 StatementType_Bytesizes[] = {
     [Statement_Declaration] = sizeof(Declaration),
-    [Statement_FixedArray] = sizeof(Declaration),
     [Statement_Constant] = sizeof(Declaration),
     [Statement_Typedef] = sizeof(Typedef),
     [Statement_Assignment] = sizeof(Assignment),

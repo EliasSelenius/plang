@@ -23,7 +23,17 @@
 #include "globals.c"
 #include "syntax_tree_allocator.c"
 
-void addFile(char* filename, char* extension);
+
+void addFile(char* filename, char* extension) {
+    File file;
+    u32 name_size = strlen(filename) + 1;
+    file.filename = malloc(name_size);
+    strcpy_s(file.filename, name_size, filename);
+
+    list_add(parser.src_files, file);
+
+    printf("addFile: \"%s\"\n", file.filename);
+}
 
 #include "error_messages.c"
 #include "lexer.c"

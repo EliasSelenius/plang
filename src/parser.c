@@ -147,30 +147,44 @@ static Type* type_modifier(Type* type) {
     return null;
 }
 
-static void printType(Type* type) {
+static void print_typenode(Type* type) {
     switch (type->node_type) {
         case TypeNode_MustInfer: printf("let"); break;
         case TypeNode_Normal: {
             printf("%s", get_string(type->name));
-            printf("%.*s", type->solvedstate.numPointers, "***********");
         } break;
 
         case TypeNode_Procedure: {
-            printType(type->procedure.return_type);
+            print_typenode(type->procedure.return_type);
             printf("(");
             Type* arg = type->procedure.first_argument;
             if (arg) {
-                printType(arg);
+                print_typenode(arg);
                 arg = arg->next;
                 while (arg) {
                     printf(", ");
-                    printType(arg);
+                    print_typenode(arg);
                     arg = arg->next;
                 }
             }
             printf(")");
         } break;
+
+        case TypeNode_Array: {
+            print_typenode(type->array.element_type);
+            printf("[]");
+        } break;
+        case TypeNode_Fixed_Array: {
+            print_typenode(type->array.element_type);
+            printf("[%d]", 0); // TODO: print proper size
+        } break;
+        case TypeNode_Dynamic_Array: {
+            print_typenode(type->array.element_type);
+            printf("[..]");
+        } break;
     }
+
+    printf("%.*s", type->solvedstate.numPointers, "***********");
 }
 
 
@@ -416,13 +430,7 @@ static Statement* proc_or_var(bool declare_localy) {
     decl->type = type;
     decl->name = name;
 
-    if (tok(Tok_OpenSquare)) {
-        decl->base.statementType = Statement_FixedArray;
-        decl->expr = expectExpression();
-        expect(Tok_CloseSquare);
-    } else if (tok(Tok_Assign)) {
-        decl->expr = expectExpression();
-    }
+    if (tok(Tok_Assign)) decl->expr = expectExpression();
 
     semicolon();
     return (Statement*)decl;
@@ -543,7 +551,6 @@ void bind_units(Unit* units, Codebase* cb) {
                 case Statement_Procedure: list_add(cb->procedures, sta); break;
 
                 case Statement_Constant: list_add(cb->global_consts, sta); break;
-                case Statement_FixedArray:
                 case Statement_Declaration: list_add(cb->global_vars, sta); break;
                 case Statement_Struct: list_add(cb->structs, sta); break;
                 case Statement_Enum: list_add(cb->enums, sta); break;
@@ -560,7 +567,7 @@ void bind_units(Unit* units, Codebase* cb) {
         resolve_typenode(type, cb);
         if (type->solvedstate.kind == Typekind_Invalid) {
             error_node(type, "Failed to resolve type");
-            printf("    "); printType(type); printf("\n");
+            printf("    "); print_typenode(type); printf("\n");
         }
     }
 
@@ -635,7 +642,7 @@ static void print_codebase(Codebase* cb) {
     }
 }
 
-static Codebase parse() {
+Codebase parse() {
 
     Unit* units = list_create(Unit);
 

@@ -54,6 +54,9 @@ static void print_value(Value value) {
         case Typekind_Enum: break;
         case Typekind_Typedef: break;
         case Typekind_Procedure: break;
+        case Typekind_Array: break;
+        case Typekind_Fixed_Array: break;
+        case Typekind_Dynamic_Array: break;
     }
 }
 

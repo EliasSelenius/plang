@@ -187,7 +187,6 @@ static Datatype typeofStatement(Statement* sta) {
     if (!sta) return type_invalid;
 
     switch (sta->statementType) {
-        case Statement_FixedArray:
         case Statement_Declaration: {
             Declaration* decl = (Declaration*)sta;
             return decl->type->solvedstate;
@@ -598,14 +597,6 @@ static Datatype validateExpressionEx(Expression* expr, Datatype expected_type) {
 // }
 
 static void validateDeclaration(Declaration* decl) {
-
-    if (decl->base.statementType == Statement_FixedArray) {
-        decl->type->solvedstate.numPointers++; // because this is a fixed array declaration.
-        // NOTE: decl->expr is used as the size expression for this fixed array
-        validateExpression(decl->expr);
-        return;
-    }
-
     if (decl->expr) {
 
         Datatype type = validateExpressionEx(decl->expr, decl->type->solvedstate);
@@ -646,15 +637,6 @@ static void validateEnum(Enum* en) {
 
 static void validateStatement(Statement* sta) {
     switch (sta->statementType) {
-        case Statement_FixedArray: {
-            Declaration* decl = (Declaration*)sta;
-
-            decl->type->solvedstate.numPointers++; // because this is a fixed array declaration.
-
-            // NOTE: decl->expr is used as the size expression for this fixed array
-            Datatype sizetype = validateExpression(decl->expr);
-            // TODO: is asstype a valid integer expression?
-        } break;
 
         case Statement_Declaration: {
             Declaration* decl = (Declaration*)sta;
@@ -783,6 +765,11 @@ static void validateStatement(Statement* sta) {
         case Statement_Expression: {
             StatementExpression* staExpr = (StatementExpression*)sta;
             validateExpression(staExpr->expr);
+        } break;
+
+        case Statement_Argument:
+        case Statement_EnumEntry: {
+            error(0, "internal(validator)", "Unreachable code. This is a bug!");
         } break;
     }
 }

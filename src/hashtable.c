@@ -65,5 +65,5 @@ void hashtable_add(Hashtable* table, u32 hash, void* data) {
 }
 
 bool hashtable_contains(Hashtable* table, u32 hash) {
-
+    return false;
 }

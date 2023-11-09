@@ -277,7 +277,6 @@ static Scope* expectScope() {
                 // case Statement_For: // declare_symbol() is called in expectStatement() for for-loops, because it must be called before we parse inner statement
                 // case Statement_Procedure: // declare_symbol() is called in proc_or_var() for same reason as above
 
-                case Statement_FixedArray:
                 case Statement_Declaration:
                 case Statement_Constant:
 

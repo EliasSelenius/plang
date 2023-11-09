@@ -99,16 +99,26 @@
 
 */
 
-void addFile(char* filename, char* extension) {
-    File file;
-    u32 name_size = strlen(filename) + 1;
-    file.filename = malloc(name_size);
-    strcpy_s(file.filename, name_size, filename);
+#include <stdio.h>
+#include <stdlib.h>
 
-    list_add(parser.src_files, file);
+#include "prelude.h"
+#include "essh-string.h"
 
-    printf("addFile: \"%s\"\n", file.filename);
-}
+void addFile(char* filename, char* extension);
+
+typedef struct Codebase {
+
+    struct Procedure** procedures; // list
+    struct Declaration** global_vars; // list
+    struct Declaration** global_consts; // list
+    struct Struct** structs; // list
+    struct Enum** enums; // list
+    struct Typedef** type_defs; // list
+
+} Codebase;
+
+Codebase parse();
 
 int main(int argc, char* argv[]) {
 
@@ -128,15 +138,16 @@ int main(int argc, char* argv[]) {
         if (cstrEquals(argv[1], "build")) {
             foreachFile(".pog", addFile);
             i = 2;
-        } else if (cstrEquals(argv[1], "eval")) {
-            printf("Evaling...\n");
-            tokens = list_create(Token);
-            lex(argv[2]);
-            Expression* expr = expectExpression();
-            Value v = interpret_expression(expr);
-            print_value(v);
-            return 0;
         }
+        // else if (cstrEquals(argv[1], "eval")) {
+        //     printf("Evaling...\n");
+        //     tokens = list_create(Token);
+        //     lex(argv[2]);
+        //     Expression* expr = expectExpression();
+        //     Value v = interpret_expression(expr);
+        //     print_value(v);
+        //     return 0;
+        // }
     }
 
     while (i < argc) {
@@ -157,15 +168,15 @@ int main(int argc, char* argv[]) {
     Codebase cb = parse();
 
 
-    if (false) { // hash test
-        foreach (index, string_table.byteoffsets) {
-            char* str = &string_table.data->bytes[*index];
+    // if (false) { // hash test
+    //     foreach (index, string_table.byteoffsets) {
+    //         char* str = &string_table.data->bytes[*index];
 
-            printf("%s -> %llu\n", str, string_hash(str));
-        }
+    //         printf("%s -> %llu\n", str, string_hash(str));
+    //     }
 
-        return 1;
-    }
+    //     return 1;
+    // }
 
 
     printf("Transpile...\n");
