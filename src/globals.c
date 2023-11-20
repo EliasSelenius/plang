@@ -182,6 +182,22 @@ static Statement* get_global_type(Identifier name, Codebase* codebase) {
     return null;
 }
 
+static Statement* get_global_symbol_from_codebase(Identifier name, Codebase* cb) {
+    foreach (proc, cb->procedures) {
+        if ((*proc)->name == name) return (Statement*)(*proc);
+    }
+
+    foreach (var, cb->global_vars) {
+        if ((*var)->name == name) return (Statement*)(*var);
+    }
+
+    foreach (con, cb->global_consts) {
+        if ((*con)->name == name) return (Statement*)(*con);
+    }
+
+    return null;
+}
+
 static Statement* get_global_symbol(Identifier name, Unit* unit) {
     foreach (item, unit->top_level_statements) {
         Statement* sta = *item;

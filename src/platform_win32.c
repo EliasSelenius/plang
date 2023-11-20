@@ -45,6 +45,15 @@ static char* getExt(char* filename) {
 }
 
 
+typedef struct FileInfo {
+    DWORD dwFileAttributes;
+    FILETIME ftCreationTime;
+    FILETIME ftLastAccessTime;
+    FILETIME ftLastWriteTime;
+    u64 bytesize;
+    char* name;
+} FileInfo;
+
 void foreachFile(char* ext, void (*func)(char* filename, char* extension)) {
 
     HANDLE handle;

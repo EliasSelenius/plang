@@ -188,7 +188,7 @@ typedef struct Type {
 #define type_float64 (Datatype) { .kind = Typekind_float64 }
 #define type_char    (Datatype) { .kind = Typekind_char }
 #define type_void    (Datatype) { .kind = Typekind_void }
-#define type_bool    type_uint8;
+#define type_bool    type_uint8
 
 static inline bool typeEquals(Datatype a, Datatype b) {
     return a.kind == b.kind && a.data_ptr == b.data_ptr && a.numPointers == b.numPointers;
@@ -590,6 +590,23 @@ typedef struct CaseLabelStatement {
     SwitchStatement* switch_statement;
 } CaseLabelStatement;
 
+typedef union StmtPointer {
+    Statement* sta;
+    StatementExpression* expr;
+    Declaration* decl;
+    Typedef* type_def;
+    Assignment* assign;
+    Scope* scope;
+    WhileStatement* while_loop;
+    ForStatement* for_loop;
+    IfStatement* if_sta;
+    SwitchStatement* switch_sta;
+    ReturnStatement* ret_sta;
+    GotoStatement* goto_sta;
+    LabelStatement* label;
+    CaseLabelStatement* case_sta;
+} StmtPointer;
+
 // ----Procedures----------------------------------------------
 
 typedef struct ProcArg {
@@ -631,10 +648,18 @@ typedef struct CapturedVariable {
 
 // ----Struct----------------------------------------------
 
+// typedef struct Field {
+//     Type* type;
+//     Identifier name;
+//     Expression* expr;
+//     u32 byte_offset;
+//     bool include_context;
+// } Field;
 
 typedef struct Struct {
     Statement base;
     Identifier name;
+    u32 byte_size;
     u32 deps; // TODO: temporary, until we figure out a better way of transpiling structs in the correct order
     Declaration* fields; // list
 } Struct;

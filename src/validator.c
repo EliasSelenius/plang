@@ -108,7 +108,7 @@ static char* get_basic_type_string(Datatype type) {
     }
 }
 
-static void construct_type_string(Datatype type, StringBuilder* sb) {
+static char* construct_type_string(Datatype type, StringBuilder* sb) {
 
     Type* typenode = type.array_typenode; // same as proc_ptr_typenode
 
@@ -145,24 +145,10 @@ static void construct_type_string(Datatype type, StringBuilder* sb) {
 
     u32 np = type.numPointers;
     while (np-- != 0) sbAppendChar(sb, '*');
+
+    return sb->content;
 }
 
-static StringBuilder* temp_builder() {
-
-    static u32 calls = 0;
-    static const u32 builders_count = 2;
-    static StringBuilder builders[builders_count] = {0};
-
-    StringBuilder* sb = &builders[calls++ % builders_count];
-
-    if (sb->content == null) {
-        *sb = sbCreate();
-        printf("[DEBUG]: Initialized temporary string builder. This should only happen %u times.\n", builders_count);
-    }
-
-    sbClear(sb);
-    return sb;
-}
 
 static void assertAssignability(Datatype toType, Datatype fromType, void* node) {
     if (!typeAssignable(toType, fromType)) {

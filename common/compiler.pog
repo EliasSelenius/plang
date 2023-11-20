@@ -1,0 +1,6 @@
+
+type Codebase;
+
+void init_parser();
+void init_string_table();
+uint64 repl_input(char* code, Codebase* cb);

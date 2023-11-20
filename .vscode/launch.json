@@ -23,7 +23,7 @@
             "request": "launch",
             "terminal": "external",
             "program": "${workspaceFolder}/bin/plang.exe",
-            "args": ["minbug.pog"],
+            "args": ["drafts/minbug.pog", "cflags", "-lbin/pog_compiler.lib"],
             "cwd": "${workspaceFolder}",
         },
 

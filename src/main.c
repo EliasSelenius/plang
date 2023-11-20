@@ -105,20 +105,7 @@
 #include "prelude.h"
 #include "essh-string.h"
 
-void addFile(char* filename, char* extension);
-
-typedef struct Codebase {
-
-    struct Procedure** procedures; // list
-    struct Declaration** global_vars; // list
-    struct Declaration** global_consts; // list
-    struct Struct** structs; // list
-    struct Enum** enums; // list
-    struct Typedef** type_defs; // list
-
-} Codebase;
-
-Codebase parse();
+#include "public.h"
 
 int main(int argc, char* argv[]) {
 
@@ -134,20 +121,17 @@ int main(int argc, char* argv[]) {
 
     u32 i = 1;
 
+    bool evaling = false;
+
     if (argc >= 2) {
         if (cstrEquals(argv[1], "build")) {
             foreachFile(".pog", addFile);
             i = 2;
         }
-        // else if (cstrEquals(argv[1], "eval")) {
-        //     printf("Evaling...\n");
-        //     tokens = list_create(Token);
-        //     lex(argv[2]);
-        //     Expression* expr = expectExpression();
-        //     Value v = interpret_expression(expr);
-        //     print_value(v);
-        //     return 0;
-        // }
+        else if (cstrEquals(argv[1], "eval")) {
+            i = 2;
+            evaling = true;
+        }
     }
 
     while (i < argc) {
@@ -167,6 +151,13 @@ int main(int argc, char* argv[]) {
 
     Codebase cb = parse();
 
+    if (evaling) {
+        char input[256];
+        while (fgets(input, sizeof(input), stdin)) {
+            repl_input(input, &cb);
+        }
+        return 0;
+    }
 
     // if (false) { // hash test
     //     foreach (index, string_table.byteoffsets) {

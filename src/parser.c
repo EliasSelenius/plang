@@ -482,6 +482,11 @@ static Statement* parse_top_level_statement() {
     return null;
 }
 
+static void reset_parser() {
+    list_clear(parser.unresolved_variables);
+    token_index = 0;
+}
+
 static Unit parse_unit() {
     Unit unit = {0};
     current_unit = &unit;
@@ -491,9 +496,8 @@ static Unit parse_unit() {
     unit.external_symbols = list_create(VariableExpression*);
     unit.external_types = list_create(Type*);
 
-    list_clear(parser.unresolved_variables);
+    reset_parser();
 
-    token_index = 0;
     while (peek().type != Tok_EOF) {
         list_clear(parser.local_symbols);
         Statement* top_lvl_sta = parse_top_level_statement();

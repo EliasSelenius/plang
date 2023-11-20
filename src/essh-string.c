@@ -172,3 +172,17 @@ void sbCopyIntoBuffer(StringBuilder* sb, char* buffer, u32 bufferLength) {
         buffer[i] = sb->content[i];
     }
 }
+
+StringBuilder* temp_builder() {
+
+    static u32 calls = 0;
+    static const u32 builders_count = 2;
+    static StringBuilder builders[builders_count] = {0};
+
+    StringBuilder* sb = &builders[calls++ % builders_count];
+
+    if (sb->content == null) *sb = sbCreate();
+    sbClear(sb);
+
+    return sb;
+}

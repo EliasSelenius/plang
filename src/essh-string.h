@@ -52,4 +52,4 @@ void sbAppendChar(StringBuilder* sb, char c);
 void sbAppend(StringBuilder* sb, char* str);
 void sbAppendSpan(StringBuilder* sb, StrSpan str);
 void sbCopyIntoBuffer(StringBuilder* sb, char* buffer, u32 bufferLength);
-
+StringBuilder* temp_builder();

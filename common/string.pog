@@ -50,7 +50,7 @@ int32 string_equals(string a, string b) {
     return true;
 }
 
-int32 is_whitespace(char c) { return c == ' ' or c == '\n'; }
+int32 is_whitespace(char c) { return c == ' ' or c == '\n' or c == '\t'; }
 int32 is_upper_case_letter(char c) { return c >= 'A' and c <= 'Z'; }
 int32 is_lower_case_letter(char c) { return c >= 'a' and c <= 'z'; }
 int32 is_letter(char c) { return is_lower_case_letter(c) or is_upper_case_letter(c); }
@@ -64,10 +64,22 @@ int32 is_punctuation(char c) {
         or (c >= '{' and c <= '~');
 }
 
+int32 is_whitespace_or_empty(string str) {
+    for 0 .. str.length {
+        if !is_whitespace(str.chars[it]) return false;
+    }
+
+    return true;
+}
+
 struct StringBuilder {
     char* content;
     uint32 capacity;
     uint32 length;
+}
+
+string to_string(StringBuilder sb) {
+    return {sb.content, sb.length} as string;
 }
 
 StringBuilder sb_create() {

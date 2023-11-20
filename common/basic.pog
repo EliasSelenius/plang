@@ -19,6 +19,8 @@ void* memcpy(void* dst, void* src, uint64 size);
 
 uint64 strlen(char* str);
 
+void exit(int32 code);
+
 char* fileread(char* filename) {
     return fileread(filename, "r");
 }
