@@ -26,6 +26,15 @@
             "args": ["drafts/minbug.pog", "cflags", "-lbin/pog_compiler.lib"],
             "cwd": "${workspaceFolder}",
         },
+        {
+            "name": "eval minbug.pog",
+            "type": "lldb",
+            "request": "launch",
+            "terminal": "external",
+            "program": "${workspaceFolder}/bin/plang.exe",
+            "args": ["eval", "drafts/minbug.pog"],
+            "cwd": "${workspaceFolder}",
+        },
 
         {
             "name": "compile minesweeper",
@@ -61,7 +70,7 @@
             "request": "launch",
             "terminal": "external",
             "program": "${workspaceFolder}/bin/plang.exe",
-            "args": ["main.pog", "cflags", "-lglfw3dll"],
+            "args": ["main.pog", "cflags", "-lglfw3dll", "-l../plang/bin/pog_compiler"],
             "cwd": "${workspaceFolder}/../textus_quill",
         }
     ]

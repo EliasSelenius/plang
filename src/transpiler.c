@@ -278,7 +278,10 @@ static void transpilePrint(Expression** args) {
                 sbAppend(sb, ", ");
             }
             sb->length -= 2;
-        } else transpileExpression(arg);
+        } else {
+            if (arg->expressionType == ExprType_Sizeof) sbAppend(sb, "(uint32)");
+            transpileExpression(arg);
+        }
     }
 
     sbAppend(sb, ")");
@@ -352,13 +355,15 @@ static void transpileExpression(Expression* expr) {
         case ExprType_Variable: {
             VariableExpression* var = (VariableExpression*)expr;
 
-            StatementType ref_type = var->ref->statementType;
-            if (ref_type == Statement_Constant) {
-                transpileExpression(((Declaration*)var->ref)->expr);
-                break;
-            }
+            if (var->ref) {
+                StatementType ref_type = var->ref->statementType;
+                if (ref_type == Statement_Constant) {
+                    transpileExpression(((Declaration*)var->ref)->expr);
+                    break;
+                }
 
-            if (ref_type == Statement_Enum) break;
+                if (ref_type == Statement_Enum) break;
+            }
 
             sbAppend(sb, get_string(var->name));
         } break;

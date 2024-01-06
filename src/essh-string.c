@@ -60,7 +60,9 @@ bool spStartsWith(StrSpan sv, char* start) {
     }
 }
 
-
+bool string_ends_with(char* str, char* substr) {
+    return false;
+}
 
 bool spanEquals(StrSpan span, char* str) {
     return spanEqualsSpan(span, spFrom(str));
@@ -98,6 +100,12 @@ StrSpan numberToString(u64 num) {
     return (StrSpan) { &number_string[strIndex], 20 - strIndex };
 }
 
+char* alloc_string_copy(char* str) {
+    u32 len = strlen(str);
+    char* res = malloc(len + 1);
+    strcpy_s(res, len + 1, str);
+    return res;
+}
 
 // ----------StringBuilder----------------
 

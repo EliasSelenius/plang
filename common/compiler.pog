@@ -1,6 +1,10 @@
 
 type Codebase;
+type Parser;
 
-void init_parser();
-void init_string_table();
-uint64 repl_input(char* code, Codebase* cb);
+Parser* init_parser();
+void parser_parse_source(Parser* parser, char* source);
+void parser_parse_file(Parser* parser, char* file_name);
+
+void parser_add_input_file(Parser* parser, char* file_name);
+void parse(Parser* parser);

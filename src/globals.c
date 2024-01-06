@@ -55,7 +55,7 @@ static Identifier builtin_string_add = 0;
 static Identifier builtin_string_static_init = 0;
 
 
-void init_string_table() {
+static void init_string_table() {
 
     // string_table.identifiers = list_create(Identifier);
     // string_table.arena = arena_create();
@@ -90,17 +90,69 @@ void init_string_table() {
 }
 
 
-static Procedure builtin_print_proc = {0};
+static void init_typenode_for_proc(Procedure* proc); // TODO: put all forward-decl in same file
 
-static Token* tokens; // darray
-static u32 token_index = 0;
+static Procedure* builtin_procedures;
 
+static Procedure create_builtin_proc(char* name) {
+    Procedure proc = {0};
+    proc.name = register_string(spFrom(name));
+    proc.base.statementType = Statement_Procedure;
+    init_typenode_for_proc(&proc);
+    return proc;
+}
+
+
+/*
+
+    input -> parser -> unit
+    units will contain syntax tree and arena so it can be freed independently from other units
+    aswell as lists of unresolved symbols in the syntax tree
+
+    units -> binder -> codebase
+    binder will set correct references to variables and types in syntax tree (resolving symbols)
+    then it will construct a Codebase object containing lists of pointers to all the things
+    this process may be redone several times
+
+    codebase -> validator
+    typecheking
+
+*/
+
+typedef struct Unit {
+    Arena arena; // TODO: make use of this arena
+    Statement** top_level_statements; // list
+    VariableExpression** external_symbols; // list
+    Type** external_types; // list
+} Unit;
+
+
+typedef struct File {
+    char* filename;
+} File;
+
+
+typedef struct CodeLocation {
+    char* file_name;
+    u32 line, column;
+} CodeLocation;
+
+typedef struct Error {
+    CodeLocation location;
+    char* message;
+} Error;
 
 typedef struct Parser {
+
+    Token* tokens; // list
+    u32 token_index;
+
+    Unit* units; // list
+
     File* src_files;
     u32 current_file_index;
-    Scope* scope;
 
+    Scope* scope;         // current scope being parsed
     Procedure* procedure; // current procedure that is being validated
 
     Statement** local_symbols; // all the things a VariableExpression might refer to
@@ -109,24 +161,75 @@ typedef struct Parser {
     VariableExpression** unresolved_variables; // list
     Type** unresolved_types; // list
 
+    Error* errors; // list
+
+    // these options are added for REPL
+    bool allow_lonely_expressions;
+    bool allow_omitting_semicolon;
+
 } Parser;
 
-static Parser parser;
+static inline Token peek_at(Parser* parser, i32 offset) { return parser->tokens[parser->token_index + offset]; }
+static inline Token peek(Parser* parser) { return peek_at(parser, 0); }
+static inline Token advance(Parser* parser) { return parser->tokens[parser->token_index++]; }
 
-void init_parser() {
-    parser = (Parser) {0};
-    parser.src_files = list_create(File);
-
-    parser.local_symbols = list_create(Statement*);
-    parser.local_types = list_create(Statement*);
-
-    parser.unresolved_variables = list_create(VariableExpression*);
-    parser.unresolved_types = list_create(Type*);
-
+static void gen_error(Parser* parser, char* file_name, u32 line, u32 column, char* msg) {
+    Error e = {0};
+    e.location.file_name = file_name;
+    e.location.line = line;
+    e.location.column = column;
+    e.message = msg;
+    list_add(parser->errors, e);
 }
 
-static inline File* get_current_file() { return &parser.src_files[parser.current_file_index]; }
-static inline File* get_file(u32 index) { return &parser.src_files[index]; }
+static void reset_parser(Parser* parser) {
+    list_clear(parser->unresolved_variables);
+    parser->token_index = 0;
+}
+
+Parser* init_parser() {
+
+    if (string_table.data == null) {
+        init_string_table();
+
+        builtin_procedures = list_create(Procedure);
+        list_add(builtin_procedures, create_builtin_proc("print"));
+        list_add(builtin_procedures, create_builtin_proc("add"));
+    }
+
+    Parser* parser = calloc(1, sizeof(Parser));
+
+    parser->tokens = list_create(Token);
+    parser->token_index = 0;
+
+    parser->units = list_create(Unit);
+
+    parser->src_files = list_create(File);
+
+    parser->local_symbols = list_create(Statement*);
+    parser->local_types = list_create(Statement*);
+
+    parser->unresolved_variables = list_create(VariableExpression*);
+    parser->unresolved_types = list_create(Type*);
+
+    parser->errors = list_create(Error);
+
+    return parser;
+}
+
+void free_parser(Parser* parser) {
+    // TODO: ...
+}
+
+void parser_add_input_file(Parser* parser, char* file_name) {
+    File file = {0};
+    file.filename = alloc_string_copy(file_name);
+
+    list_add(parser->src_files, file);
+}
+
+static inline File* get_current_file(Parser* parser) { return &parser->src_files[parser->current_file_index]; }
+static inline File* get_file(Parser* parser, u32 index) { return &parser->src_files[index]; }
 
 static Identifier getNameOfStatement(Statement* sta) {
     switch (sta->statementType) {
@@ -145,15 +248,15 @@ static Identifier getNameOfStatement(Statement* sta) {
 }
 
 
-static void declare_local_type(Statement* sta) {
+static void declare_local_type(Parser* parser, Statement* sta) {
     // TODO: already declared error
-    list_add(parser.local_types, sta);
+    list_add(parser->local_types, sta);
 }
 
-static Statement* get_local_type(Identifier name) {
-    i32 len = (i32)list_length(parser.local_types);
+static Statement* get_local_type(Parser* parser, Identifier name) {
+    i32 len = (i32)list_length(parser->local_types);
     for (i32 i = len-1; i >= 0; i--) {
-        Statement* sta = parser.local_types[i];
+        Statement* sta = parser->local_types[i];
         if (name == getNameOfStatement(sta)) return sta;
     }
 
@@ -207,25 +310,30 @@ static Statement* get_global_symbol(Identifier name, Unit* unit) {
     return null;
 }
 
-static Statement* get_symbol(Identifier name) {
+static Statement* get_symbol(Parser* parser, Identifier name) {
 
 
-    i32 len = (i32)list_length(parser.local_symbols);
+    i32 len = (i32)list_length(parser->local_symbols);
     for (i32 i = len-1; i >= 0; i--) {
-        Statement* sta = parser.local_symbols[i];
+        Statement* sta = parser->local_symbols[i];
         if (name == getNameOfStatement(sta)) return sta;
+    }
+
+    u32 builtin_procs_len = list_length(builtin_procedures);
+    for (u32 i = 0; i < builtin_procs_len; i++) {
+        if (builtin_procedures[i].name == name) return (Statement*)(&builtin_procedures[i]);
     }
 
     return null;
 }
 
-static void declare_symbol(Statement* sta) {
+static void declare_symbol(Parser* parser, Statement* sta) {
 
     // TODO: already declared error
 
-    list_add(parser.local_symbols, sta);
+    list_add(parser->local_symbols, sta);
 }
 
-static void stack_pop(u32 num) {
-    list_head(parser.local_symbols)->length -= num;
+static void stack_pop(Parser* parser, u32 num) {
+    list_head(parser->local_symbols)->length -= num;
 }

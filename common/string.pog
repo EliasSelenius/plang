@@ -50,6 +50,26 @@ int32 string_equals(string a, string b) {
     return true;
 }
 
+int32 starts_with(char* text, char* start) {
+    int32 i = 0;
+    while start[i] {
+        if start[i] != text[i] return false;
+        i++;
+    }
+
+    return true;
+}
+
+string substr_until(char* str, char delim) {
+    string res = { str, 0 };
+
+    uint32 i = 0;
+    while str[i] and str[i] != delim  i++;
+
+    res.length = i;
+    return res;
+}
+
 int32 is_whitespace(char c) { return c == ' ' or c == '\n' or c == '\t'; }
 int32 is_upper_case_letter(char c) { return c >= 'A' and c <= 'Z'; }
 int32 is_lower_case_letter(char c) { return c >= 'a' and c <= 'z'; }
@@ -71,6 +91,27 @@ int32 is_whitespace_or_empty(string str) {
 
     return true;
 }
+
+// Levenshtein edit distance
+//   naive implementation
+//   TODO: maybe implement Wagner-Fischer algorithm
+int32 lev(string a, string b) {
+    string tail(string str) {
+        return { str.chars as uint64 + 1, str.length - 1 } as string;
+    }
+
+    if a.length == 0 return b.length as int32;
+    if b.length == 0 return a.length as int32;
+
+    if a.chars[0] == b.chars[0] return lev(tail(a), tail(b));
+
+    int32 i = lev(tail(a), b);
+    i = min(i, lev(a, tail(b)));
+    i = min(i, lev(tail(a), tail(b)));
+
+    return i + 1;
+}
+
 
 struct StringBuilder {
     char* content;

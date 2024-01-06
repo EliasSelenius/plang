@@ -70,29 +70,28 @@ u32 StatementType_Bytesizes[] = {
     [Statement_DefaultLabel] = sizeof(Statement)
 };
 
-Node node_init() {
+Node node_init(Parser* parser) {
     Node node = {0};
-    node.file_index = parser.current_file_index;
-    node.lineNumber = tokens[token_index].line;
+    node.file_index = parser->current_file_index;
+    node.lineNumber = peek(parser).line;
     return node;
 }
 
-void* allocate_node(u32 node_size) {
+void* allocate_node(Parser* parser, u32 node_size) {
     Node* node = calloc(1, node_size);
-    node->file_index = parser.current_file_index;
-    node->lineNumber = tokens[token_index].line;
+    *node = node_init(parser);
     return node;
 }
 
-void* allocExpr(ExprType type) {
-    Expression* expr = allocate_node(ExpressionType_Bytesizes[type]);
+void* allocExpr(Parser* parser, ExprType type) {
+    Expression* expr = allocate_node(parser, ExpressionType_Bytesizes[type]);
     expr->expressionType = type;
     expr->datatype = type_invalid;
     return expr;
 }
 
-void* allocStatement(StatementType type) {
-    Statement* sta = allocate_node(StatementType_Bytesizes[type]);
+void* allocStatement(Parser* parser, StatementType type) {
+    Statement* sta = allocate_node(parser, StatementType_Bytesizes[type]);
     sta->statementType = type;
     return sta;
 }

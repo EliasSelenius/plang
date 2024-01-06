@@ -55,3 +55,20 @@ void filewrite(char* filename, char* content) {
 
     fclose(file);
 }
+
+
+
+
+struct FileInfo {
+    char* name;
+    uint64 size;
+
+    uint64 creation_time;
+    uint64 last_access_time;
+    uint64 last_write_time;
+}
+
+type enumerate_files_callback = void(FileInfo, void*);
+
+void enumerate_files(char* path, enumerate_files_callback callback, void* user_data);
+void print_file(FileInfo info, void* user_data);

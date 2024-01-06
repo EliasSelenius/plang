@@ -1,159 +1,157 @@
 
 
-static void expectProcCallArgs(ProcCall* proc, Expression* proc_expr) {
+static void expectProcCallArgs(Parser* parser, ProcCall* proc, Expression* proc_expr) {
     proc->proc_expr = proc_expr;
 
-    Expression* expr = parseExpression();
+    Expression* expr = parseExpression(parser);
     if (expr) {
         proc->args = list_create(Expression*);
         list_add(proc->args, expr);
 
-        while (tok(Tok_Comma)) {
-            expr = expectExpression();
+        while (tok(parser, Tok_Comma)) {
+            expr = expectExpression(parser);
             list_add(proc->args, expr);
         }
     } else {
         proc->args = null;
     }
 
-    expect(Tok_CloseParen);
+    expect(parser, Tok_CloseParen);
 }
 
-static Expression* literal_expr(ExprType expr_type) {
-    LiteralExpression* lit = allocExpr(expr_type);
-    lit->data = tokens[token_index++].data;
+static Expression* literal_expr(Parser* parser, ExprType expr_type) {
+    LiteralExpression* lit = allocExpr(parser, expr_type);
+    lit->data = advance(parser).data;
     return (Expression*)lit;
 }
 
-static Expression* parseLeafExpression() {
+static Expression* parseLeafExpression(Parser* parser) {
     Expression* res = null;
 
     UnaryExpression* unary = null;
-    switch (tokens[token_index].type) {
-        case Tok_Mul: unary = allocExpr(ExprType_Unary_AddressOf); token_index++; break;
-        case Tok_At: unary = allocExpr(ExprType_Unary_ValueOf); token_index++; break;
-        case Tok_ExclamationMark: unary = allocExpr(ExprType_Unary_Not); token_index++; break;
-        case Tok_PlusPlus: unary = allocExpr(ExprType_Unary_PreIncrement); token_index++; break;
-        case Tok_MinusMinus: unary = allocExpr(ExprType_Unary_PreDecrement); token_index++; break;
-        case Tok_Minus: unary = allocExpr(ExprType_Unary_Negate); token_index++; break;
-        case Tok_Tilde: unary = allocExpr(ExprType_Unary_BitwiseNot); token_index++; break;
+    switch (peek(parser).type) {
+        case Tok_Mul: unary = allocExpr(parser, ExprType_Unary_AddressOf); advance(parser); break;
+        case Tok_At: unary = allocExpr(parser, ExprType_Unary_ValueOf); advance(parser); break;
+        case Tok_ExclamationMark: unary = allocExpr(parser, ExprType_Unary_Not); advance(parser); break;
+        case Tok_PlusPlus: unary = allocExpr(parser, ExprType_Unary_PreIncrement); advance(parser); break;
+        case Tok_MinusMinus: unary = allocExpr(parser, ExprType_Unary_PreDecrement); advance(parser); break;
+        case Tok_Minus: unary = allocExpr(parser, ExprType_Unary_Negate); advance(parser); break;
+        case Tok_Tilde: unary = allocExpr(parser, ExprType_Unary_BitwiseNot); advance(parser); break;
         default: break;
     }
 
-    switch (tokens[token_index].type) {
+    switch (peek(parser).type) {
         case Tok_Word: {
-            VariableExpression* ve = allocExpr(ExprType_Variable);
-            ve->name = tokens[token_index++].data.string;
+            VariableExpression* ve = allocExpr(parser, ExprType_Variable);
+            ve->name = advance(parser).data.string;
 
-            if (ve->name != builtin_string_print) {
-                ve->ref = get_symbol(ve->name);
-                if (!ve->ref) list_add(parser.unresolved_variables, ve);
-            }
+            ve->ref = get_symbol(parser, ve->name);
+            if (!ve->ref) list_add(parser->unresolved_variables, ve);
 
             res = (Expression*)ve;
         } break;
 
         case Tok_Keyword_Alloc: {
-            AllocExpression* alloc = allocExpr(ExprType_Alloc);
-            token_index++;
-            alloc->type = expectType();
+            AllocExpression* alloc = allocExpr(parser, ExprType_Alloc);
+            advance(parser);
+            alloc->type = expectType(parser);
             alloc->sizeExpr = null;
-            if (tok(Tok_OpenSquare)) {
-                alloc->sizeExpr = expectExpression();
-                expect(Tok_CloseSquare);
+            if (tok(parser, Tok_OpenSquare)) {
+                alloc->sizeExpr = expectExpression(parser);
+                expect(parser, Tok_CloseSquare);
             }
 
             res = (Expression*)alloc;
         } break;
 
         case Tok_Keyword_Sizeof: {
-            SizeofExpression* sof = allocExpr(ExprType_Sizeof);
-            token_index++;
+            SizeofExpression* sof = allocExpr(parser, ExprType_Sizeof);
+            advance(parser);
 
             bool mustClose = false;
-            if (tok(Tok_OpenParen)) mustClose = true;
-            sof->type = expectType();
-            if (mustClose) expect(Tok_CloseParen);
+            if (tok(parser, Tok_OpenParen)) mustClose = true;
+            sof->type = expectType(parser);
+            if (mustClose) expect(parser, Tok_CloseParen);
 
             res = (Expression*)sof;
         } break;
 
         case Tok_OpenParen: {
-            ParenthesizedExpression* p = allocExpr(ExprType_Parenthesized);
-            token_index++;
-            p->innerExpr = expectExpression();
-            expect(Tok_CloseParen);
+            ParenthesizedExpression* p = allocExpr(parser, ExprType_Parenthesized);
+            advance(parser);
+            p->innerExpr = expectExpression(parser);
+            expect(parser, Tok_CloseParen);
 
             res = (Expression*)p;
         } break;
 
         case Tok_Period: {
-            DerefOperator* deref = allocExpr(ExprType_Deref);
-            token_index++;
-            deref->name = identifier();
+            DerefOperator* deref = allocExpr(parser, ExprType_Deref);
+            advance(parser);
+            deref->name = identifier(parser);
             res = (Expression*)deref;
         } break;
 
         case Tok_OpenCurl: {
-            CompoundExpression* com = allocExpr(ExprType_Compound);
-            token_index++;
+            CompoundExpression* com = allocExpr(parser, ExprType_Compound);
+            advance(parser);
             res = (Expression*)com;
 
-            if (tok(Tok_CloseCurl)) break;
+            if (tok(parser, Tok_CloseCurl)) break;
 
             com->elements = list_create(CompoundElement);
             do {
                 CompoundElement el = {0};
-                if (tokens[token_index + 1].type == Tok_Assign) {
-                    el.name = identifier();
-                    token_index++;
+                if (peek_at(parser, 1).type == Tok_Assign) {
+                    el.name = identifier(parser);
+                    advance(parser);
                 }
 
-                el.expr = expectExpression();
+                el.expr = expectExpression(parser);
                 list_add(com->elements, el);
 
-            } while (tok(Tok_Comma));
+            } while (tok(parser, Tok_Comma));
 
-            expect(Tok_CloseCurl);
+            expect(parser, Tok_CloseCurl);
         } break;
 
-        case Tok_Integer:       res = literal_expr(ExprType_Literal_Integer); break;
-        case Tok_Decimal:       res = literal_expr(ExprType_Literal_Decimal); break;
-        case Tok_String:        res = literal_expr(ExprType_Literal_String); break;
-        case Tok_Char:          res = literal_expr(ExprType_Literal_Char); break;
-        case Tok_Keyword_True:  res = allocExpr(ExprType_Literal_True); token_index++; break;
-        case Tok_Keyword_False: res = allocExpr(ExprType_Literal_False); token_index++; break;
-        case Tok_Keyword_Null:  res = allocExpr(ExprType_Literal_Null); token_index++; break;
+        case Tok_Integer:       res = literal_expr(parser, ExprType_Literal_Integer); break;
+        case Tok_Decimal:       res = literal_expr(parser, ExprType_Literal_Decimal); break;
+        case Tok_String:        res = literal_expr(parser, ExprType_Literal_String); break;
+        case Tok_Char:          res = literal_expr(parser, ExprType_Literal_Char); break;
+        case Tok_Keyword_True:  res = allocExpr(parser, ExprType_Literal_True); advance(parser); break;
+        case Tok_Keyword_False: res = allocExpr(parser, ExprType_Literal_False); advance(parser); break;
+        case Tok_Keyword_Null:  res = allocExpr(parser, ExprType_Literal_Null); advance(parser); break;
 
         default: return null;
     }
 
     while (true) {
-        switch (tokens[token_index].type) {
+        switch (peek(parser).type) {
             case Tok_Period: {
-                DerefOperator* deref = allocExpr(ExprType_Deref);
-                token_index++;
+                DerefOperator* deref = allocExpr(parser, ExprType_Deref);
+                advance(parser);
 
                 deref->expr = res;
-                deref->name = identifier();
+                deref->name = identifier(parser);
                 res = (Expression*)deref;
             } continue;
 
             case Tok_OpenSquare: {
-                IndexingExpression* ind = allocExpr(ExprType_Indexing);
-                token_index++;
+                IndexingExpression* ind = allocExpr(parser, ExprType_Indexing);
+                advance(parser);
 
                 ind->indexed = res;
-                ind->index = expectExpression();
-                expect(Tok_CloseSquare);
+                ind->index = expectExpression(parser);
+                expect(parser, Tok_CloseSquare);
                 res = (Expression*)ind;
             } continue;
 
             case Tok_OpenParen: {
-                ProcCall* call = allocExpr(ExprType_ProcCall);
-                token_index++;
+                ProcCall* call = allocExpr(parser, ExprType_ProcCall);
+                advance(parser);
 
-                expectProcCallArgs(call, res);
+                expectProcCallArgs(parser, call, res);
                 res = (Expression*)call;
             } continue;
 
@@ -167,17 +165,17 @@ static Expression* parseLeafExpression() {
         res = (Expression*)unary;
     }
 
-    switch (tokens[token_index].type) {
+    switch (peek(parser).type) {
         case Tok_PlusPlus: {
-            UnaryExpression* postInc = allocExpr(ExprType_Unary_PostIncrement);
-            token_index++;
+            UnaryExpression* postInc = allocExpr(parser, ExprType_Unary_PostIncrement);
+            advance(parser);
             postInc->expr = res;
             res = (Expression*)postInc;
         } break;
 
         case Tok_MinusMinus: {
-            UnaryExpression* postDec = allocExpr(ExprType_Unary_PostDecrement);
-            token_index++;
+            UnaryExpression* postDec = allocExpr(parser, ExprType_Unary_PostDecrement);
+            advance(parser);
             postDec->expr = res;
             res = (Expression*)postDec;
         } break;
@@ -185,37 +183,34 @@ static Expression* parseLeafExpression() {
         default: break;
     }
 
-    if (tokens[token_index].type == Tok_Keyword_As) {
-        CastExpression* cast = allocExpr(ExprType_Cast);
-        token_index++;
+    if (peek(parser).type == Tok_Keyword_As) {
+        CastExpression* cast = allocExpr(parser, ExprType_Cast);
+        advance(parser);
         cast->expr = res;
-        cast->castToType = expectType();
+        cast->castToType = expectType(parser);
         res = (Expression*)cast;
     }
 
     return res;
 }
 
-static Expression* testForTernary(Expression* expr) {
-    if (tokens[token_index].type != Tok_QuestionMark) return expr;
+static Expression* testForTernary(Parser* parser, Expression* expr) {
+    if (peek(parser).type != Tok_QuestionMark) return expr;
 
-    TernaryExpression* ter = allocExpr(ExprType_Ternary);
-    token_index++;
+    TernaryExpression* ter = allocExpr(parser, ExprType_Ternary);
+    advance(parser);
 
     ter->condition = expr;
-    ter->thenExpr = expectExpression();
-    expect(Tok_Colon);
-    ter->elseExpr = expectExpression();
+    ter->thenExpr = expectExpression(parser);
+    expect(parser, Tok_Colon);
+    ter->elseExpr = expectExpression(parser);
 
     return (Expression*)ter;
 }
 
-static Expression* expectExpression() {
-    Expression* res = parseExpression();
-    if (res == null) {
-        error_token("Expected expression.");
-        token_index++; // TODO: why am I incrementing the token index here, but not in expectLeafExpression?
-    }
+static Expression* expectExpression(Parser* parser) {
+    Expression* res = parseExpression(parser);
+    if (res == null) fatal_parse_error(parser, "Expected expression.");
     return res;
 }
 
@@ -260,9 +255,9 @@ static inline bool isBinaryExpression(Expression* expr) {
     return operatorPriority(expr->expressionType) != 0;
 }
 
-static Expression* expectLeafExpression() {
-    Expression* res = parseLeafExpression();
-    if (!res) error_token("Expected expression.");
+static Expression* expectLeafExpression(Parser* parser) {
+    Expression* res = parseLeafExpression(parser);
+    if (!res) fatal_parse_error(parser, "Expected expression.");
     return res;
 }
 
@@ -315,30 +310,30 @@ static BinaryExpression* appendBinaryExpression(BinaryExpression* target, Binary
     return null; // should never happen
 }
 
-static Expression* parseExpression() {
-    Expression* a = parseLeafExpression();
+static Expression* parseExpression(Parser* parser) {
+    Expression* a = parseLeafExpression(parser);
     if (!a) return null;
 
-    TokenType tokentype = tokens[token_index].type;
+    TokenType tokentype = peek(parser).type;
     ExprType exprType = getExprTypeForBinaryOperator(tokentype);
-    if (!exprType) return testForTernary(a);
+    if (!exprType) return testForTernary(parser, a);
 
-    BinaryExpression* root = allocExpr(exprType);
-    token_index++;
+    BinaryExpression* root = allocExpr(parser, exprType);
+    advance(parser);
     root->left = a;
-    root->right = expectLeafExpression();
+    root->right = expectLeafExpression(parser);
 
-    tokentype = tokens[token_index].type;
+    tokentype = peek(parser).type;
     while ( (exprType = getExprTypeForBinaryOperator(tokentype)) ) {
 
-        BinaryExpression* op = allocExpr(exprType);
-        token_index++;
-        op->right = expectLeafExpression();
+        BinaryExpression* op = allocExpr(parser, exprType);
+        advance(parser);
+        op->right = expectLeafExpression(parser);
 
         root = appendBinaryExpression(root, op);
 
-        tokentype = tokens[token_index].type;
+        tokentype = peek(parser).type;
     }
 
-    return testForTernary((Expression*)root);
+    return testForTernary(parser, (Expression*)root);
 }

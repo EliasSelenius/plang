@@ -12,47 +12,6 @@ typedef struct Statement Statement;
 typedef struct VariableExpression VariableExpression;
 typedef struct Type Type;
 
-/*
-
-    input -> parser -> unit
-    units will contain syntax tree and arena so it can be freed independently from other units
-    aswell as lists of unresolved symbols in the syntax tree
-
-    units -> binder -> codebase
-    binder will set correct references to variables and types in syntax tree (resolving symbols)
-    then it will construct a Codebase object containing lists of pointers to all the things
-    this process may be redone several times
-
-    codebase -> validator
-    typecheking
-
-*/
-
-typedef struct Unit {
-    Arena arena; // TODO: make use of this arena
-    Statement** top_level_statements; // list
-    VariableExpression** external_symbols; // list
-    Type** external_types; // list
-} Unit;
-
-static Unit* current_unit;
-
-
-typedef struct Codebase {
-
-    Procedure** procedures; // list
-    Declaration** global_vars; // list
-    Declaration** global_consts; // list
-    Struct** structs; // list
-    Enum** enums; // list
-    Typedef** type_defs; // list
-
-} Codebase;
-
-typedef struct File {
-    char* filename;
-} File;
-
 // ----Types---------------------------------------------
 
 typedef enum Typekind {
@@ -457,21 +416,6 @@ typedef struct TernaryExpression {
     Expression* elseExpr;
 } TernaryExpression;
 
-typedef union ExprPointer {
-    Expression* expr;
-    VariableExpression* var;
-    DerefOperator* deref;
-    TernaryExpression* ternary;
-    BinaryExpression* binary;
-    UnaryExpression* unary;
-    LiteralExpression* literal;
-    ParenthesizedExpression* parenth;
-    CastExpression* cast;
-    SizeofExpression* size_of;
-    AllocExpression* alloc;
-    CompoundExpression* compound;
-    IndexingExpression* indexing;
-} ExprPointer;
 
 // ----Statements----------------------------------------------
 
@@ -516,7 +460,7 @@ typedef struct StatementExpression {
 typedef struct Declaration {
     Statement base;
     Type* type;
-    Expression* expr; // if this is a fixed sized array expr is the size expression for the array
+    Expression* expr; // can be null
     Identifier name;
     bool include_context; // TODO: flags
     bool is_static;
@@ -590,22 +534,6 @@ typedef struct CaseLabelStatement {
     SwitchStatement* switch_statement;
 } CaseLabelStatement;
 
-typedef union StmtPointer {
-    Statement* sta;
-    StatementExpression* expr;
-    Declaration* decl;
-    Typedef* type_def;
-    Assignment* assign;
-    Scope* scope;
-    WhileStatement* while_loop;
-    ForStatement* for_loop;
-    IfStatement* if_sta;
-    SwitchStatement* switch_sta;
-    ReturnStatement* ret_sta;
-    GotoStatement* goto_sta;
-    LabelStatement* label;
-    CaseLabelStatement* case_sta;
-} StmtPointer;
 
 // ----Procedures----------------------------------------------
 
@@ -645,6 +573,41 @@ typedef struct CapturedVariable {
     Datatype type;
 } CapturedVariable;
 
+// ----------------------------------------------------------
+
+typedef union ExprPointer {
+    Expression* expr;
+    VariableExpression* var;
+    DerefOperator* deref;
+    TernaryExpression* ternary;
+    BinaryExpression* binary;
+    UnaryExpression* unary;
+    LiteralExpression* literal;
+    ParenthesizedExpression* parenth;
+    CastExpression* cast;
+    SizeofExpression* size_of;
+    AllocExpression* alloc;
+    CompoundExpression* compound;
+    IndexingExpression* indexing;
+    ProcCall* call;
+} ExprPointer;
+
+typedef union StmtPointer {
+    Statement* sta;
+    StatementExpression* expr;
+    Declaration* decl;
+    Typedef* type_def;
+    Assignment* assign;
+    Scope* scope;
+    WhileStatement* while_loop;
+    ForStatement* for_loop;
+    IfStatement* if_sta;
+    SwitchStatement* switch_sta;
+    ReturnStatement* ret_sta;
+    GotoStatement* goto_sta;
+    LabelStatement* label;
+    CaseLabelStatement* case_sta;
+} StmtPointer;
 
 // ----Struct----------------------------------------------
 

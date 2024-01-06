@@ -19,7 +19,7 @@ StrSpan spTrimCharEnd(StrSpan sv, char c);
 
 bool spStartsWith(StrSpan sv, char* start);
 
-
+bool string_ends_with(char* str, char* substr);
 
 inline bool isWhitespace(char c) { return c == ' ' || c == '\n'; }
 inline bool isUpperCaseLetter(char c) { return c >= 'A' && c <= 'Z'; }
@@ -34,6 +34,8 @@ bool spanEqualsSpan(StrSpan span1, StrSpan span2);
 bool cstrEquals(char* a, char* b);
 
 StrSpan numberToString(u64 num);
+
+char* alloc_string_copy(char* str);
 
 // --------StringBuilder------------------
 

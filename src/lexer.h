@@ -108,4 +108,3 @@ typedef struct Token {
     u32 line;
     Tokendata data;
 } Token;
-

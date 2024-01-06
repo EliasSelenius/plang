@@ -23,6 +23,7 @@
         - named arguments e.g foo(arg_name: "daw")
         - single expression body
         - field initializers
+        - redundant cast warning
 
     InProgress:
         - print structs
@@ -104,8 +105,17 @@
 
 #include "prelude.h"
 #include "essh-string.h"
+#include "../platform/platform.h"
 
 #include "public.h"
+
+
+static Parser* g_Parser;
+
+void add_file(FileInfo info, void* user_data) {
+    if (string_ends_with(info.name, ".pog")) parser_add_input_file(g_Parser, info.name);
+}
+
 
 int main(int argc, char* argv[]) {
 
@@ -114,8 +124,7 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
-    init_parser();
-    init_string_table();
+    g_Parser = init_parser();
 
     startPerf();
 
@@ -125,7 +134,9 @@ int main(int argc, char* argv[]) {
 
     if (argc >= 2) {
         if (cstrEquals(argv[1], "build")) {
-            foreachFile(".pog", addFile);
+            printf("NOT IMPLEMENTED: build option\n");
+            exit(1);
+            enumerate_files(".", add_file, null);
             i = 2;
         }
         else if (cstrEquals(argv[1], "eval")) {
@@ -138,7 +149,7 @@ int main(int argc, char* argv[]) {
         char* arg = argv[i++];
         if (spanEquals(spFrom("cflags"), arg)) break;
         // printf("    %d. %s\n", i, arg);
-        addFile(arg, null);
+        parser_add_input_file(g_Parser, arg);
     }
 
     StringBuilder sb = sbCreate();
@@ -149,12 +160,16 @@ int main(int argc, char* argv[]) {
     }
 
 
-    Codebase cb = parse();
+    Codebase cb = parse(g_Parser);
 
     if (evaling) {
+
+        REPL repl;
+        repl_init(&repl, &cb);
+
         char input[256];
         while (fgets(input, sizeof(input), stdin)) {
-            repl_input(input, &cb);
+            repl_input(input, &repl);
         }
         return 0;
     }

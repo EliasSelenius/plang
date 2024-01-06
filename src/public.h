@@ -11,5 +11,21 @@ typedef struct Codebase {
 
 } Codebase;
 
-Codebase parse();
-void addFile(char* filename, char* extension);
+typedef struct REPL {
+    Codebase* codebase; // can be null
+    struct ScopeContext* context;
+    struct Parser* parser;
+} REPL;
+
+typedef struct Parser Parser;
+
+Parser* init_parser();
+void parser_parse_source(Parser* parser, char* source);
+void parser_parse_file(Parser* parser, char* file_name);
+
+void parser_add_input_file(Parser* parser, char* file_name);
+Codebase parse(Parser* parser);
+void transpile(Codebase* codebase);
+
+void repl_init(REPL* repl, Codebase* cb);
+u64 repl_input(char* code, REPL* repl);

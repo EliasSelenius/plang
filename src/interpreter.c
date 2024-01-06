@@ -19,6 +19,25 @@ typedef struct Value {
     };
 } Value;
 
+#define value_invalid (Value) {0}
+
+
+typedef struct ReplVariable {
+    Identifier name;
+    Value value;
+} ReplVariable;
+
+typedef struct ScopeContext {
+    struct ScopeContext* enclosing_context;
+    ReplVariable* variables; // list
+} ScopeContext;
+
+
+
+static Value interpret_expression(Expression* expr, ScopeContext* context);
+
+
+
 
 static void print_value(Value value) {
 
@@ -64,15 +83,40 @@ static void print_value(Value value) {
 }
 
 
-typedef struct REPL_Variable {
-    Identifier name;
-    Value value;
-} REPL_Variable;
+static ScopeContext* push_scope(ScopeContext* enclosing) {
+    ScopeContext* res = malloc(sizeof(ScopeContext));
+    res->enclosing_context = enclosing;
+    res->variables = list_create(ReplVariable);
+    return res;
+}
 
-typedef struct REPL {
-    Codebase* codebase; // can be null
-    REPL_Variable* variables; // list
-} REPL;
+static ScopeContext* pop_scope(ScopeContext* context) {
+    list_delete(context->variables);
+    ScopeContext* res = context->enclosing_context;
+    free(context);
+    return res;
+}
+
+static ReplVariable* scope_context_get(ScopeContext* context, Identifier name) {
+    foreach (var, context->variables) {
+        if (var->name == name) return var;
+    }
+
+    if (context->enclosing_context) return scope_context_get(context->enclosing_context, name);
+    return null;
+}
+
+static void scope_context_set(ScopeContext* context, Identifier name, Value v) {
+    scope_context_get(context, name)->value = v;
+}
+
+static void scope_context_declare(ScopeContext* context, Identifier name, Value v) {
+
+    // TODO: already declared error? or maybe this is already handled by parser
+
+    ReplVariable var = {name, v};
+    list_add(context->variables, var);
+}
 
 static u64 datatype_bytesize(Datatype type) {
     if (type.numPointers) return 8;
@@ -103,7 +147,20 @@ static u64 datatype_bytesize(Datatype type) {
     }
 }
 
-static Value interpret_expression(Expression* expr) {
+
+static Value interpret_procedure(ProcCall* call, ScopeContext* context) {
+    if (call->proc->name == builtin_string_print) {
+        if (call->args) {
+            foreach (arg, call->args) {
+                print_value(interpret_expression(*arg, context));
+            }
+        }
+    }
+
+    return value_invalid;
+}
+
+static Value interpret_expression(Expression* expr, ScopeContext* context) {
     ExprPointer e = (ExprPointer)expr;
 
     switch (expr->expressionType) {
@@ -134,8 +191,8 @@ static Value interpret_expression(Expression* expr) {
                 case Typekind_AmbiguousDecimal: value.float64 = left.float64 op right.float64; break;
 
         #define binary_expr(cases) {                             \
-            Value left = interpret_expression(e.binary->left);   \
-            Value right = interpret_expression(e.binary->right); \
+            Value left = interpret_expression(e.binary->left, context);   \
+            Value right = interpret_expression(e.binary->right, context); \
             Value value = {0};                                   \
             value.type = expr->datatype;                         \
             switch (expr->datatype.kind) {                       \
@@ -175,19 +232,19 @@ static Value interpret_expression(Expression* expr) {
 
 
         case ExprType_Unary_Not: {
-            Value v = interpret_expression(e.unary->expr);
+            Value v = interpret_expression(e.unary->expr, context);
             v.uint64 = !v.uint64;
             return v;
         }
         case ExprType_Unary_BitwiseNot: {
-            Value v = interpret_expression(e.unary->expr);
+            Value v = interpret_expression(e.unary->expr, context);
             v.uint64 = ~v.uint64;
             return v;
         }
         case ExprType_Unary_AddressOf: break;
         case ExprType_Unary_ValueOf: break;
         case ExprType_Unary_Negate: {
-            Value v = interpret_expression(e.unary->expr);
+            Value v = interpret_expression(e.unary->expr, context);
             v.uint64 = -v.uint64;
             return v;
         }
@@ -202,7 +259,15 @@ static Value interpret_expression(Expression* expr) {
         case ExprType_Literal_Null:    return (Value) { .type = type_voidPointer, .pointer = null };
 
         case ExprType_Variable: {
-            // if (e.var->ref)
+            if (e.var->ref == null) {
+                ReplVariable* var = scope_context_get(context, e.var->name);
+                if (var) return var->value;
+
+                printf("Could not find reference\n");
+            }
+
+            
+
         } break;
         case ExprType_Alloc: {
             u64 size = datatype_bytesize(e.alloc->type->solvedstate);
@@ -212,28 +277,34 @@ static Value interpret_expression(Expression* expr) {
             return v;
         }
         case ExprType_Ternary: {
-            Value c = interpret_expression(e.ternary->condition);
-            if (c.pointer) return interpret_expression(e.ternary->thenExpr);
-            return interpret_expression(e.ternary->elseExpr);
+            Value c = interpret_expression(e.ternary->condition, context);
+            if (c.pointer) return interpret_expression(e.ternary->thenExpr, context);
+            return interpret_expression(e.ternary->elseExpr, context);
         }
-        case ExprType_ProcCall: break;
+        case ExprType_ProcCall: {
+            return interpret_procedure(e.call, context);
+        }
         case ExprType_Deref: break;
         case ExprType_Indexing: break;
         case ExprType_Cast: break;
         case ExprType_Sizeof: return (Value) { .type = type_ambiguousInteger, .uint64 = datatype_bytesize(e.size_of->type->solvedstate) };
-        case ExprType_Parenthesized: return interpret_expression(e.parenth->innerExpr);
+        case ExprType_Parenthesized: return interpret_expression(e.parenth->innerExpr, context);
         case ExprType_Compound: break;
     }
 
-    return (Value) { .type = type_invalid, .pointer = null };
+    return value_invalid;
 }
 
 
-static void interpret_statement(Statement* sta, REPL* repl) {
+static Value interpret_statement(Statement* sta, ScopeContext* context) {
     StmtPointer s = (StmtPointer)sta;
 
     switch (sta->statementType) {
-        case Statement_Declaration: break;
+        case Statement_Declaration: {
+            Value v = {0};
+            if (s.decl->expr) v = interpret_expression(s.decl->expr, context);
+            scope_context_declare(context, s.decl->name, v);
+        } break;
         case Statement_Constant: break;
         case Statement_Typedef: break;
         case Statement_Procedure: break;
@@ -241,10 +312,23 @@ static void interpret_statement(Statement* sta, REPL* repl) {
         case Statement_Struct: break;
         case Statement_Enum: break;
         case Statement_EnumEntry: break;
-        case Statement_Assignment: break;
-        case Statement_Expression: break;
-        case Statement_Scope: break;
-        case Statement_If: break;
+        case Statement_Assignment: {
+        } break;
+        case Statement_Expression: {
+            return interpret_expression(s.expr->expr, context);
+        } break;
+        case Statement_Scope: {
+            ScopeContext* inner_scope = push_scope(context);
+            foreach (sta, s.scope->statements) {
+                interpret_statement(*sta, inner_scope);
+            }
+            pop_scope(inner_scope);
+        } break;
+        case Statement_If: {
+            Value v = interpret_expression(s.if_sta->condition, context);
+            if (v.pointer) interpret_statement(s.if_sta->then_statement, context);
+            else interpret_statement(s.if_sta->else_statement, context);
+        } break;
         case Statement_While: break;
         case Statement_For: break;
         case Statement_Switch: break;
@@ -256,23 +340,35 @@ static void interpret_statement(Statement* sta, REPL* repl) {
         case Statement_CaseLabel: break;
         case Statement_DefaultLabel: break;
     }
+
+    return (Value) { .type = type_invalid, .pointer = null };
 }
 
 
-u64 repl_input(char* code, Codebase* cb) {
-    lex(code);
-    reset_parser();
-    Expression* expr = expectExpression();
+void repl_init(REPL* repl, Codebase* cb) {
+    repl->codebase = cb;
+    repl->context = push_scope(null);
+    repl->parser = init_parser();
+    repl->parser->allow_omitting_semicolon = true;
+}
 
-    foreach (var, parser.unresolved_variables) {
-        (*var)->ref = get_global_symbol_from_codebase((*var)->name, cb);
-        if ((*var)->ref == null) printf("unresolved var\n");
+u64 repl_input(char* code, REPL* repl) {
+    lex(repl->parser, code);
+    reset_parser(repl->parser);
+    Statement* sta = expectStatement(repl->parser);
+
+    foreach (var, repl->parser->unresolved_variables) {
+        (*var)->ref = get_global_symbol_from_codebase((*var)->name, repl->codebase);
+        // if ((*var)->ref == null) printf("unresolved var\n");
     }
 
-    validateExpression(expr);
+    validateStatement(repl->parser, sta);
 
-    Value v = interpret_expression(expr);
-    print_value(v);
-    printf("\n");
+    Value v = interpret_statement(sta, repl->context);
+    if (sta->statementType == Statement_Expression) {
+        print_value(v);
+        printf("\n");
+    }
+
     return v.uint64;
 }
