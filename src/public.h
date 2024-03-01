@@ -19,11 +19,20 @@ typedef struct REPL {
 
 typedef struct Parser Parser;
 
+typedef struct CodeLocation {
+    char* file_name;
+    u32 line, column;
+} CodeLocation;
+
+typedef struct Error {
+    CodeLocation location;
+    char* message;
+} Error;
+
 Parser* init_parser();
 void parser_parse_source(Parser* parser, char* source);
 void parser_parse_file(Parser* parser, char* file_name);
 
-void parser_add_input_file(Parser* parser, char* file_name);
 Codebase parse(Parser* parser);
 void transpile(Codebase* codebase);
 

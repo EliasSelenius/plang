@@ -2,7 +2,7 @@
 char* fileread(const char* filename, u32* strLength) {
     FILE* file;
     if ( fopen_s(&file, filename, "r") ) {
-        printf("Could not read file: %s\n", filename);
+        printf("Could not read file: \"%s\"\n", filename);
         return null;
     }
 
@@ -23,7 +23,7 @@ char* fileread(const char* filename, u32* strLength) {
 void filewrite(const char* filename, char* content) {
     FILE* file;
     if ( fopen_s(&file, filename, "w") ) {
-        printf("Could not write to file: %s\n", filename);
+        printf("Could not write to file: \"%s\"\n", filename);
         return;
     }
 

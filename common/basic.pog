@@ -1,4 +1,7 @@
 
+type bool = uint8;
+type byte = uint8;
+
 type FILE;
 
 int32 fopen_s(FILE** stream, char* filename, char* mode);
@@ -16,6 +19,7 @@ void* malloc(uint64 size);
 void free(void* block);
 void* realloc(void* buffer, uint64 size);
 void* memcpy(void* dst, void* src, uint64 size);
+void* memset(void* dst, int32 val, uint64 size);
 
 uint64 strlen(char* str);
 
@@ -56,19 +60,3 @@ void filewrite(char* filename, char* content) {
     fclose(file);
 }
 
-
-
-
-struct FileInfo {
-    char* name;
-    uint64 size;
-
-    uint64 creation_time;
-    uint64 last_access_time;
-    uint64 last_write_time;
-}
-
-type enumerate_files_callback = void(FileInfo, void*);
-
-void enumerate_files(char* path, enumerate_files_callback callback, void* user_data);
-void print_file(FileInfo info, void* user_data);

@@ -1,10 +1,55 @@
 
-type Codebase;
 type Parser;
+
+type Procedure;
+type Declaration;
+type Declaration;
+type Struct;
+type Enum;
+type Typedef;
+
+struct Codebase {
+    Procedure** procedures; // list
+    Declaration** global_vars; // list
+    Declaration** global_consts; // list
+    Struct** structs; // list
+    Enum** enums; // list
+    Typedef** type_defs; // list
+}
 
 Parser* init_parser();
 void parser_parse_source(Parser* parser, char* source);
 void parser_parse_file(Parser* parser, char* file_name);
+Codebase parse(Parser* parser);
 
-void parser_add_input_file(Parser* parser, char* file_name);
-void parse(Parser* parser);
+
+struct FileInfo {
+    char* path;
+    char* name;
+    uint64 size;
+
+    uint64 creation_time;
+    uint64 last_access_time;
+    uint64 last_write_time;
+}
+
+type enumerate_files_callback = void(FileInfo, void*);
+
+void enumerate_files(char* path, enumerate_files_callback callback, void* user_data, bool recursive);
+void print_file(FileInfo info, void* user_data);
+
+FileInfo* get_all_files(char* path, bool recursive) {
+    FileInfo* files = list_create(sizeof FileInfo);
+
+    void append_fileinfo(FileInfo info, void* user_data) {
+        FileInfo** list = user_data as FileInfo**;
+        let full_path = alloc_string_copy(info.path);
+        info.path = full_path.chars;
+        info.name = trim(substr_to_end(full_path, '/'), 1).chars;
+
+        list_add(list, *info);
+    }
+
+    enumerate_files(path, append_fileinfo, *files as void*, recursive);
+    return files;
+}

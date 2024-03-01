@@ -79,25 +79,43 @@ static Statement* expectStatement(Parser* parser) {
             ForStatement* forsta = allocStatement(parser, Statement_For);
             advance(parser);
 
-            if (peek_at(parser, 1).type == Tok_Colon) {
+            bool must_close = tok(parser, Tok_OpenParen);
+
+            TokenType expected_token = Tok_Comma;
+            TokenType tt = parser->tokens[peekType(parser) + 1].type;
+
+            if (peek_at(parser, 1).type == Tok_Colon) { // for i :
                 forsta->index_name = identifier(parser);
                 advance(parser);
-            } else if (parser->tokens[peekType(parser) + 1].type == Tok_Colon) {
+                expected_token = Tok_Dotdot;
+            } else if (tt == Tok_Colon) { // for uint32 i :
                 forsta->index_type = expectType(parser);
                 forsta->index_name = identifier(parser);
-                advance(parser);
-            } else {
+                advance(parser); // advance over ':'
+                expected_token = Tok_Dotdot;
+            } else if (tt == Tok_Assign) { // for uint32 i =
+                forsta->index_type = expectType(parser);
+                forsta->index_name = identifier(parser);
+                advance(parser); // advance over '='
+                forsta->iterator_assignment = expectExpression(parser);
+                expect(parser, Tok_Comma);
+            } else if (tt == Tok_Comma) { // for uint32 i,
+                forsta->index_type = expectType(parser);
+                forsta->index_name = identifier(parser);
+                advance(parser); // advance over ','
+            } else { // for min_expr (.. max_expr)?
                 forsta->index_name = builtin_string_it;
-            }
-
-            forsta->min_expr = expectExpression(parser);
-
-            if (tok(parser, Tok_Dotdot)) {
-                forsta->max_expr = expectExpression(parser);
+                expected_token = Tok_Dotdot;
             }
 
             declare_symbol(parser, (Statement*)forsta);
-            forsta->statement = expectStatement(parser);
+
+            forsta->condition = expectExpression(parser);
+            if (tok(parser, expected_token)) forsta->iterator_update = expectExpression(parser);
+
+            if (must_close) expect(parser, Tok_CloseParen);
+
+            forsta->statement = tok(parser, Tok_Semicolon) ? null : expectStatement(parser);
             stack_pop(parser, 1);
             return (Statement*)forsta;
         }
@@ -219,7 +237,6 @@ static Statement* expectStatement(Parser* parser) {
 
     if (token) {
         Assignment* ass = allocStatement(parser, Statement_Assignment);
-        ass->base.nodebase.lineNumber = expr->nodebase.lineNumber;
         ass->assigneeExpr = expr;
         ass->assignmentOper = token->type;
         ass->expr = expectExpression(parser);
@@ -229,7 +246,7 @@ static Statement* expectStatement(Parser* parser) {
 
 
     StatementExpression* staExpr = allocStatement(parser, Statement_Expression);
-    staExpr->base.nodebase.lineNumber = expr->nodebase.lineNumber;
+    staExpr->base.nodebase.loc = expr->nodebase.loc;
     staExpr->expr = expr;
     semicolon(parser);
     return (Statement*)staExpr;
@@ -241,7 +258,7 @@ static Statement* expectStatement(Parser* parser) {
     //     case ExprType_Unary_PostDecrement:
     //     case ExprType_ProcCall: {
     //         StatementExpression* staExpr = allocStatement(parser, Statement_Expression);
-    //         staExpr->base.nodebase.lineNumber = expr->nodebase.lineNumber;
+    //         staExpr->base.nodebase.loc.line = expr->nodebase.loc.line;
     //         staExpr->expr = expr;
     //         semicolon(parser);
     //         return (Statement*)staExpr;
@@ -262,7 +279,7 @@ static Statement* expectStatement(Parser* parser) {
     //                                 Tok_BitXorAssign);
     //         if (token) {
     //             Assignment* ass = allocStatement(parser, Statement_Assignment);
-    //             ass->base.nodebase.lineNumber = expr->nodebase.lineNumber;
+    //             ass->base.nodebase.loc.line = expr->nodebase.loc.line;
     //             ass->assigneeExpr = expr;
     //             ass->assignmentOper = token->type;
     //             ass->expr = expectExpression(parser);

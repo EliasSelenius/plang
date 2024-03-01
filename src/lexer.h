@@ -105,6 +105,6 @@ typedef union Tokendata {
 
 typedef struct Token {
     TokenType type;
-    u32 line;
+    u32 line, column;
     Tokendata data;
 } Token;

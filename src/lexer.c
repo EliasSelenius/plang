@@ -2,13 +2,39 @@
 
 
 static u32 current_line;
+static u32 current_column;
 static char* cursor;
 
+static char* advance_next_char() {
+    current_column++;
+    return cursor++;
+}
+
+static void advance_next_line() {
+    current_line++;
+    current_column = 0;
+}
+
+static Token construct_token_here(TokenType type) {
+    Token t = {0};
+    t.type = type;
+    t.line = current_line;
+    t.column = current_column;
+    return t;
+}
+
 static inline void appendToken(Parser* parser, TokenType type) {
-    Token token;
-    token.type = type;
-    token.line = current_line;
+    Token token = construct_token_here(type);
     list_add(parser->tokens, token);
+}
+
+static void lexer_error(Parser* parser, const char* format, ...) {
+    CodeLocation loc = { .file_name = parser->current_file_name, .line = current_line, .column = current_column };
+
+    va_list args;
+    va_start(args, format);
+    gen_errorv(parser, loc, format, args);
+    va_end(args);
 }
 
 static u64 hex_char_to_value(char h) {
@@ -21,7 +47,7 @@ static u64 hex_char_to_value(char h) {
 
 static u64 hex_number(u32* numDigits) {
     char* start = cursor;
-    while (isHexDigit(*cursor) || *cursor == '_') cursor++;
+    while (isHexDigit(*cursor) || *cursor == '_') advance_next_char();
     u32 len = cursor - start;
 
     u32 num_underscores = 0;
@@ -69,9 +95,10 @@ static void lex(Parser* parser, char* input) {
 
     cursor = input - 1;
     current_line = 1;
+    current_column = 0;
 
     while (true) {
-        cursor++;
+        advance_next_char();
 
 
 
@@ -88,7 +115,7 @@ static void lex(Parser* parser, char* input) {
             if (*cursor == ' ') continue;
 
             if (*cursor == '\n') {
-                current_line++;
+                advance_next_line();
                 continue;
             }
         }
@@ -137,10 +164,7 @@ static void lex(Parser* parser, char* input) {
             else if (spanEquals(word, "static")) tokType = Tok_Keyword_Static;
 
 
-            Token token;
-            token.type = tokType;
-            token.line = current_line;
-
+            Token token = construct_token_here(tokType);
             if (token.type == Tok_Word) {
                 token.data.string = register_string(word);
             }
@@ -154,9 +178,7 @@ static void lex(Parser* parser, char* input) {
         if (*cursor == '0' && *(cursor + 1) == 'x') {
             cursor += 2;
 
-            Token token = {0};
-            token.line = current_line;
-            token.type = Tok_Integer;
+            Token token = construct_token_here(Tok_Integer);
 
             u32 numDigits;
             token.data.integer = hex_number(&numDigits);
@@ -168,16 +190,14 @@ static void lex(Parser* parser, char* input) {
 
         // number
         if (isDigit(*cursor)) {
-            Token token = {0};
-            token.line = current_line;
-            token.type = Tok_Integer;
+            Token token = construct_token_here(Tok_Integer);
 
             u32 numDigits;
             u64 num = number(&numDigits);
             token.data.integer = num;
 
             if (*cursor == '.' && isDigit(*(cursor+1))) {
-                cursor++;
+                advance_next_char();
                 f64 fraction = (f64)number(&numDigits);
 
                 f64 denom = 1.0;
@@ -193,7 +213,7 @@ static void lex(Parser* parser, char* input) {
                 case 'f': break;
                 case 'd': break;
                 case 'u': {
-                    if (*(cursor + 1) == 'l') cursor++;
+                    if (*(cursor + 1) == 'l') advance_next_char();
                 } break;
                 case 'l': break;
                 default: cursor--; break;
@@ -205,11 +225,11 @@ static void lex(Parser* parser, char* input) {
 
         // chars
         if (*cursor == '\'') {
-            char* strStart = cursor++;
+            char* strStart = advance_next_char();
 
             char c = *cursor;
             if (c == '\\') {
-                cursor++;
+                advance_next_char();
 
                 switch (*cursor) {
                     case 'n': c = '\n'; break;
@@ -219,17 +239,14 @@ static void lex(Parser* parser, char* input) {
                 }
 
             } else {
-                if (c > '~' || c < ' ') error(current_line, get_current_file(parser)->filename, "Invalid character.");
+                if (c > '~' || c < ' ') lexer_error(parser, "Invalid character.");
             }
 
-            cursor++;
-            if (*cursor != '\'') error(current_line, get_current_file(parser)->filename, "Missing closing single quote.");
+            advance_next_char();
+            if (*cursor != '\'') lexer_error(parser, "Missing closing single quote.");
 
-            Token token = {
-                .type = Tok_Char,
-                .line = current_line,
-                .data.character = c
-            };
+            Token token = construct_token_here(Tok_Char);
+            token.data.character = c;
             list_add(parser->tokens, token);
             continue;
         }
@@ -240,8 +257,8 @@ static void lex(Parser* parser, char* input) {
             while ( !(*++cursor == '"' && *(cursor - 1) != '\\') ) {
                 if (*cursor == '\n') {
                     // TODO: consider whether we want to allow multi-line strings
-                    error(current_line, get_current_file(parser)->filename, "Strings cannot contain new-lines.");
-                    current_line++;
+                    lexer_error(parser, "Strings cannot contain new-lines.");
+                    advance_next_line();
                 }
             }
 
@@ -250,12 +267,8 @@ static void lex(Parser* parser, char* input) {
                 .length = cursor - strStart
             };
 
-            Token token = {
-                .type = Tok_String,
-                .line = current_line,
-                .data.string = register_string(str)
-            };
-
+            Token token = construct_token_here(Tok_String);
+            token.data.string = register_string(str);
             list_add(parser->tokens, token);
             continue;
         }
@@ -273,9 +286,9 @@ static void lex(Parser* parser, char* input) {
             char* commentStart = cursor;
             cursor += 1;
             while ( !(*++cursor == '*' && *(cursor + 1) == '/') ) {
-                if (*cursor == '\n') current_line++;
+                if (*cursor == '\n') advance_next_line();
             }
-            cursor++;
+            advance_next_char();
             continue;
         }
 
@@ -285,7 +298,7 @@ static void lex(Parser* parser, char* input) {
             case ',': appendToken(parser, Tok_Comma); continue;
 
             case '.': switch (*(cursor + 1)) {
-                case '.': appendToken(parser, Tok_Dotdot); cursor++; continue;
+                case '.': appendToken(parser, Tok_Dotdot); advance_next_char(); continue;
                 default: appendToken(parser, Tok_Period); continue;
             }
 
@@ -296,15 +309,15 @@ static void lex(Parser* parser, char* input) {
             case '~': appendToken(parser, Tok_Tilde); continue;
 
             case '&': switch (*(cursor + 1)) {
-                case '=': appendToken(parser, Tok_BitAndAssign); cursor++; continue;
+                case '=': appendToken(parser, Tok_BitAndAssign); advance_next_char(); continue;
                 default: appendToken(parser, Tok_Ampersand); continue;
             }
             case '|': switch (*(cursor + 1)) {
-                case '=': appendToken(parser, Tok_BitOrAssign); cursor++; continue;
+                case '=': appendToken(parser, Tok_BitOrAssign); advance_next_char(); continue;
                 default: appendToken(parser, Tok_Pipe); continue;
             }
             case '^': switch (*(cursor + 1)) {
-                case '=': appendToken(parser, Tok_BitXorAssign); cursor++; continue;
+                case '=': appendToken(parser, Tok_BitXorAssign); advance_next_char(); continue;
                 default: appendToken(parser, Tok_Caret); continue;
             }
 
@@ -316,26 +329,26 @@ static void lex(Parser* parser, char* input) {
             case ']': appendToken(parser, Tok_CloseSquare); continue;
 
             case '<': switch (*(cursor + 1)) {
-                case '=': appendToken(parser, Tok_LessThanOrEqual); cursor++; continue;
-                case '<': appendToken(parser, Tok_LeftShift); cursor++; continue;
+                case '=': appendToken(parser, Tok_LessThanOrEqual); advance_next_char(); continue;
+                case '<': appendToken(parser, Tok_LeftShift); advance_next_char(); continue;
                 default: appendToken(parser, Tok_LessThan); continue;
             }
 
             case '>': switch (*(cursor + 1)) {
-                case '=': appendToken(parser, Tok_GreaterThanOrEqual); cursor++; continue;
-                case '>': appendToken(parser, Tok_RightShift); cursor++; continue;
+                case '=': appendToken(parser, Tok_GreaterThanOrEqual); advance_next_char(); continue;
+                case '>': appendToken(parser, Tok_RightShift); advance_next_char(); continue;
                 default: appendToken(parser, Tok_GreaterThan); continue;
             }
 
             case '+': switch (*(cursor + 1)) {
-                case '+': appendToken(parser, Tok_PlusPlus); cursor++; continue;
-                case '=': appendToken(parser, Tok_PlusAssign); cursor++; continue;
+                case '+': appendToken(parser, Tok_PlusPlus); advance_next_char(); continue;
+                case '=': appendToken(parser, Tok_PlusAssign); advance_next_char(); continue;
                 default: appendToken(parser, Tok_Plus); continue;
             }
 
             case '-': switch (*(cursor + 1)) {
-                case '-': appendToken(parser, Tok_MinusMinus); cursor++; continue;
-                case '=': appendToken(parser, Tok_MinusAssign); cursor++; continue;
+                case '-': appendToken(parser, Tok_MinusMinus); advance_next_char(); continue;
+                case '=': appendToken(parser, Tok_MinusAssign); advance_next_char(); continue;
                 default: appendToken(parser, Tok_Minus); continue;
             }
 
@@ -345,7 +358,7 @@ static void lex(Parser* parser, char* input) {
             if (*cursor == c) { \
                 if (*(cursor + 1) == '=') { \
                     appendToken(parser, tokenEqual); \
-                    cursor++; \
+                    advance_next_char(); \
                 } else appendToken(parser, token); \
                 continue; \
             } \
@@ -357,8 +370,9 @@ static void lex(Parser* parser, char* input) {
         test_op_eq('/', Tok_Div, Tok_DivAssign);
         test_op_eq('%', Tok_Mod, Tok_ModAssign);
 
+        #undef test_op_eq
 
         // Error: token not recognized
-        error(current_line, get_current_file(parser)->filename, "Unknown byte value encountered %d.", *cursor);
+        lexer_error(parser, "Unknown byte value encountered %d.", *cursor);
     }
 }

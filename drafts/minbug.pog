@@ -1,16 +1,29 @@
 
-// include "common/basic.pog";
-// include "common/list.pog";
+// T* add(with $T[..]* list, T item) {
+//     return list_add(list as void**, *item as void*, sizeof T);
+// }
 
-struct Foo {
-    float32 x, y, z;
+struct Transform {
+    float32 x, y;
 }
 
+struct Entity {
+    with Transform tr;
+}
 
 void main() {
-    Foo[..] foos;
+    // uint32[..] numbers = alloc uint32[..];
 
-    Foo foo;
-    foo.x = 12;
-    add(foos, foo);
+    // add(numbers, 12);
+    // add(numbers, 645);
+
+
+    // for 0 .. numbers.length {
+    //     print(it, "\n");
+    // }
+
+    Entity e;
+    e.x = 21;
+    e.tr.x = 6;
+    e.tr = {};
 }

@@ -1,12 +1,11 @@
 
 /*
 
+    -O0 -g -fsanitize=address -fno-omit-frame-pointer
+
     llvm-symbolizer.exe --use-native-pdb-reader --print-source-context-lines=20 -e ./bin/plang.exe
 
     TODO list:
-        *- clasic for loop: for uint32 i = 0, i < 10, i++ { }
-        - for int loop: for 12 { }
-        - loop block: loop { } == while (true) { }
         - nested multi-line comments
         - disallow void as variable type in declaration
         - make assignments be expressions
@@ -28,7 +27,6 @@
     InProgress:
         - print structs
         *- file name in errors
-        *- line numbers in validation errors
         - modules or namespaces ?
         *- array literal
         *- struct literal
@@ -36,6 +34,8 @@
 
 
     DONE list:
+        *- line numbers in validation errors
+        *- clasic for loop: for uint32 i = 0, i < 10, i++ { }
         - global variable runtime expression assignment
         - it keyword
         *- enums
@@ -102,6 +102,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "prelude.h"
 #include "essh-string.h"
@@ -109,11 +110,11 @@
 
 #include "public.h"
 
-
 static Parser* g_Parser;
 
+
 void add_file(FileInfo info, void* user_data) {
-    if (string_ends_with(info.name, ".pog")) parser_add_input_file(g_Parser, info.name);
+    // if (string_ends_with(info.name, ".pog")) parser_add_input_file(g_Parser, info.name);
 }
 
 
@@ -136,7 +137,7 @@ int main(int argc, char* argv[]) {
         if (cstrEquals(argv[1], "build")) {
             printf("NOT IMPLEMENTED: build option\n");
             exit(1);
-            enumerate_files(".", add_file, null);
+            enumerate_files(".", add_file, null, true);
             i = 2;
         }
         else if (cstrEquals(argv[1], "eval")) {
@@ -149,7 +150,7 @@ int main(int argc, char* argv[]) {
         char* arg = argv[i++];
         if (spanEquals(spFrom("cflags"), arg)) break;
         // printf("    %d. %s\n", i, arg);
-        parser_add_input_file(g_Parser, arg);
+        parser_parse_file(g_Parser, arg);
     }
 
     StringBuilder sb = sbCreate();

@@ -1,0 +1,27 @@
+
+struct Node {
+    Node* next;
+    uint32 num;
+}
+
+Node* gen_list(uint32 count) {
+    if count == 0  return null;
+
+    Node* n = alloc Node;
+    n.next = gen_list(count - 1);
+    n.num = count;
+    return n;
+}
+
+void main() {
+    for 0 .. 3             print(it, " "); print("\n");
+    for i : 0 .. 3         print(i, " "); print("\n");
+    for (void* i : 0 .. 3 as void*) print(i, " "); print("\n");
+
+    for int32 i = 0, i < 3, i++ print(i, " "); print("\n");
+
+    Node* list = gen_list(3);
+    void advance(Node** n) { @n = (@n).next; }
+    for (let node = list, node, advance(*node)) print(node.num, " "); print("\n");
+
+}

@@ -107,6 +107,29 @@ char* alloc_string_copy(char* str) {
     return res;
 }
 
+char* alloc_vprintf(const char* format, va_list args) {
+
+    va_list args2;
+    va_copy(args2, args);
+
+    int n = vsnprintf(null, 0, format, args);
+    char* buffer = malloc(n + 1);
+
+    n = vsnprintf(buffer, n + 1, format, args2);
+    buffer[n] = 0;
+
+    va_end(args2);
+    return buffer;
+}
+
+char* alloc_printf(const char* format, ...) {
+    va_list args;
+    va_start(args, format);
+    char* buffer = alloc_vprintf(format, args);
+    va_end(args);
+    return buffer;
+}
+
 // ----------StringBuilder----------------
 
 StringBuilder sbCreateWithCapacity(u32 initialCapacity) {
@@ -193,4 +216,20 @@ StringBuilder* temp_builder() {
     sbClear(sb);
 
     return sb;
+}
+
+
+
+
+char* path_get_file_name(char* path) {
+    char* res = path;
+    for (u32 i = 0; path[i]; i++) {
+        if (path[i] == '/') res = &path[i + 1];
+    }
+    return res;
+}
+
+void path_append(StringBuilder* sb, char* path) {
+    if (sb->content[sb->length - 1] != '/') sbAppendChar(sb, '/');
+    sbAppend(sb, path);
 }

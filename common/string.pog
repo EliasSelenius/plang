@@ -20,7 +20,7 @@ uint64 parse_int(string str) {
     uint64 res = 0;
     for i : 0 .. str.length {
         let c = str.chars[i] as uint8 - '0';
-        res += c * pow_uint64(10, str.length - i - 1);
+        res += c * pow_uint64(10, (str.length - i - 1) as uint64);
     }
     return res;
 }
@@ -33,7 +33,7 @@ uint64 parse_int(char* c_str, uint32* length) {
     char* c = c_str;
     while is_digit(@c)  c++;
 
-    @length = c - c_str;
+    @length = (c - c_str) as uint32;
 
     string str = { c_str, @length };
     return parse_int(str);
@@ -41,13 +41,33 @@ uint64 parse_int(char* c_str, uint32* length) {
 
 float64 parse_float(char* c_str) {
     uint32 len;
+    return parse_float(c_str, *len);
+}
+float64 parse_float(char* c_str, uint32* length) {
+
+    char* start = c_str;
+
+    float64 sign = 1;
+    if c_str[0] == '-' {
+        sign = -1;
+        c_str++;
+    }
+
+    uint32 len;
     let int_part = parse_int(c_str, *len) as float64;
     c_str += len;
-    if @c_str != '.' return int_part;
+
+    if @c_str != '.' {
+        @length = (c_str - start) as uint32;
+        return int_part * sign;
+    }
+
     c_str++;
     let frac_part = parse_int(c_str, *len) as float64;
     let denom = pow_uint64(10, len) as float64;
-    return int_part + (frac_part / denom);
+
+    @length = (c_str - start) as uint32 + len;
+    return (int_part + (frac_part / denom)) * sign;
 }
 
 
@@ -69,14 +89,13 @@ string to_string(uint64 num) {
 }
 
 
-// TODO: dont use int32 as boolean, implement bool type in compiler
-int32 string_equals(string a, string b) {
+bool string_equals(string a, string b) {
     if a.length != b.length return false;
     for i : 0 .. a.length if a.chars[i] != b.chars[i] return false;
     return true;
 }
 
-int32 starts_with(char* text, char* start) {
+bool starts_with(char* text, char* start) {
     int32 i = 0;
     while start[i] {
         if start[i] != text[i] return false;
@@ -93,7 +112,14 @@ string substr_until(char* str, char delim) {
     while str[i] and str[i] != delim  i++;
 
     res.length = i;
+    if str[res.length] == delim  res.length++; // resulting string contains delim, but not zero-term
     return res;
+}
+
+string substr_to_end(string str, char start) {
+    int64 i = str.length - 1;
+    while (i >= 0 and str.chars[i] != start) i--;
+    return { *str.chars[i], str.length - i };
 }
 
 char* trim_starting_whitespace(char* c_str) {
@@ -101,21 +127,26 @@ char* trim_starting_whitespace(char* c_str) {
     return c_str;
 }
 
-int32 is_whitespace(char c) { return c == ' ' or c == '\n' or c == '\t'; }
-int32 is_upper_case_letter(char c) { return c >= 'A' and c <= 'Z'; }
-int32 is_lower_case_letter(char c) { return c >= 'a' and c <= 'z'; }
-int32 is_letter(char c) { return is_lower_case_letter(c) or is_upper_case_letter(c); }
-int32 is_digit(char c) { return c >= '0' and c <= '9'; }
-int32 is_hexdigit(char c) { return is_digit(c) or (c >= 'a' and c <= 'f') or (c >= 'A' and c <= 'F'); }
-int32 is_alphanumeric(char c) { return is_letter(c) or is_digit(c); }
-int32 is_punctuation(char c) {
+string trim(string str, uint32 len) {
+    return { str.chars + len, str.length - len };
+}
+
+
+bool is_whitespace(char c) { return c == ' ' or c == '\n' or c == '\t'; }
+bool is_upper_case_letter(char c) { return c >= 'A' and c <= 'Z'; }
+bool is_lower_case_letter(char c) { return c >= 'a' and c <= 'z'; }
+bool is_letter(char c) { return is_lower_case_letter(c) or is_upper_case_letter(c); }
+bool is_digit(char c) { return c >= '0' and c <= '9'; }
+bool is_hexdigit(char c) { return is_digit(c) or (c >= 'a' and c <= 'f') or (c >= 'A' and c <= 'F'); }
+bool is_alphanumeric(char c) { return is_letter(c) or is_digit(c); }
+bool is_punctuation(char c) {
     return (c >= '!' and c <= '/')
         or (c >= ':' and c <= '@')
         or (c >= '[' and c <= '`')
         or (c >= '{' and c <= '~');
 }
 
-int32 is_whitespace_or_empty(string str) {
+bool is_whitespace_or_empty(string str) {
     for 0 .. str.length {
         if !is_whitespace(str.chars[it]) return false;
     }
@@ -123,25 +154,40 @@ int32 is_whitespace_or_empty(string str) {
     return true;
 }
 
+string alloc_string_copy(char* str) { return alloc_string_copy(make_string(str)); }
+string alloc_string_copy(string str) {
+    string res = {};
+    res.length = str.length;
+    res.chars = malloc(str.length + 1);
+
+    for 0 .. str.length {
+        res.chars[it] = str.chars[it];
+    }
+    res.chars[str.length] = 0 as char;
+
+    return res;
+}
+
+
 // Levenshtein edit distance
 //   naive implementation
 //   TODO: maybe implement Wagner-Fischer algorithm
-// int32 lev(string a, string b) {
-//     string tail(string str) {
-//         return { str.chars as uint64 + 1, str.length - 1 } as string;
-//     }
+uint32 lev(string a, string b) {
+    string tail(string str) {
+        return { str.chars + 1, str.length - 1 };
+    }
 
-//     if a.length == 0 return b.length as int32;
-//     if b.length == 0 return a.length as int32;
+    if a.length == 0 return b.length;
+    if b.length == 0 return a.length;
 
-//     if a.chars[0] == b.chars[0] return lev(tail(a), tail(b));
+    if a.chars[0] == b.chars[0] return lev(tail(a), tail(b));
 
-//     int32 i = lev(tail(a), b);
-//     i = min(i, lev(a, tail(b)));
-//     i = min(i, lev(tail(a), tail(b)));
+    uint32 i = lev(tail(a), b);
+    i = min(i, lev(a, tail(b)));
+    i = min(i, lev(tail(a), tail(b)));
 
-//     return i + 1;
-// }
+    return i + 1;
+}
 
 
 
@@ -237,6 +283,7 @@ void sb_remove(StringBuilder* sb, int32 loc, uint32 num_chars) {
 
 void sb_clear(StringBuilder* sb) {
     sb.length = 0;
+    sb.content[0] = 0 as char;
 }
 
 
@@ -244,4 +291,16 @@ void sb_clear(StringBuilder* sb) {
 
 struct StringReader {
     char* current;
+    uint32 line;
+    uint32 column;
 }
+
+struct SR_Token {
+    string str;
+    uint32 line;
+    uint32 column;
+}
+
+// SR_Token read_token(with StringReader* sr) {
+//     if @sr.current == 0  return 
+// }

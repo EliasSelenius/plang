@@ -1,6 +1,7 @@
 
 
 typedef struct FileInfo {
+    char* path;
     char* name;
     u64 size;
 
@@ -9,7 +10,7 @@ typedef struct FileInfo {
 
 typedef void (*enumerate_files_callback)(FileInfo info, void* user_data);
 
-void enumerate_files(char* path, enumerate_files_callback callback, void* user_data);
+void enumerate_files(char* path, enumerate_files_callback callback, void* user_data, bool recursive);
 
 void startPerf();
 i64 endPerf();

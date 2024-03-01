@@ -278,26 +278,6 @@ static void init_typenode_for_proc(Procedure* proc) {
     proc->type_node = type;
 }
 
-static ProcArg* expectProcArguments(Parser* parser) {
-
-    if (tok(parser, Tok_CloseParen)) {
-        return null;
-    }
-
-    ProcArg* res = list_create(ProcArg);
-    ProcArg arg;
-    arg.base.statementType = Statement_Argument;
-    do {
-        tok(parser, Tok_Keyword_With);
-        arg.base.nodebase = node_init(parser);
-        arg.type = expectType(parser);
-        arg.name = identifier(parser);
-        list_add(res, arg);
-    } while (tok(parser, Tok_Comma));
-    expect(parser, Tok_CloseParen);
-
-    return res;
-}
 
 static Statement* expectEnum(Parser* parser) {
 
@@ -343,7 +323,7 @@ static Statement* expectStruct(Parser* parser) {
         list_add(stru->fields, field);
 
         while (tok(parser, Tok_Comma)) {
-            field.base.nodebase.lineNumber = peek(parser).line;
+            field.base.nodebase.loc.line = peek(parser).line;
             field.name = identifier(parser);
             list_add(stru->fields, field);
         }
@@ -375,6 +355,26 @@ static Statement* expectConst(Parser* parser) {
     return (Statement*)decl;
 }
 
+static ProcArg* expectProcArguments(Parser* parser) {
+
+    if (tok(parser, Tok_CloseParen)) {
+        return null;
+    }
+
+    ProcArg* res = list_create(ProcArg);
+    ProcArg arg;
+    arg.base.statementType = Statement_Argument;
+    do {
+        tok(parser, Tok_Keyword_With);
+        arg.base.nodebase = node_init(parser);
+        arg.type = expectType(parser);
+        arg.name = identifier(parser);
+        list_add(res, arg);
+    } while (tok(parser, Tok_Comma));
+    expect(parser, Tok_CloseParen);
+
+    return res;
+}
 
 static Statement* proc_or_var(Parser* parser, bool declare_localy) {
 
@@ -424,16 +424,16 @@ static Statement* proc_or_var(Parser* parser, bool declare_localy) {
 }
 
 
-static void skipBody(Parser* parser) {
-    while (true) {
-        switch (peek(parser).type) {
-            case Tok_OpenCurl: advance(parser); skipBody(parser); break;
-            case Tok_CloseCurl: advance(parser); return;
-            case Tok_EOF: error_temp("Unmatched curly-bracket.\n"); return;
-            default: advance(parser); break;
-        }
-    }
-}
+// static void skipBody(Parser* parser) {
+//     while (true) {
+//         switch (peek(parser).type) {
+//             case Tok_OpenCurl: advance(parser); skipBody(parser); break;
+//             case Tok_CloseCurl: advance(parser); return;
+//             case Tok_EOF: error_temp("Unmatched curly-bracket.\n"); return;
+//             default: advance(parser); break;
+//         }
+//     }
+// }
 
 static Statement* parse_top_level_statement(Parser* parser) {
 
@@ -442,9 +442,9 @@ static Statement* parse_top_level_statement(Parser* parser) {
         case Tok_Keyword_Include: {
             advance(parser);
             expect(parser, Tok_String);
-            char* file_name = get_string(peek_at(parser, -1).data.string);
-            printf("include \"%s\"\n", file_name);
-            parser_add_input_file(parser, file_name);
+            Identifier file_name = peek_at(parser, -1).data.string;
+            printf("include \"%s\"\n", get_string(file_name));
+            list_add(parser->current_unit->included_files, file_name);
             semicolon(parser);
         } break;
 
@@ -466,39 +466,37 @@ static Statement* parse_top_level_statement(Parser* parser) {
     return null;
 }
 
-static Unit parse_unit(Parser* parser) {
-    Unit unit = {0};
+static void parse_unit(Parser* parser) {
+    Unit* unit = list_add_empty(parser->units);
+    parser->current_unit = unit;
 
-    unit.arena = arena_create();
-    unit.top_level_statements = list_create(Statement*);
-    unit.external_symbols = list_create(VariableExpression*);
-    unit.external_types = list_create(Type*);
+    unit->arena = arena_create();
+    unit->top_level_statements = list_create(Statement*);
+    unit->external_symbols = list_create(VariableExpression*);
+    unit->external_types = list_create(Type*);
+    unit->included_files = list_create(Identifier);
 
     reset_parser(parser);
 
     while (peek(parser).type != Tok_EOF) {
         list_clear(parser->local_symbols);
         Statement* top_lvl_sta = parse_top_level_statement(parser);
-        if (top_lvl_sta) list_add(unit.top_level_statements, top_lvl_sta);
+        if (top_lvl_sta) list_add(unit->top_level_statements, top_lvl_sta);
     }
 
     foreach (item, parser->unresolved_variables) {
         VariableExpression* var = *item;
-        var->ref = get_global_symbol(var->name, &unit);
+        var->ref = get_global_symbol(var->name, unit);
 
-        if (!var->ref) list_add(unit.external_symbols, var);
+        if (!var->ref) list_add(unit->external_symbols, var);
     }
 
-    // {
-    //     printf("Unresolved: (external symbols)\n");
-    //     foreach (item, unit.external_symbols) {
-    //         VariableExpression* var = *item;
-    //         printf("    \"%s\" at line %d\n", get_string(var->name), var->base.nodebase.lineNumber);
-    //     }
-    // }
-
-
-    return unit;
+    Identifier* includes = unit->included_files;
+    foreach (include, includes) {
+        char* file_name = get_string(*include);
+        printf("NOW including: \"%s\"\n", file_name);
+        parser_parse_file(parser, file_name);
+    }
 }
 
 
@@ -509,8 +507,7 @@ static Unit parse_unit(Parser* parser) {
 
 void parser_parse_source(Parser* parser, char* source) {
     lex(parser, source);
-    Unit u = parse_unit(parser);
-    list_add(parser->units, u);
+    if (setjmp(parser->jump_location) == 0) parse_unit(parser);
 }
 
 void parser_parse_file(Parser* parser, char* file_name) {
@@ -647,13 +644,6 @@ static void print_codebase(Codebase* cb) {
 
 Codebase parse(Parser* parser) {
 
-    for (u32 i = 0; i < list_length(parser->src_files); i++) {
-        File* file = &parser->src_files[i];
-        parser->current_file_index = i;
-
-        parser_parse_file(parser, file->filename);
-    }
-
     Codebase cb = {0};
     bind_units(parser, &cb);
 
@@ -662,16 +652,18 @@ Codebase parse(Parser* parser) {
     // its just that we dont want to validate if there was a syntax error, but parser may produce errors that are not syntax errors
     u32 num_errors = list_length(parser->errors);
     if (num_errors) {
+        print_errors(parser);
         printf("There were %d errors during parsing.\n", num_errors);
-        exit(0);
+        return cb;
     }
 
     printf("Validate...\n");
     validate(parser, &cb);
     num_errors = list_length(parser->errors);
     if (num_errors) {
+        print_errors(parser);
         printf("There were %d errors during validation.\n", num_errors);
-        exit(0);
+        return cb;
     }
 
     // print_codebase(&cb);

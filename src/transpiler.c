@@ -579,10 +579,11 @@ static void transpileCondition(Expression* cond) {
 static void transpileIfStatement(IfStatement* ifst) {
     sbAppend(sb, "if ");
     transpileCondition(ifst->condition);
-    sbAppend(sb, " ");
 
-    if (ifst->then_statement) transpileStatement(ifst->then_statement);
-    else sbAppend(sb, ";");
+    if (ifst->then_statement) {
+        sbAppend(sb, " ");
+        transpileStatement(ifst->then_statement);
+    } else sbAppend(sb, ";");
 
     if (ifst->else_statement) {
         sbAppend(sb, " else ");
@@ -703,9 +704,10 @@ static void transpileStatement(Statement* statement) {
             WhileStatement* sta = (WhileStatement*)statement;
             sbAppend(sb, "while ");
             transpileCondition(sta->condition);
-            sbAppend(sb, " ");
-            if (sta->statement) transpileStatement(sta->statement);
-            else sbAppend(sb, ";");
+            if (sta->statement) {
+                sbAppend(sb, " ");
+                transpileStatement(sta->statement);
+            } else sbAppend(sb, ";");
         } break;
         case Statement_For: {
             ForStatement* forsta = (ForStatement*)statement;
@@ -714,23 +716,38 @@ static void transpileStatement(Statement* statement) {
             sbAppend(sb, "for (");
 
             if (forsta->index_type) transpileType(forsta->index_type);
-            else transpileDatatype(type_int32); // TODO: change this
+            else transpileDatatype(default_for_loop_numeric_type);
 
             sbAppend(sb, " ");
             sbAppend(sb, name);
             sbAppend(sb, " = ");
-            transpileExpression(forsta->min_expr);
-            sbAppend(sb, "; ");
 
-            sbAppend(sb, name);
-            sbAppend(sb, " < ");
-            transpileExpression(forsta->max_expr);
-            sbAppend(sb, "; ");
+            if (forsta->iterator_assignment) {
 
-            sbAppend(sb, name);
-            sbAppend(sb, "++) ");
+                transpileExpression(forsta->iterator_assignment);
+                sbAppend(sb, "; ");
+                transpileExpression(forsta->condition);
+                sbAppend(sb, "; ");
+                if (forsta->iterator_update) transpileExpression(forsta->iterator_update);
+                sbAppend(sb, ")");
 
-            transpileStatement(forsta->statement);
+            } else {
+                transpileExpression(forsta->min_expr);
+                sbAppend(sb, "; ");
+
+                sbAppend(sb, name);
+                sbAppend(sb, " < ");
+                transpileExpression(forsta->max_expr);
+                sbAppend(sb, "; ");
+
+                sbAppend(sb, name);
+                sbAppend(sb, "++)");
+            }
+
+            if (forsta->statement) {
+                sbAppend(sb, " ");
+                transpileStatement(forsta->statement);
+            } else sbAppend(sb, ";");
         } break;
 
         case Statement_Switch: {
@@ -789,7 +806,7 @@ static void transpileStatement(Statement* statement) {
 
         case Statement_Argument:
         case Statement_EnumEntry: {
-            error(0, "internal(transpiler)", "Unreachable code. This is a bug!");
+            // Unreachable code
         } break;
     }
 }

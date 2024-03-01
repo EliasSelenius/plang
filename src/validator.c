@@ -151,21 +151,11 @@ static char* construct_type_string(Datatype type, StringBuilder* sb) {
 
 
 static void assertAssignability(Parser* parser, Datatype toType, Datatype fromType, void* node) {
-    if (!typeAssignable(toType, fromType)) {
+    if (typeAssignable(toType, fromType)) return;
 
-        StringBuilder *to_sb, *from_sb;
-        to_sb = temp_builder();
-        from_sb = temp_builder();
-
-        construct_type_string(toType, to_sb);
-        construct_type_string(fromType, from_sb);
-
-        if (node) {
-            error_node(parser, node, "Type missmatch. \"%s\" is not assignable to \"%s\".", from_sb->content, to_sb->content);
-        } else {
-            error_temp("Type missmatch. \"%s\" is not assignable to \"%s\".", from_sb->content, to_sb->content);
-        }
-    }
+    char* to_str = construct_type_string(toType, temp_builder());
+    char* from_str = construct_type_string(fromType, temp_builder());
+    error_node(parser, node, "Type missmatch. \"%s\" is not assignable to \"%s\".", from_str, to_str);
 }
 
 static Datatype typeofStatement(Statement* sta) {
@@ -200,7 +190,7 @@ static Datatype typeofStatement(Statement* sta) {
 
         case Statement_For: {
             ForStatement* forsta = (ForStatement*)sta;
-            return forsta->index_type ? forsta->index_type->solvedstate : type_int32; // NOTE: hardcoded default type here.
+            return forsta->index_type ? forsta->index_type->solvedstate : default_for_loop_numeric_type;
         }
 
         default: break;
@@ -703,14 +693,23 @@ static void validateStatement(Parser* parser, Statement* sta) {
         case Statement_For: {
             ForStatement* forsta = (ForStatement*)sta;
 
+            if (forsta->iterator_assignment) {
+                Datatype type = validateExpressionEx(parser, forsta->iterator_assignment, forsta->index_type->solvedstate);
+                if (forsta->index_type->node_type == TypeNode_MustInfer) {
+                    forsta->index_type->solvedstate = type;
+                } else {
+                    assertAssignability(parser, forsta->index_type->solvedstate, type, forsta->iterator_assignment);
+                }
+            }
+
             validateExpression(parser, forsta->min_expr);
-            validateExpression(parser, forsta->max_expr);
+            if (forsta->max_expr) validateExpression(parser, forsta->max_expr);
 
             Datatype type = forsta->index_type
                           ? forsta->index_type->solvedstate
-                          : type_int32;
+                          : default_for_loop_numeric_type;
 
-            validateStatement(parser, forsta->statement);
+            if (forsta->statement) validateStatement(parser, forsta->statement);
         } break;
 
         case Statement_Switch: {
@@ -779,7 +778,7 @@ static void validateStatement(Parser* parser, Statement* sta) {
 
         case Statement_Argument:
         case Statement_EnumEntry: {
-            error(0, "internal(validator)", "Unreachable code. This is a bug!");
+            // Unreachable code
         } break;
     }
 }

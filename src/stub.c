@@ -5,11 +5,13 @@
 #include <stdarg.h>
 #include <math.h>
 #include <assert.h>
-
+#include <setjmp.h>
 
 #include "prelude.h"
 #include "io.c"
 #include "../platform/platform.h"
+
+#include "meme.h"
 
 #include "essh-string.h"
 #include "essh-string.c"
@@ -18,6 +20,7 @@
 #include "arena.c"
 #include "hashtable.c"
 
+
 #include "public.h"
 #include "lexer.h"
 #include "syntax_tree.c"
@@ -25,7 +28,6 @@
 #include "syntax_tree_allocator.c"
 
 
-#include "error_messages.c"
 #include "lexer.c"
 #include "parser.c"
 #include "parser_expressions.c"

@@ -72,8 +72,9 @@ u32 StatementType_Bytesizes[] = {
 
 Node node_init(Parser* parser) {
     Node node = {0};
-    node.file_index = parser->current_file_index;
-    node.lineNumber = peek(parser).line;
+    node.loc.file_name = parser->current_file_name;
+    node.loc.line = peek(parser).line;
+    node.loc.column = peek(parser).column;
     return node;
 }
 

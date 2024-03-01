@@ -36,6 +36,8 @@ bool cstrEquals(char* a, char* b);
 StrSpan numberToString(u64 num);
 
 char* alloc_string_copy(char* str);
+char* alloc_vprintf(const char* format, va_list args);
+char* alloc_printf(const char* format, ...);
 
 // --------StringBuilder------------------
 
@@ -55,3 +57,6 @@ void sbAppend(StringBuilder* sb, char* str);
 void sbAppendSpan(StringBuilder* sb, StrSpan str);
 void sbCopyIntoBuffer(StringBuilder* sb, char* buffer, u32 bufferLength);
 StringBuilder* temp_builder();
+
+char* path_get_file_name(char* path);
+void path_append(StringBuilder* sb, char* path);

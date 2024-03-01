@@ -124,23 +124,8 @@ typedef struct Unit {
     Statement** top_level_statements; // list
     VariableExpression** external_symbols; // list
     Type** external_types; // list
+    Identifier* included_files; // list
 } Unit;
-
-
-typedef struct File {
-    char* filename;
-} File;
-
-
-typedef struct CodeLocation {
-    char* file_name;
-    u32 line, column;
-} CodeLocation;
-
-typedef struct Error {
-    CodeLocation location;
-    char* message;
-} Error;
 
 typedef struct Parser {
 
@@ -149,8 +134,8 @@ typedef struct Parser {
 
     Unit* units; // list
 
-    File* src_files;
-    u32 current_file_index;
+    Unit* current_unit;
+    char* current_file_name;
 
     Scope* scope;         // current scope being parsed
     Procedure* procedure; // current procedure that is being validated
@@ -167,20 +152,70 @@ typedef struct Parser {
     bool allow_lonely_expressions;
     bool allow_omitting_semicolon;
 
+    jmp_buf jump_location;
+
 } Parser;
 
 static inline Token peek_at(Parser* parser, i32 offset) { return parser->tokens[parser->token_index + offset]; }
 static inline Token peek(Parser* parser) { return peek_at(parser, 0); }
 static inline Token advance(Parser* parser) { return parser->tokens[parser->token_index++]; }
 
-static void gen_error(Parser* parser, char* file_name, u32 line, u32 column, char* msg) {
+
+
+
+static void gen_errorv(Parser* parser, CodeLocation loc, const char* format, va_list args) {
     Error e = {0};
-    e.location.file_name = file_name;
-    e.location.line = line;
-    e.location.column = column;
-    e.message = msg;
+    e.location = loc;
+    e.message = alloc_vprintf(format, args);
     list_add(parser->errors, e);
 }
+
+static void gen_error(Parser* parser, CodeLocation loc, const char* format, ...) {
+    va_list args;
+    va_start(args, format);
+    gen_errorv(parser, loc, format, args);
+    va_end(args);
+}
+
+static void print_errors(Parser* parser) {
+    foreach (err, parser->errors) {
+        printf("%s:%d:%d: error: %s\n", err->location.file_name, err->location.line, err->location.column, err->message);
+    }
+}
+
+static void fatal_parse_error(Parser* parser, char* format, ...) {
+    Token tok = peek(parser);
+    CodeLocation loc = { .file_name = parser->current_file_name, .line = tok.line, .column = tok.column };
+
+    va_list args;
+    va_start(args, format);
+    gen_errorv(parser, loc, format, args);
+    va_end(args);
+
+    longjmp(parser->jump_location, 1);
+}
+
+static void error_token(Parser* parser, char* format, ...) {
+    Token tok = peek(parser);
+    CodeLocation loc = { .file_name = parser->current_file_name, .line = tok.line, .column = tok.column };
+
+    va_list args;
+    va_start(args, format);
+    gen_errorv(parser, loc, format, args);
+    va_end(args);
+}
+
+static void error_node(Parser* parser, void* node, char* format, ...) {
+    Node* n = (Node*)node;
+
+    va_list args;
+    va_start(args, format);
+    gen_errorv(parser, n->loc, format, args);
+    va_end(args);
+}
+
+
+
 
 static void reset_parser(Parser* parser) {
     list_clear(parser->unresolved_variables);
@@ -204,8 +239,6 @@ Parser* init_parser() {
 
     parser->units = list_create(Unit);
 
-    parser->src_files = list_create(File);
-
     parser->local_symbols = list_create(Statement*);
     parser->local_types = list_create(Statement*);
 
@@ -221,15 +254,6 @@ void free_parser(Parser* parser) {
     // TODO: ...
 }
 
-void parser_add_input_file(Parser* parser, char* file_name) {
-    File file = {0};
-    file.filename = alloc_string_copy(file_name);
-
-    list_add(parser->src_files, file);
-}
-
-static inline File* get_current_file(Parser* parser) { return &parser->src_files[parser->current_file_index]; }
-static inline File* get_file(Parser* parser, u32 index) { return &parser->src_files[index]; }
 
 static Identifier getNameOfStatement(Statement* sta) {
     switch (sta->statementType) {
@@ -248,6 +272,31 @@ static Identifier getNameOfStatement(Statement* sta) {
 }
 
 
+static Statement* get_global_type(Identifier name, Codebase* codebase) {
+    foreach (stru, codebase->structs)   if ((*stru)->name == name) return (Statement*)(*stru);
+    foreach (tdef, codebase->type_defs) if ((*tdef)->name == name) return (Statement*)(*tdef);
+    foreach (enom, codebase->enums)     if ((*enom)->name == name) return (Statement*)(*enom);
+
+    return null;
+}
+
+static Statement* get_global_symbol_from_codebase(Identifier name, Codebase* cb) {
+    foreach (prc, cb->procedures)    if ((*prc)->name == name) return (Statement*)(*prc);
+    foreach (var, cb->global_vars)   if ((*var)->name == name) return (Statement*)(*var);
+    foreach (con, cb->global_consts) if ((*con)->name == name) return (Statement*)(*con);
+
+    return null;
+}
+
+static Statement* get_global_symbol(Identifier name, Unit* unit) {
+    foreach (item, unit->top_level_statements) {
+        Statement* sta = *item;
+        if (name == getNameOfStatement(sta)) return sta;
+    }
+
+    return null;
+}
+
 static void declare_local_type(Parser* parser, Statement* sta) {
     // TODO: already declared error
     list_add(parser->local_types, sta);
@@ -263,55 +312,7 @@ static Statement* get_local_type(Parser* parser, Identifier name) {
     return null;
 }
 
-static Statement* get_global_type(Identifier name, Codebase* codebase) {
-    {
-        foreach (item, codebase->structs) {
-            if ((*item)->name == name) return (Statement*)(*item);
-        }
-    }
-
-    {
-        foreach (item, codebase->type_defs) {
-            if ((*item)->name == name) return (Statement*)(*item);
-        }
-    }
-
-    {
-        foreach (item, codebase->enums) {
-            if ((*item)->name == name) return (Statement*)(*item);
-        }
-    }
-
-    return null;
-}
-
-static Statement* get_global_symbol_from_codebase(Identifier name, Codebase* cb) {
-    foreach (proc, cb->procedures) {
-        if ((*proc)->name == name) return (Statement*)(*proc);
-    }
-
-    foreach (var, cb->global_vars) {
-        if ((*var)->name == name) return (Statement*)(*var);
-    }
-
-    foreach (con, cb->global_consts) {
-        if ((*con)->name == name) return (Statement*)(*con);
-    }
-
-    return null;
-}
-
-static Statement* get_global_symbol(Identifier name, Unit* unit) {
-    foreach (item, unit->top_level_statements) {
-        Statement* sta = *item;
-        if (name == getNameOfStatement(sta)) return sta;
-    }
-
-    return null;
-}
-
 static Statement* get_symbol(Parser* parser, Identifier name) {
-
 
     i32 len = (i32)list_length(parser->local_symbols);
     for (i32 i = len-1; i >= 0; i--) {

@@ -35,12 +35,12 @@ void* _list_create(u32 stride) {
     return list;
 }
 
-#define list_add(list, value) {   \
-    typeof(value) __unique_var_name_to_not_fuck_things_up = value;     \
-    _list_add((void**)&list, &__unique_var_name_to_not_fuck_things_up); \
-}
+#define list_add(list, value) do {   \
+    typeof(value) temp = value;      \
+    _list_add((void**)&list, &temp); \
+} while (0)
 
-#define list_get_next(list) _list_add((void**)&list, null);
+#define list_add_empty(list) _list_add((void**)&list, null);
 
 
 void* _list_add(void** list, void* value) {

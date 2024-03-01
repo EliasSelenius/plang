@@ -92,8 +92,7 @@ typedef struct Datatype {
 
 
 typedef struct Node {
-    u32 file_index;
-    u32 lineNumber;
+    CodeLocation loc;
 } Node;
 
 typedef enum TypeNode {
@@ -491,12 +490,20 @@ typedef struct WhileStatement {
     Statement* statement;
 } WhileStatement;
 
+#define default_for_loop_numeric_type type_int32
 typedef struct ForStatement {
     Statement base;
     Type* index_type; // can be null
     Identifier index_name;
-    Expression* min_expr;
-    Expression* max_expr;
+    Expression* iterator_assignment;
+    union {
+        Expression* min_expr;
+        Expression* condition;
+    };
+    union {
+        Expression* max_expr;
+        Expression* iterator_update;
+    };
     Statement* statement;
 } ForStatement;
 

@@ -17,34 +17,54 @@ void* list_create(uint32 stride) {
     return *head[1];
 }
 
-List* list_head(void* list) {
-    return *(list as List*)[-1];
+List* list_head(void* list) { return *(list as List*)[-1]; }
+uint32 list_length(void* list) { return list_head(list).length; }
+uint32 list_capacity(void* list) { return list_head(list).capacity; }
+uint32 list_stride(void* list) { return list_head(list).stride; }
+
+void list_set_length(void* list, uint32 new_len) { list_head(list).length = new_len; }
+
+void list_delete(void* list) {
+    free(list_head(list));
 }
 
 void list_clear(void* list) {
     list_head(list).length = 0;
 }
 
-void list_add(void** list, void* data) {
+void list_grow(void** list, uint32 new_capacity) {
     List* head = list_head(@list);
 
-    if head.capacity == head.length {
-        head.capacity *= 2;
-        head = realloc(head, sizeof List + head.capacity * head.stride);
-        @list = *head[1];
-    }
-
-    uint64 dst = @list as uint64;
-    dst += head.length * head.stride;
-    memcpy(dst as void*, data, head.stride);
-
-    head.length++;
+    head.capacity = new_capacity;
+    head = realloc(head, sizeof List + head.capacity * head.stride);
+    @list = *head[1];
 }
 
-uint32 list_length(void* list) {
-    return list_head(list).length;
+void* list_add(void** list, void* data) {
+
+    let len = list_length(@list);
+    let cap = list_capacity(@list);
+    let stride = list_stride(@list);
+
+    if cap == len  list_grow(list, cap * 2);
+
+    void* dst = (@list as byte*) + len * stride;
+    memcpy(dst, data, stride);
+
+    list_set_length(@list, len + 1);
+    return dst;
 }
 
-void list_delete(void* list) {
-    free(list_head(list));
+void* list_get(void* list, uint32 index) {
+    return (list as byte*) + list_stride(list) * index;
+}
+
+void* list_last_item(void* list) {
+    return list_get(list, list_length(list) - 1);
+}
+
+void list_unordered_remove(void* list, uint32 index) {
+    let len = list_length(list);
+    memcpy(list_get(list, index), list_get(list, len - 1), list_stride(list));
+    list_set_length(list, len - 1);
 }

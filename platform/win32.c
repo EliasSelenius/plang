@@ -22,7 +22,7 @@ char* path_get_filename(char* path) {
 #define make_u64(high, low) ((u64)low | ((u64)high << 32))
 static u64 make_u64_from_FILETIME(FILETIME t) { return make_u64(t.dwHighDateTime, t.dwLowDateTime); }
 
-static void enumerate_files_internal(StringBuilder* sb, enumerate_files_callback callback, void* user_data) {
+static void enumerate_files_internal(StringBuilder* sb, enumerate_files_callback callback, void* user_data, bool recursive) {
     HANDLE handle;
     WIN32_FIND_DATA data;
 
@@ -45,14 +45,15 @@ static void enumerate_files_internal(StringBuilder* sb, enumerate_files_callback
         if (data.cFileName[0] == '.') continue; // skip dot files like .git .vscode . .. etc
         // if (cstrEquals(".", data.cFileName) || cstrEquals("..", data.cFileName)) continue;
 
-        if (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-            u32 len = sb->length;
-            sbAppend(sb, "/");
-            sbAppend(sb, data.cFileName);
-            enumerate_files_internal(sb, callback, user_data);
-            sb->length = len;
+        u32 len = sb->length;
+        sbAppend(sb, "/");
+        sbAppend(sb, data.cFileName);
+
+        if (recursive && (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) ) {
+            enumerate_files_internal(sb, callback, user_data, recursive);
         } else {
             FileInfo file = {0};
+            file.path = sb->content;
             file.name = data.cFileName;
             file.size = make_u64(data.nFileSizeHigh, data.nFileSizeLow);
             file.creation_time = make_u64_from_FILETIME(data.ftCreationTime);
@@ -61,15 +62,18 @@ static void enumerate_files_internal(StringBuilder* sb, enumerate_files_callback
 
             callback(file, user_data);
         }
+
+        sb->length = len;
+
     } while (FindNextFile(handle, &data));
 
     FindClose(handle);
 }
 
-void enumerate_files(char* path, enumerate_files_callback callback, void* user_data) {
+void enumerate_files(char* path, enumerate_files_callback callback, void* user_data, bool recursive) {
     StringBuilder* sb = temp_builder();
     sbAppend(sb, path);
-    enumerate_files_internal(sb, callback, user_data);
+    enumerate_files_internal(sb, callback, user_data, recursive);
 }
 
 
@@ -90,7 +94,7 @@ static void print_time(u64 t) {
 }
 
 void print_file(FileInfo info, void* user_data) {
-    printf("file: \"%s\" (%llu bytes) ", info.name, info.size);
+    printf("file: \"%s\" (%llu bytes) ", info.path, info.size);
     print_time(info.last_write_time);
     printf("\n");
 }
