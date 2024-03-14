@@ -513,6 +513,7 @@ void parser_parse_source(Parser* parser, char* source) {
 void parser_parse_file(Parser* parser, char* file_name) {
     u32 content_len = 0;
     char* content = fileread(file_name, &content_len);
+    parser->current_file_name = file_name;
     parser_parse_source(parser, content);
     free(content);
 }

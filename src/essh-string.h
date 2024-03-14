@@ -5,6 +5,13 @@ typedef struct StrSpan {
     u32 length;
 } StrSpan;
 
+// TODO: fase out StrSpan in favor of this string struct
+typedef struct string {
+    char* chars;
+    u32 length;
+} string;
+
+inline string make_string(char* c_str) { return (string) { c_str, strlen(c_str) }; }
 
 StrSpan spFrom(char* str);
 void spCopyTo(StrSpan src, char* dest);
@@ -39,6 +46,9 @@ char* alloc_string_copy(char* str);
 char* alloc_vprintf(const char* format, va_list args);
 char* alloc_printf(const char* format, ...);
 
+string lev_dist_tail(string str);
+u32 lev_dist(string a, string b);
+
 // --------StringBuilder------------------
 
 typedef struct StringBuilder {
@@ -55,6 +65,10 @@ inline void sbClear(StringBuilder* sb) { sb->length = 0; }
 void sbAppendChar(StringBuilder* sb, char c);
 void sbAppend(StringBuilder* sb, char* str);
 void sbAppendSpan(StringBuilder* sb, StrSpan str);
+
+void sb_append_format_args(StringBuilder* sb, const char* format, va_list args);
+void sb_append_format(StringBuilder* sb, const char* format, ...);
+
 void sbCopyIntoBuffer(StringBuilder* sb, char* buffer, u32 bufferLength);
 StringBuilder* temp_builder();
 

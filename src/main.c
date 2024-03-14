@@ -98,6 +98,15 @@
         *- break, continue
         - null literal
 
+
+upcoming todos:
+ - make sure the parser_parse_source() never exits
+
+ - improved arenas (look at raddbg)
+ - lists in arenas?
+
+ - include paths relative to file
+
 */
 
 #include <stdio.h>

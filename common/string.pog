@@ -133,6 +133,7 @@ string trim(string str, uint32 len) {
 
 
 bool is_whitespace(char c) { return c == ' ' or c == '\n' or c == '\t'; }
+bool is_whitespace_or_null(char c) { return is_whitespace(c) or c == 0; }
 bool is_upper_case_letter(char c) { return c >= 'A' and c <= 'Z'; }
 bool is_lower_case_letter(char c) { return c >= 'a' and c <= 'z'; }
 bool is_letter(char c) { return is_lower_case_letter(c) or is_upper_case_letter(c); }

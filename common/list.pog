@@ -68,3 +68,9 @@ void list_unordered_remove(void* list, uint32 index) {
     memcpy(list_get(list, index), list_get(list, len - 1), list_stride(list));
     list_set_length(list, len - 1);
 }
+
+void* list_pop(void* list) {
+    void* res = list_last_item(list);
+    list_head(list).length--;
+    return res;
+}

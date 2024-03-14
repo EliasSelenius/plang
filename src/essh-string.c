@@ -130,6 +130,28 @@ char* alloc_printf(const char* format, ...) {
     return buffer;
 }
 
+// Levenshtein edit distance
+//   naive implementation
+//   TODO: maybe implement Wagner-Fischer algorithm
+string lev_dist_tail(string str) {
+    return (string) { str.chars + 1, str.length - 1 };
+}
+u32 lev_dist(string a, string b) {
+
+    if (a.length == 0) return b.length;
+    if (b.length == 0) return a.length;
+
+    if (a.chars[0] == b.chars[0]) return lev_dist(lev_dist_tail(a), lev_dist_tail(b));
+
+    u32 i = lev_dist(lev_dist_tail(a), b);
+    u32 temp = lev_dist(a, lev_dist_tail(b));
+    if (temp < i) i = temp;
+    temp = lev_dist(lev_dist_tail(a), lev_dist_tail(b));
+    if (temp < i) i = temp;
+
+    return i + 1;
+}
+
 // ----------StringBuilder----------------
 
 StringBuilder sbCreateWithCapacity(u32 initialCapacity) {
@@ -196,6 +218,27 @@ void sbAppendSpan(StringBuilder* sb, StrSpan str) {
 
     // make sure the content is zero-terminated, so that it can be used as a c string
     sb->content[sb->length] = '\0';
+}
+
+
+void sb_append_format_args(StringBuilder* sb, const char* format, va_list args) {
+    va_list args2;
+    va_copy(args2, args);
+    int n = vsnprintf(null, 0, format, args);
+    growBufferSize(sb, n);
+
+    n = vsnprintf(sb->content + sb->length, n + 1, format, args2);
+    sb->length += n;
+    sb->content[sb->length] = '\0';
+
+    va_end(args2);
+}
+
+void sb_append_format(StringBuilder* sb, const char* format, ...) {
+    va_list args;
+    va_start(args, format);
+    sb_append_format_args(sb, format, args);
+    va_end(args);
 }
 
 void sbCopyIntoBuffer(StringBuilder* sb, char* buffer, u32 bufferLength) {
