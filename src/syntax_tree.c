@@ -1,16 +1,82 @@
 
 
-typedef struct Procedure Procedure;
-typedef struct ForStatement ForStatement;
-typedef struct Struct Struct;
-typedef struct Enum Enum;
-typedef struct Typedef Typedef;
-typedef struct Datatype Datatype;
-typedef struct ProcArg ProcArg;
-typedef struct Declaration Declaration;
-typedef struct Statement Statement;
-typedef struct VariableExpression VariableExpression;
-typedef struct Type Type;
+#define for_each_binary_node(X, A)\
+    X(Plus, A) X(Minus, A) X(Mul, A) X(Div, A) X(Mod, A)\
+    X(Less, A) X(Greater, A) X(LessEquals, A) X(GreaterEquals, A)\
+    X(Equals, A) X(NotEquals, A)\
+    X(BooleanAnd, A) X(BooleanOr, A)\
+    X(Bitwise_And, A) X(Bitwise_Or, A) X(Bitwise_Xor, A)\
+    X(Bitwise_Lshift, A) X(Bitwise_Rshift, A)\
+
+#define for_each_unary_node(X, A)\
+    X(Unary_PreIncrement, A) X(Unary_PostIncrement, A)\
+    X(Unary_PreDecrement, A) X(Unary_PostDecrement, A)\
+    X(Unary_Not, A) X(Unary_BitwiseNot, A)\
+    X(Unary_AddressOf, A) X(Unary_ValueOf, A)\
+    X(Unary_Negate, A)\
+
+#define for_each_literal_node(X, A)\
+    X(Literal_Integer, A) X(Literal_Decimal, A)\
+    X(Literal_Char, A) X(Literal_String, A)\
+    X(Literal_True, A) X(Literal_False, A) X(Literal_Null, A)\
+
+#define for_each_other_expr_node(X, A)\
+    X(Variable, A) X(Alloc, A) X(Ternary, A) X(ProcCall, A) X(Deref, A)\
+    X(Indexing, A) X(Cast, A) X(Sizeof, A) X(Parenthesized, A) X(Compound, A)\
+
+#define for_each_stmt_node(X, A)\
+    X(Declaration, A) X(Constant, A) X(Typedef, A) X(Procedure, A) X(Argument, A) X(Struct, A) X(Enum, A)\
+    X(EnumEntry, A) X(Assignment, A) X(Expression, A) X(Scope, A) X(If, A) X(While, A) X(For, A) X(Switch, A)\
+    X(Continue, A) X(Break, A) X(Return, A) X(Goto, A) X(Label, A) X(CaseLabel, A) X(DefaultLabel, A)\
+
+#define for_each_type_node(X, A)\
+    X(Type_MustInfer, A) X(Type_Basic, A) X(Type_Procedure, A)\
+    X(Type_Array, A) X(Type_Fixed_Array, A) X(Type_Dynamic_Array, A)\
+
+#define for_each_expr_node(X, A)\
+    for_each_binary_node(X, A)\
+    for_each_unary_node(X, A)\
+    for_each_literal_node(X, A)\
+    for_each_other_expr_node(X, A)\
+
+#define for_each_node(X, A)\
+    for_each_expr_node(X, A)\
+    for_each_stmt_node(X, A)\
+    for_each_type_node(X, A)\
+
+
+#define node_enum_entry(name, a) Node_##name,
+typedef enum Nodekind {
+    Node_Invalid = 0,
+    for_each_node(node_enum_entry,)
+    Nodekind_Count
+} Nodekind;
+#undef node_enum_entry
+
+#define for_each_node_struct(X)\
+    for_each_stmt_node(X, Stmt)\
+    for_each_other_expr_node(X, Expression)\
+    X(Binary, Expression)\
+    X(Unary, Expression)\
+    X(Literal, Expression)\
+    X(Type,)\
+
+#define typedef_node(name, a) typedef struct name##a name##a;
+for_each_node_struct(typedef_node)
+#undef typedef_node
+
+
+typedef struct AstNode {
+    CodeLocation loc;
+    Nodekind kind;
+} AstNode;
+
+#define AstNodePointer_field(name, a) name##a* name;
+typedef union AstNodePointer {
+    for_each_node_struct(AstNodePointer_field)
+} AstNodePointer;
+#undef AstNodePointer_field
+
 
 // ----Types---------------------------------------------
 
@@ -81,33 +147,17 @@ typedef struct Datatype {
     u32 numPointers;
     union {
         void* data_ptr;
-        Struct* stru;
-        Enum* _enum;
-        Typedef* type_def;
+        StructStmt* stru;
+        EnumStmt* _enum;
+        TypedefStmt* type_def;
         Type* proc_ptr_typenode;
         Type* array_typenode;
     };
 } Datatype;
 
 
-
-typedef struct Node {
-    CodeLocation loc;
-} Node;
-
-typedef enum TypeNode {
-    TypeNode_MustInfer,
-    TypeNode_Normal,
-    TypeNode_Procedure,
-    TypeNode_Array,
-    TypeNode_Fixed_Array,
-    TypeNode_Dynamic_Array
-} TypeNode;
-
-typedef struct Type {
-    Node nodebase;
-    TypeNode node_type;
-
+struct Type {
+    AstNode nodebase;
     Datatype solvedstate;
 
     union {
@@ -125,7 +175,7 @@ typedef struct Type {
     };
 
     struct Type* next;
-} Type;
+};
 
 
 #define type_invalid          (Datatype) { .kind = Typekind_Invalid }
@@ -272,351 +322,93 @@ static Datatype mergeNumberTypes(Datatype a, Datatype b) {
 
 // ----Expressions---------------------------------------------
 
-// TODO:
-// typedef enum BinaryOperator {
-//     BinaryOperator_Addition,
-//     BinaryOperator_Subtraction,
-//     BinaryOperator_Multiplication,
-//     BinaryOperator_Division,
-//     BinaryOperator_Modulus
-// } BinaryOperator;
-
-typedef enum ExprType {
-
-    ExprType_Plus = 1,
-    ExprType_Minus,
-    ExprType_Mul,
-    ExprType_Div,
-    ExprType_Mod,
-
-    ExprType_Less,
-    ExprType_Greater,
-    ExprType_LessEquals,
-    ExprType_GreaterEquals,
-    ExprType_Equals,
-    ExprType_NotEquals,
-    ExprType_BooleanAnd,
-    ExprType_BooleanOr,
-
-    ExprType_Bitwise_And,
-    ExprType_Bitwise_Or,
-    ExprType_Bitwise_Xor,
-    ExprType_Bitwise_Lshift,
-    ExprType_Bitwise_Rshift,
-
-    ExprType_Unary_PreIncrement,
-    ExprType_Unary_PostIncrement,
-    ExprType_Unary_PreDecrement,
-    ExprType_Unary_PostDecrement,
-    ExprType_Unary_Not,
-    ExprType_Unary_BitwiseNot,
-    ExprType_Unary_AddressOf,
-    ExprType_Unary_ValueOf,
-    ExprType_Unary_Negate,
-
-    ExprType_Literal_Integer,
-    ExprType_Literal_Decimal,
-    ExprType_Literal_Char,
-    ExprType_Literal_String,
-    ExprType_Literal_True,
-    ExprType_Literal_False,
-    ExprType_Literal_Null,
-
-    ExprType_Variable,
-    ExprType_Alloc,
-    ExprType_Ternary,
-    ExprType_ProcCall,
-    ExprType_Deref,
-    ExprType_Indexing,
-    ExprType_Cast,
-    ExprType_Sizeof,
-    ExprType_Parenthesized,
-    ExprType_Compound
-
-} ExprType;
-
 typedef struct Expression {
-    Node nodebase;
-    ExprType expressionType;
+    AstNode nodebase;
     Datatype datatype;
 } Expression;
+
+#define default_for_loop_numeric_type type_int32
+
+typedef struct Statement {
+    AstNode nodebase;
+} Statement;
 
 typedef struct CompoundElement {
     Expression* expr;
     Identifier name;
 } CompoundElement;
 
-typedef struct CompoundExpression {
-    Expression base;
-    CompoundElement* elements; // list, can be null
-} CompoundExpression;
 
-typedef struct LiteralExpression {
-    Expression base;
-    Tokendata data;
-} LiteralExpression;
+#define DefineExpressionNode(name, stuff) struct name##Expression { Expression base; struct stuff;};
+#define DefineStatementNode(name, stuff) struct name##Stmt { Statement base; struct stuff;};
 
-typedef struct UnaryExpression {
-    Expression base;
-    Expression* expr;
-} UnaryExpression;
-
-typedef struct BinaryExpression {
-    Expression base;
-    Expression* left;
-    Expression* right;
-} BinaryExpression;
-
-typedef struct ParenthesizedExpression {
-    Expression base;
-    Expression* innerExpr;
-} ParenthesizedExpression;
-
-typedef struct IndexingExpression {
-    Expression base;
-    Expression* indexed;
-    Expression* index;
-} IndexingExpression;
-
-typedef struct AllocExpression {
-    Expression base;
-    Expression* sizeExpr;
-    Type* type;
-} AllocExpression;
-
-typedef struct DerefOperator {
-    Expression base;
-    Expression* expr;
-    Identifier name;
-} DerefOperator;
-
-typedef struct VariableExpression {
-    Expression base;
-    Identifier name;
-
-    Statement* ref; // procedure, global, enum
-} VariableExpression;
-
-typedef struct CastExpression {
-    Expression base;
-    Expression* expr;
-    Type* castToType;
-} CastExpression;
-
-typedef struct SizeofExpression {
-    Expression base;
-    Type* type;
-} SizeofExpression;
-
-typedef struct TernaryExpression {
-    Expression base;
-    Expression* condition;
-    Expression* thenExpr;
-    Expression* elseExpr;
-} TernaryExpression;
-
+DefineExpressionNode(Compound,      { CompoundElement* elements;                                                  })
+DefineExpressionNode(Literal,       { Tokendata        data;                                                      })
+DefineExpressionNode(Unary,         { Expression*      expr;                                                      })
+DefineExpressionNode(Binary,        { Expression*      left;       Expression* right;                             })
+DefineExpressionNode(Parenthesized, { Expression*      innerExpr;                                                 })
+DefineExpressionNode(Indexing,      { Expression*      indexed;    Expression* index;                             })
+DefineExpressionNode(Alloc,         { Expression*      sizeExpr;   Type*       type;                              })
+DefineExpressionNode(Deref,         { Expression*      expr;       Identifier  name;                              })
+DefineExpressionNode(Variable,      { Identifier       name;       Statement*  ref;                               }) // ref = procedure, global, enum
+DefineExpressionNode(Cast,          { Expression*      expr;       Type*       castToType;                        })
+DefineExpressionNode(Sizeof,        { Type*            type;                                                      })
+DefineExpressionNode(Ternary,       { Expression*      condition;  Expression* thenExpr;    Expression* elseExpr; })
 
 // ----Statements----------------------------------------------
+DefineStatementNode(Typedef,     { Type*       type;         Identifier name;                                                       })
+DefineStatementNode(Assignment,  { Expression* assigneeExpr; TokenType assignmentOper;  Expression* expr;                           })
+DefineStatementNode(Scope,       { ScopeStmt*  parentScope;  Statement** statements; /* list */                                     })
+DefineStatementNode(While,       { Expression* condition;    Statement* statement;                                                  })
+DefineStatementNode(If,          { Expression* condition;    Statement* then_statement; Statement* else_statement;                  })
+DefineStatementNode(Switch,      { Expression* expr;         ScopeStmt* scope;                                                      })
+DefineStatementNode(Return,      { Expression* returnExpr;                                                                          })
+DefineStatementNode(Goto,        { Identifier  label;                                                                               })
+DefineStatementNode(Label,       { Identifier  label;                                                                               })
+DefineStatementNode(CaseLabel,   { Expression* expr;         SwitchStmt* switch_statement;                                          })
+DefineStatementNode(Argument,    { Type*       type;         Identifier name;                                                       })
 
-typedef enum StatementType {
-    Statement_Declaration,
-    Statement_Constant,
-    Statement_Typedef,
-    Statement_Procedure,
-    Statement_Argument,
-    Statement_Struct,
-    Statement_Enum,
-    Statement_EnumEntry,
 
-    Statement_Assignment,
-    Statement_Expression,
-
-    Statement_Scope,
-    Statement_If,
-    Statement_While,
-    Statement_For,
-    Statement_Switch,
-
-    Statement_Continue,
-    Statement_Break,
-    Statement_Return,
-    Statement_Goto,
-    Statement_Label,
-    Statement_CaseLabel,
-    Statement_DefaultLabel
-} StatementType;
-
-typedef struct Statement {
-    Node nodebase;
-    StatementType statementType;
-} Statement;
-
-typedef struct StatementExpression {
-    Statement base;
-    Expression* expr;
-} StatementExpression;
-
-typedef struct Declaration {
-    Statement base;
-    Type* type;
-    Expression* expr; // can be null
+DefineStatementNode(Declaration, {
+    Type*       type;
+    Expression* expr; /* can be null */
     Identifier name;
-    bool include_context; // TODO: flags
+    bool include_context; /* TODO: flags */
     bool is_static;
-} Declaration;
+})
 
-typedef struct Typedef {
-    Statement base;
-    Type* type;
-    Identifier name;
-} Typedef;
-
-typedef struct Assignment {
-    Statement base;
-    Expression* assigneeExpr;
-    TokenType assignmentOper; // = += -= *= /= etc...
-    Expression* expr;
-} Assignment;
-
-typedef struct Scope {
-    Statement base;
-    struct Scope* parentScope;
-    Statement** statements; // list
-} Scope;
-
-typedef struct WhileStatement {
-    Statement base;
-    Expression* condition;
-    Statement* statement;
-} WhileStatement;
-
-#define default_for_loop_numeric_type type_int32
-typedef struct ForStatement {
-    Statement base;
-    Type* index_type; // can be null
-    Identifier index_name;
+DefineStatementNode(For, {
+    Type*       index_type;   /* can be null */
+    Identifier  index_name;
     Expression* iterator_assignment;
-    union {
-        Expression* min_expr;
-        Expression* condition;
-    };
-    union {
-        Expression* max_expr;
-        Expression* iterator_update;
-    };
+    union { Expression* min_expr; Expression* condition; };
+    union { Expression* max_expr; Expression* iterator_update; };
     Statement* statement;
-} ForStatement;
+})
 
-typedef struct IfStatement {
-    Statement base;
-    Expression* condition;
-    Statement* then_statement;
-    Statement* else_statement;
-} IfStatement;
-
-typedef struct SwitchStatement {
-    Statement base;
-    Expression* expr;
-    Scope* scope;
-} SwitchStatement;
-
-typedef struct ReturnStatement {
-    Statement base;
-    Expression* returnExpr;
-} ReturnStatement;
-
-typedef struct GotoStatement {
-    Statement base;
-    Identifier label;
-} GotoStatement;
-
-typedef struct LabelStatement {
-    Statement base;
-    Identifier label;
-} LabelStatement;
-
-typedef struct CaseLabelStatement {
-    Statement base;
-    Expression* expr;
-    SwitchStatement* switch_statement;
-} CaseLabelStatement;
-
-
-// ----Procedures----------------------------------------------
-
-typedef struct ProcArg {
-    Statement base;
-    Type* type;
-    Identifier name;
-} ProcArg;
-
-typedef struct Procedure {
-    Statement base;
+DefineStatementNode(Procedure, {
     Identifier name;
     Type* returnType;
-    ProcArg* arguments; // list, can be null
+    ArgumentStmt* arguments; // list, can be null
 
     /* overload
         value of zero means this function is not overloaded.
         a value of N means this function is the N'th function in the set of all its siblings. Where N > 0
     */
     u32 overload;
-    struct Procedure* next_overload;
+    ProcedureStmt* next_overload;
 
-    Scope* scope; // scope can be null
+    ScopeStmt* scope; // scope can be null
 
     Type* type_node;
-} Procedure;
+})
 
-typedef struct ProcCall {
-    Expression base;
+DefineExpressionNode(ProcCall, {
     Expression* proc_expr;
     Expression** args; // list, can be null
-    Procedure* proc; // can be null if this ProcCall is calling a procptr
-} ProcCall;
+    ProcedureStmt* proc; // can be null if this ProcCall is calling a procptr
+})
 
-typedef struct CapturedVariable {
-    Identifier name;
-    Datatype type;
-} CapturedVariable;
-
-// ----------------------------------------------------------
-
-typedef union ExprPointer {
-    Expression* expr;
-    VariableExpression* var;
-    DerefOperator* deref;
-    TernaryExpression* ternary;
-    BinaryExpression* binary;
-    UnaryExpression* unary;
-    LiteralExpression* literal;
-    ParenthesizedExpression* parenth;
-    CastExpression* cast;
-    SizeofExpression* size_of;
-    AllocExpression* alloc;
-    CompoundExpression* compound;
-    IndexingExpression* indexing;
-    ProcCall* call;
-} ExprPointer;
-
-typedef union StmtPointer {
-    Statement* sta;
-    StatementExpression* expr;
-    Declaration* decl;
-    Typedef* type_def;
-    Assignment* assign;
-    Scope* scope;
-    WhileStatement* while_loop;
-    ForStatement* for_loop;
-    IfStatement* if_sta;
-    SwitchStatement* switch_sta;
-    ReturnStatement* ret_sta;
-    GotoStatement* goto_sta;
-    LabelStatement* label;
-    CaseLabelStatement* case_sta;
-} StmtPointer;
-
-// ----Struct----------------------------------------------
 
 // typedef struct Field {
 //     Type* type;
@@ -626,27 +418,38 @@ typedef union StmtPointer {
 //     bool include_context;
 // } Field;
 
-typedef struct Struct {
-    Statement base;
+DefineStatementNode(Struct, {
     Identifier name;
     u32 byte_size;
     u32 deps; // TODO: temporary, until we figure out a better way of transpiling structs in the correct order
-    Declaration* fields; // list
-} Struct;
+    DeclarationStmt* fields; // list
+})
 
-static Declaration* getField(Struct* stru, Identifier name) {
+DefineStatementNode(EnumEntry, {
+    EnumStmt* _enum;
+    Expression* expr; // can be null
+    u64 value;
+    Identifier name;
+})
+
+DefineStatementNode(Enum, {
+    Identifier name;
+    EnumEntryStmt* entries; // list
+})
+
+static DeclarationStmt* getField(StructStmt* stru, Identifier name) {
     u32 len = list_length(stru->fields);
     for (u32 i = 0; i < len; i++)
         if (stru->fields[i].name == name) return &stru->fields[i];
     return null;
 }
 
-static Statement* getMember(Struct* stru, Identifier name) {
+static Statement* getMember(StructStmt* stru, Identifier name) {
     foreach (field, stru->fields) {
         if (field->name == name) return (Statement*)field;
 
         if (field->include_context) {
-            Struct* sub_stru = field->type->solvedstate.stru;
+            StructStmt* sub_stru = field->type->solvedstate.stru;
             Statement* sta = getMember(sub_stru, name);
             if (sta) return sta;
         }
@@ -654,21 +457,7 @@ static Statement* getMember(Struct* stru, Identifier name) {
     return null;
 }
 
-typedef struct EnumEntry {
-    Statement base;
-    Enum* _enum;
-    Expression* expr; // can be null
-    u64 value;
-    Identifier name;
-} EnumEntry;
-
-typedef struct Enum {
-    Statement base;
-    Identifier name;
-    EnumEntry* entries; // list
-} Enum;
-
-static EnumEntry* getEnumEntry(Enum* en, Identifier name) {
+static EnumEntryStmt* getEnumEntry(EnumStmt* en, Identifier name) {
     u32 len = list_length(en->entries);
     for (u32 i = 0; i < len; i++) if (en->entries[i].name == name) {
         return &en->entries[i];
@@ -686,73 +475,101 @@ static Datatype dealiasType(Datatype type) {
     return type;
 }
 
-static bool isCompiletimeExpression(Expression* expr) {
-    ExprPointer e = (ExprPointer)expr;
-    switch (expr->expressionType) {
-        case ExprType_Plus:
-        case ExprType_Minus:
-        case ExprType_Mul:
-        case ExprType_Div:
-        case ExprType_Mod:
-        case ExprType_Less:
-        case ExprType_Greater:
-        case ExprType_LessEquals:
-        case ExprType_GreaterEquals:
-        case ExprType_Equals:
-        case ExprType_NotEquals:
-        case ExprType_BooleanAnd:
-        case ExprType_BooleanOr:
-        case ExprType_Bitwise_And:
-        case ExprType_Bitwise_Or:
-        case ExprType_Bitwise_Xor:
-        case ExprType_Bitwise_Lshift:
-        case ExprType_Bitwise_Rshift:
-            return isCompiletimeExpression(e.binary->left) && isCompiletimeExpression(e.binary->right);
+// #define index_initializer(name, value) [Node_##name] = value,
+// #define index_initializer_binary(name)      index_initializer(name, sizeof(BinaryExpression))
+// #define index_initializer_unary(name)       index_initializer(name, sizeof(UnaryExpression))
+// #define index_initializer_literal(name)     index_initializer(name, sizeof(LiteralExpression))
+// #define index_initializer_other_expr(name)  index_initializer(name, sizeof(name##Expression))
+// #define index_initializer_stmt(name)        index_initializer(name, sizeof(name##Stmt))
 
-        case ExprType_Unary_PreIncrement:
-        case ExprType_Unary_PostIncrement:
-        case ExprType_Unary_PreDecrement:
-        case ExprType_Unary_PostDecrement:
-            return false;
+// static u32 node_struct_sizes[] = {
+//     for_each_binary_node(index_initializer_binary)
+//     for_each_unary_node(index_initializer_unary)
+//     for_each_literal_node(index_initializer_literal)
+//     for_each_other_expr_node(index_initializer_other_expr)
+//     for_each_stmt_node(index_initializer_stmt)
+// };
 
-        case ExprType_Unary_Not:
-        case ExprType_Unary_BitwiseNot:
-        case ExprType_Unary_Negate:
-        case ExprType_Unary_ValueOf:
-            return isCompiletimeExpression(e.unary->expr);
+// #undef index_initializer_binary
+// #undef index_initializer_unary
+// #undef index_initializer_literal
+// #undef index_initializer_other_expr
+// #undef index_initializer_stmt
 
-        case ExprType_Unary_AddressOf: return false;
+// #define index_initializer_string(name) index_initializer(name, #name)
+// static char* node_names[] = {
+//     for_each_node(index_initializer_string)
+// };
+// #undef index_initializer_string
+// #undef index_initializer
 
-        case ExprType_Literal_Integer:
-        case ExprType_Literal_Decimal:
-        case ExprType_Literal_Char:
-        case ExprType_Literal_String:
-        case ExprType_Literal_True:
-        case ExprType_Literal_False:
-        case ExprType_Literal_Null:
-            return true;
+// static bool isCompiletimeExpression(Expression* expr) {
+//     ExprPointer e = (ExprPointer)expr;
+//     switch (expr->expressionType) {
+//         case ExprType_Plus:
+//         case ExprType_Minus:
+//         case ExprType_Mul:
+//         case ExprType_Div:
+//         case ExprType_Mod:
+//         case ExprType_Less:
+//         case ExprType_Greater:
+//         case ExprType_LessEquals:
+//         case ExprType_GreaterEquals:
+//         case ExprType_Equals:
+//         case ExprType_NotEquals:
+//         case ExprType_BooleanAnd:
+//         case ExprType_BooleanOr:
+//         case ExprType_Bitwise_And:
+//         case ExprType_Bitwise_Or:
+//         case ExprType_Bitwise_Xor:
+//         case ExprType_Bitwise_Lshift:
+//         case ExprType_Bitwise_Rshift:
+//             return isCompiletimeExpression(e.binary->left) && isCompiletimeExpression(e.binary->right);
 
-        case ExprType_Variable: return e.var->ref->statementType == Statement_Constant;
-        case ExprType_Alloc: return false;
-        case ExprType_Ternary: return isCompiletimeExpression(e.ternary->condition) && isCompiletimeExpression(e.ternary->thenExpr) && isCompiletimeExpression(e.ternary->elseExpr);
-        case ExprType_ProcCall: return false;
+//         case ExprType_Unary_PreIncrement:
+//         case ExprType_Unary_PostIncrement:
+//         case ExprType_Unary_PreDecrement:
+//         case ExprType_Unary_PostDecrement:
+//             return false;
 
-        case ExprType_Deref:
-            if (e.deref->base.datatype.kind == Typekind_Enum) return true;
-            return isCompiletimeExpression(e.deref->expr);
+//         case ExprType_Unary_Not:
+//         case ExprType_Unary_BitwiseNot:
+//         case ExprType_Unary_Negate:
+//         case ExprType_Unary_ValueOf:
+//             return isCompiletimeExpression(e.unary->expr);
 
-        case ExprType_Indexing: return isCompiletimeExpression(e.indexing->indexed) && isCompiletimeExpression(e.indexing->index);
-        case ExprType_Cast: return isCompiletimeExpression(e.cast->expr);
-        case ExprType_Sizeof: return true;
-        case ExprType_Parenthesized: return isCompiletimeExpression(e.parenth->innerExpr);
+//         case ExprType_Unary_AddressOf: return false;
 
-        case ExprType_Compound: {
-            if (!e.compound->elements) return true;
-            foreach (elm, e.compound->elements) {
-                if (!isCompiletimeExpression(elm->expr)) return false;
-            }
+//         case ExprType_Literal_Integer:
+//         case ExprType_Literal_Decimal:
+//         case ExprType_Literal_Char:
+//         case ExprType_Literal_String:
+//         case ExprType_Literal_True:
+//         case ExprType_Literal_False:
+//         case ExprType_Literal_Null:
+//             return true;
 
-            return true;
-        }
-    }
-}
+//         case ExprType_Variable: return e.var->ref->statementType == Statement_Constant;
+//         case ExprType_Alloc: return false;
+//         case ExprType_Ternary: return isCompiletimeExpression(e.ternary->condition) && isCompiletimeExpression(e.ternary->thenExpr) && isCompiletimeExpression(e.ternary->elseExpr);
+//         case ExprType_ProcCall: return false;
+
+//         case ExprType_Deref:
+//             if (e.deref->base.datatype.kind == Typekind_Enum) return true;
+//             return isCompiletimeExpression(e.deref->expr);
+
+//         case ExprType_Indexing: return isCompiletimeExpression(e.indexing->indexed) && isCompiletimeExpression(e.indexing->index);
+//         case ExprType_Cast: return isCompiletimeExpression(e.cast->expr);
+//         case ExprType_Sizeof: return true;
+//         case ExprType_Parenthesized: return isCompiletimeExpression(e.parenth->innerExpr);
+
+//         case ExprType_Compound: {
+//             if (!e.compound->elements) return true;
+//             foreach (elm, e.compound->elements) {
+//                 if (!isCompiletimeExpression(elm->expr)) return false;
+//             }
+
+//             return true;
+//         }
+//     }
+// }
