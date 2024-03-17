@@ -26,8 +26,8 @@
 
 #define for_each_stmt_node(X, A)\
     X(Declaration, A) X(Constant, A) X(Typedef, A) X(Procedure, A) X(Argument, A) X(Struct, A) X(Enum, A)\
-    X(EnumEntry, A) X(Assignment, A) X(Expression, A) X(Scope, A) X(If, A) X(While, A) X(For, A) X(Switch, A)\
-    X(Continue, A) X(Break, A) X(Return, A) X(Goto, A) X(Label, A) X(CaseLabel, A) X(DefaultLabel, A)\
+    X(EnumEntry, A) X(Assignment, A) X(Scope, A) X(IfStmt, A) X(WhileStmt, A) X(ForStmt, A) X(SwitchStmt, A)\
+    X(ContinueStmt, A) X(BreakStmt, A) X(ReturnStmt, A) X(GotoStmt, A) X(LabelStmt, A) X(CaseLabelStmt, A) X(DefaultLabelStmt, A)\
 
 #define for_each_type_node(X, A)\
     X(Type_MustInfer, A) X(Type_Basic, A) X(Type_Procedure, A)\
@@ -53,8 +53,10 @@ typedef enum Nodekind {
 } Nodekind;
 #undef node_enum_entry
 
+#define node_cases(name, a) case Node_##name:
+
 #define for_each_node_struct(X)\
-    for_each_stmt_node(X, Stmt)\
+    for_each_stmt_node(X,)\
     for_each_other_expr_node(X, Expression)\
     X(Binary, Expression)\
     X(Unary, Expression)\
@@ -65,16 +67,17 @@ typedef enum Nodekind {
 for_each_node_struct(typedef_node)
 #undef typedef_node
 
+#define AstNodeFields struct { CodeLocation loc; Nodekind kind; };
+typedef struct AstNode { AstNodeFields } AstNode;
 
-typedef struct AstNode {
-    CodeLocation loc;
-    Nodekind kind;
-} AstNode;
 
 #define AstNodePointer_field(name, a) name##a* name;
-typedef union AstNodePointer {
+typedef union NodeRef {
+    AstNode* node;
+    Expression* expr;
+    Statement* stmt;
     for_each_node_struct(AstNodePointer_field)
-} AstNodePointer;
+} NodeRef;
 #undef AstNodePointer_field
 
 
@@ -147,9 +150,9 @@ typedef struct Datatype {
     u32 numPointers;
     union {
         void* data_ptr;
-        StructStmt* stru;
-        EnumStmt* _enum;
-        TypedefStmt* type_def;
+        Struct* stru;
+        Enum* _enum;
+        Typedef* type_def;
         Type* proc_ptr_typenode;
         Type* array_typenode;
     };
@@ -157,7 +160,7 @@ typedef struct Datatype {
 
 
 struct Type {
-    AstNode nodebase;
+    AstNodeFields
     Datatype solvedstate;
 
     union {
@@ -323,15 +326,15 @@ static Datatype mergeNumberTypes(Datatype a, Datatype b) {
 // ----Expressions---------------------------------------------
 
 typedef struct Expression {
-    AstNode nodebase;
+    union { AstNode node; AstNodeFields };
     Datatype datatype;
 } Expression;
 
-#define default_for_loop_numeric_type type_int32
-
 typedef struct Statement {
-    AstNode nodebase;
+    union { AstNode node; AstNodeFields };
 } Statement;
+
+#define default_for_loop_numeric_type type_int32
 
 typedef struct CompoundElement {
     Expression* expr;
@@ -339,35 +342,36 @@ typedef struct CompoundElement {
 } CompoundElement;
 
 
-#define DefineExpressionNode(name, stuff) struct name##Expression { Expression base; struct stuff;};
-#define DefineStatementNode(name, stuff) struct name##Stmt { Statement base; struct stuff;};
+#define DefineExpressionNode(name, stuff) struct name##Expression { AstNodeFields Datatype datatype; struct stuff;};
+#define DefineStatementNode(name, stuff)  struct name             { AstNodeFields struct stuff;};
 
-DefineExpressionNode(Compound,      { CompoundElement* elements;                                                  })
-DefineExpressionNode(Literal,       { Tokendata        data;                                                      })
-DefineExpressionNode(Unary,         { Expression*      expr;                                                      })
-DefineExpressionNode(Binary,        { Expression*      left;       Expression* right;                             })
-DefineExpressionNode(Parenthesized, { Expression*      innerExpr;                                                 })
-DefineExpressionNode(Indexing,      { Expression*      indexed;    Expression* index;                             })
-DefineExpressionNode(Alloc,         { Expression*      sizeExpr;   Type*       type;                              })
-DefineExpressionNode(Deref,         { Expression*      expr;       Identifier  name;                              })
-DefineExpressionNode(Variable,      { Identifier       name;       Statement*  ref;                               }) // ref = procedure, global, enum
-DefineExpressionNode(Cast,          { Expression*      expr;       Type*       castToType;                        })
-DefineExpressionNode(Sizeof,        { Type*            type;                                                      })
-DefineExpressionNode(Ternary,       { Expression*      condition;  Expression* thenExpr;    Expression* elseExpr; })
+DefineExpressionNode(Compound,      { CompoundElement* elements;                                                     })
+DefineExpressionNode(Literal,       { Tokendata        data;                                                         })
+DefineExpressionNode(Unary,         { Expression*      expr;                                                         })
+DefineExpressionNode(Binary,        { Expression*      left;       Expression* right;                                })
+DefineExpressionNode(Parenthesized, { Expression*      inner_expr;                                                   })
+DefineExpressionNode(Indexing,      { Expression*      indexed;    Expression* index;                                })
+DefineExpressionNode(Alloc,         { Expression*      size_expr;  Type*       type;                                 })
+DefineExpressionNode(Deref,         { Expression*      expr;       Identifier  name;                                 })
+DefineExpressionNode(Variable,      { Identifier       name;       NodeRef     ref;                                  }) // ref = procedure, global, enum
+DefineExpressionNode(Cast,          { Expression*      expr;       Type*       new_type;                             })
+DefineExpressionNode(Sizeof,        { Type*            type;                                                         })
+DefineExpressionNode(Ternary,       { Expression*      condition;  Expression* then_expr;   Expression* else_expr;   })
+DefineExpressionNode(ProcCall,      { Expression*      proc_expr;  Expression** args;       Procedure* proc;         }) // args = list, can be null. proc = can be null if this ProcCall is calling a procptr
 
 // ----Statements----------------------------------------------
-DefineStatementNode(Typedef,     { Type*       type;         Identifier name;                                                       })
-DefineStatementNode(Assignment,  { Expression* assigneeExpr; TokenType assignmentOper;  Expression* expr;                           })
-DefineStatementNode(Scope,       { ScopeStmt*  parentScope;  Statement** statements; /* list */                                     })
-DefineStatementNode(While,       { Expression* condition;    Statement* statement;                                                  })
-DefineStatementNode(If,          { Expression* condition;    Statement* then_statement; Statement* else_statement;                  })
-DefineStatementNode(Switch,      { Expression* expr;         ScopeStmt* scope;                                                      })
-DefineStatementNode(Return,      { Expression* returnExpr;                                                                          })
-DefineStatementNode(Goto,        { Identifier  label;                                                                               })
-DefineStatementNode(Label,       { Identifier  label;                                                                               })
-DefineStatementNode(CaseLabel,   { Expression* expr;         SwitchStmt* switch_statement;                                          })
-DefineStatementNode(Argument,    { Type*       type;         Identifier name;                                                       })
-
+DefineStatementNode(Typedef,        { Type*       type;         Identifier name;                                     })
+DefineStatementNode(Assignment,     { Expression* dst_expr;     TokenType  operator;        Expression* src_expr;    })
+DefineStatementNode(Scope,          { Scope*      parentScope;  NodeRef*   statements; /* list */                    })
+DefineStatementNode(WhileStmt,      { Expression* condition;    NodeRef    statement;                                })
+DefineStatementNode(IfStmt,         { Expression* condition;    NodeRef    then_statement;  NodeRef else_statement;  })
+DefineStatementNode(SwitchStmt,     { Expression* expr;         Scope*     scope;                                    })
+DefineStatementNode(ReturnStmt,     { Expression* expr;                                                              })
+DefineStatementNode(GotoStmt,       { Identifier  label;                                                             })
+DefineStatementNode(LabelStmt,      { Identifier  label;                                                             })
+DefineStatementNode(CaseLabelStmt,  { Expression* expr;         SwitchStmt* switch_statement;                        })
+DefineStatementNode(Argument,       { Type*       type;         Identifier  name;                                    })
+DefineStatementNode(Constant,       { Expression* expr;                                                              })
 
 DefineStatementNode(Declaration, {
     Type*       type;
@@ -377,36 +381,30 @@ DefineStatementNode(Declaration, {
     bool is_static;
 })
 
-DefineStatementNode(For, {
+DefineStatementNode(ForStmt, {
     Type*       index_type;   /* can be null */
     Identifier  index_name;
     Expression* iterator_assignment;
     union { Expression* min_expr; Expression* condition; };
     union { Expression* max_expr; Expression* iterator_update; };
-    Statement* statement;
+    NodeRef statement;
 })
 
 DefineStatementNode(Procedure, {
     Identifier name;
-    Type* returnType;
-    ArgumentStmt* arguments; // list, can be null
+    Type* return_type;
+    Argument* arguments; // list, can be null
 
     /* overload
         value of zero means this function is not overloaded.
         a value of N means this function is the N'th function in the set of all its siblings. Where N > 0
     */
     u32 overload;
-    ProcedureStmt* next_overload;
+    Procedure* next_overload;
 
-    ScopeStmt* scope; // scope can be null
+    Scope* scope; // scope can be null
 
     Type* type_node;
-})
-
-DefineExpressionNode(ProcCall, {
-    Expression* proc_expr;
-    Expression** args; // list, can be null
-    ProcedureStmt* proc; // can be null if this ProcCall is calling a procptr
 })
 
 
@@ -422,11 +420,11 @@ DefineStatementNode(Struct, {
     Identifier name;
     u32 byte_size;
     u32 deps; // TODO: temporary, until we figure out a better way of transpiling structs in the correct order
-    DeclarationStmt* fields; // list
+    Declaration* fields; // list
 })
 
 DefineStatementNode(EnumEntry, {
-    EnumStmt* _enum;
+    Enum* _enum;
     Expression* expr; // can be null
     u64 value;
     Identifier name;
@@ -434,22 +432,22 @@ DefineStatementNode(EnumEntry, {
 
 DefineStatementNode(Enum, {
     Identifier name;
-    EnumEntryStmt* entries; // list
+    EnumEntry* entries; // list
 })
 
-static DeclarationStmt* getField(StructStmt* stru, Identifier name) {
+static Declaration* getField(Struct* stru, Identifier name) {
     u32 len = list_length(stru->fields);
     for (u32 i = 0; i < len; i++)
         if (stru->fields[i].name == name) return &stru->fields[i];
     return null;
 }
 
-static Statement* getMember(StructStmt* stru, Identifier name) {
+static Statement* getMember(Struct* stru, Identifier name) {
     foreach (field, stru->fields) {
         if (field->name == name) return (Statement*)field;
 
         if (field->include_context) {
-            StructStmt* sub_stru = field->type->solvedstate.stru;
+            Struct* sub_stru = field->type->solvedstate.stru;
             Statement* sta = getMember(sub_stru, name);
             if (sta) return sta;
         }
@@ -457,7 +455,7 @@ static Statement* getMember(StructStmt* stru, Identifier name) {
     return null;
 }
 
-static EnumEntryStmt* getEnumEntry(EnumStmt* en, Identifier name) {
+static EnumEntry* getEnumEntry(Enum* en, Identifier name) {
     u32 len = list_length(en->entries);
     for (u32 i = 0; i < len; i++) if (en->entries[i].name == name) {
         return &en->entries[i];
@@ -503,73 +501,46 @@ static Datatype dealiasType(Datatype type) {
 // #undef index_initializer_string
 // #undef index_initializer
 
-// static bool isCompiletimeExpression(Expression* expr) {
-//     ExprPointer e = (ExprPointer)expr;
-//     switch (expr->expressionType) {
-//         case ExprType_Plus:
-//         case ExprType_Minus:
-//         case ExprType_Mul:
-//         case ExprType_Div:
-//         case ExprType_Mod:
-//         case ExprType_Less:
-//         case ExprType_Greater:
-//         case ExprType_LessEquals:
-//         case ExprType_GreaterEquals:
-//         case ExprType_Equals:
-//         case ExprType_NotEquals:
-//         case ExprType_BooleanAnd:
-//         case ExprType_BooleanOr:
-//         case ExprType_Bitwise_And:
-//         case ExprType_Bitwise_Or:
-//         case ExprType_Bitwise_Xor:
-//         case ExprType_Bitwise_Lshift:
-//         case ExprType_Bitwise_Rshift:
-//             return isCompiletimeExpression(e.binary->left) && isCompiletimeExpression(e.binary->right);
+static bool isCompiletimeExpression(Expression* expr) {
+    NodeRef e = (NodeRef)expr;
+    switch (e.node->kind) {
 
-//         case ExprType_Unary_PreIncrement:
-//         case ExprType_Unary_PostIncrement:
-//         case ExprType_Unary_PreDecrement:
-//         case ExprType_Unary_PostDecrement:
-//             return false;
+        for_each_binary_node(node_cases,) return isCompiletimeExpression(e.Binary->left) && isCompiletimeExpression(e.Binary->right);
 
-//         case ExprType_Unary_Not:
-//         case ExprType_Unary_BitwiseNot:
-//         case ExprType_Unary_Negate:
-//         case ExprType_Unary_ValueOf:
-//             return isCompiletimeExpression(e.unary->expr);
+        case Node_Unary_PreIncrement:
+        case Node_Unary_PostIncrement:
+        case Node_Unary_PreDecrement:
+        case Node_Unary_PostDecrement:
+            return false;
 
-//         case ExprType_Unary_AddressOf: return false;
+        case Node_Unary_Not:
+        case Node_Unary_BitwiseNot:
+        case Node_Unary_Negate:
+        case Node_Unary_ValueOf:
+            return isCompiletimeExpression(e.Unary->expr);
 
-//         case ExprType_Literal_Integer:
-//         case ExprType_Literal_Decimal:
-//         case ExprType_Literal_Char:
-//         case ExprType_Literal_String:
-//         case ExprType_Literal_True:
-//         case ExprType_Literal_False:
-//         case ExprType_Literal_Null:
-//             return true;
+        case Node_Unary_AddressOf: return false;
 
-//         case ExprType_Variable: return e.var->ref->statementType == Statement_Constant;
-//         case ExprType_Alloc: return false;
-//         case ExprType_Ternary: return isCompiletimeExpression(e.ternary->condition) && isCompiletimeExpression(e.ternary->thenExpr) && isCompiletimeExpression(e.ternary->elseExpr);
-//         case ExprType_ProcCall: return false;
+        for_each_literal_node(node_cases,) return true;
 
-//         case ExprType_Deref:
-//             if (e.deref->base.datatype.kind == Typekind_Enum) return true;
-//             return isCompiletimeExpression(e.deref->expr);
+        case Node_Variable: return e.Variable->ref.node->kind == Node_Constant;
+        case Node_Alloc: return false;
+        case Node_Ternary: return isCompiletimeExpression(e.Ternary->condition) && isCompiletimeExpression(e.Ternary->then_expr) && isCompiletimeExpression(e.Ternary->else_expr);
+        case Node_ProcCall: return false; // TODO: if it is calling a pure function with comptime constant arguments
 
-//         case ExprType_Indexing: return isCompiletimeExpression(e.indexing->indexed) && isCompiletimeExpression(e.indexing->index);
-//         case ExprType_Cast: return isCompiletimeExpression(e.cast->expr);
-//         case ExprType_Sizeof: return true;
-//         case ExprType_Parenthesized: return isCompiletimeExpression(e.parenth->innerExpr);
+        case Node_Deref:
+            if (e.Deref->datatype.kind == Typekind_Enum) return true;
+            return isCompiletimeExpression(e.Deref->expr);
 
-//         case ExprType_Compound: {
-//             if (!e.compound->elements) return true;
-//             foreach (elm, e.compound->elements) {
-//                 if (!isCompiletimeExpression(elm->expr)) return false;
-//             }
+        case Node_Indexing: return isCompiletimeExpression(e.Indexing->indexed) && isCompiletimeExpression(e.Indexing->index);
+        case Node_Cast: return isCompiletimeExpression(e.Cast->expr);
+        case Node_Sizeof: return true;
+        case Node_Parenthesized: return isCompiletimeExpression(e.Parenthesized->inner_expr);
 
-//             return true;
-//         }
-//     }
-// }
+        case Node_Compound: {
+            if (!e.Compound->elements) return true;
+            foreach (elm, e.Compound->elements) if (!isCompiletimeExpression(elm->expr)) return false;
+            return true;
+        }
+    }
+}

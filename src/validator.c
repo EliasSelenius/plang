@@ -1,11 +1,7 @@
 
 
 
-static Datatype validateExpression(Parser* parser, Expression* expr);
-static Datatype validateExpressionEx(Parser* parser, Expression* expr, Datatype expected_type);
 static bool typeAssignable(Datatype toType, Datatype fromType);
-static void validateScope(Parser* parser, Scope* scope);
-static void validateProcedure(Parser* parser, Procedure* proc);
 
 
 static bool typeAssignable(Datatype toType, Datatype fromType) {
@@ -159,52 +155,23 @@ static void assertAssignability(Parser* parser, Datatype toType, Datatype fromTy
 }
 
 static Datatype typeofStatement(Statement* sta) {
-
     if (!sta) return type_invalid;
-
-    switch (sta->statementType) {
-        case Statement_Declaration: {
-            Declaration* decl = (Declaration*)sta;
-            return decl->type->solvedstate;
-        }
-
-        case Statement_Constant: {
-            Declaration* decl = (Declaration*)sta;
-            return decl->expr->datatype;
-        }
-
-        case Statement_Argument: {
-            ProcArg* arg = (ProcArg*)sta;
-            return arg->type->solvedstate;
-        }
-
-        case Statement_Procedure: {
-            Procedure* proc = (Procedure*)sta;
-            return proc->type_node->solvedstate;
-        }
-
-        case Statement_EnumEntry: {
-            EnumEntry* entry = (EnumEntry*)sta;
-            return (Datatype) { .kind = Typekind_Enum, ._enum = entry->_enum };
-        }
-
-        case Statement_For: {
-            ForStatement* forsta = (ForStatement*)sta;
-            return forsta->index_type ? forsta->index_type->solvedstate : default_for_loop_numeric_type;
-        }
-
-        default: break;
+    NodeRef p = (NodeRef)sta;
+    switch (p.node->kind) {
+        case Node_Declaration: return p.Declaration->type->solvedstate;
+        case Node_Constant:    return p.Constant->expr->datatype;
+        case Node_Argument:    return p.Argument->type->solvedstate;
+        case Node_Procedure:   return p.Procedure->type_node->solvedstate;
+        case Node_EnumEntry:   return (Datatype) { .kind = Typekind_Enum, ._enum = p.EnumEntry->_enum };
+        case Node_ForStmt:     return p.ForStmt->index_type ? p.ForStmt->index_type->solvedstate : default_for_loop_numeric_type;
+        default: return type_invalid;
     }
-
-    return type_invalid;
 }
 
-
-static Procedure* searchMatchingOverload(Procedure* proc, ProcCall* call) {
+static Procedure* searchMatchingOverload(Procedure* proc, ProcCallExpression* call) {
     u32 argslen = call->args ? list_length(call->args) : 0;
 
     Procedure* starting_proc = proc;
-
     do {
         if (argslen != (proc->arguments ? list_length(proc->arguments) : 0)) goto next;
 
@@ -235,17 +202,13 @@ foo.bar();
 */
 
 static Procedure* get_possibly_overloaded_proc(Expression* expr) {
-    switch (expr->expressionType) {
-        case ExprType_Variable: {
-            VariableExpression* var = (VariableExpression*)expr;
-            if (var->ref->statementType == Statement_Procedure) return (Procedure*)var->ref;
-            return null;
-        }
-
+    NodeRef p = (NodeRef)expr;
+    switch (expr->kind) {
+        case Node_Variable: if (p.Variable->ref.node->kind == Node_Procedure) return p.Variable->ref.Procedure; else return null;
 
         // TODO: when contextual-inclusion on arguments are implemented, then this expression may return a Procedure that could be overloaded
-        // case ExprType_Deref: {
-        //     DerefOperator* deref = (DerefOperator*)expr;
+        // case Node_Deref: {
+        //     DerefExpression* deref = (DerefExpression*)expr;
         //     if (deref->expr) 
         //     return null;
         // }
@@ -254,22 +217,20 @@ static Procedure* get_possibly_overloaded_proc(Expression* expr) {
     }
 }
 
-static Datatype validateProcCall(Parser* parser, ProcCall* call) {
+static Datatype validateProcCall(Parser* parser, ProcCallExpression* call) {
 
     // validate passed arguments
     u32 argslength = call->args ? list_length(call->args) : 0;
-    for (u32 i = 0; i < argslength; i++) validateExpression(parser, call->args[i]);
+    for (u32 i = 0; i < argslength; i++) validate_expr(parser, call->args[i]);
 
-    Datatype type = validateExpression(parser, call->proc_expr);
+    validate_expr(parser, call->proc_expr);
 
 
     // builtin procedures
-    if (call->proc_expr->expressionType == ExprType_Variable) {
+    if (call->proc_expr->kind == Node_Variable) {
         VariableExpression* var = (VariableExpression*)call->proc_expr;
 
-        if (var->name == builtin_string_print) {
-            return type_void;
-        }
+        if (var->name == builtin_string_print) return type_void;
 
         if (var->name == builtin_string_add) {
             if (argslength == 2) {
@@ -280,8 +241,6 @@ static Datatype validateProcCall(Parser* parser, ProcCall* call) {
                 }
             }
         }
-
-
     }
 
 
@@ -291,7 +250,7 @@ static Datatype validateProcCall(Parser* parser, ProcCall* call) {
         Procedure* correct_overload = searchMatchingOverload(proc, call);
         if (correct_overload) {
             call->proc = correct_overload;
-            return correct_overload->returnType->solvedstate;
+            return correct_overload->return_type->solvedstate;
         }
 
         error_node(parser, call, "No valid overload found for \"%s\"", get_string(proc->name));
@@ -299,7 +258,7 @@ static Datatype validateProcCall(Parser* parser, ProcCall* call) {
     }
 
 
-    type = dealiasType(type); // TODO: what if it is a double pointer? Then this shouldnt work.
+    Datatype type = dealiasType(call->proc_expr->datatype); // TODO: what if it is a double pointer? Then this shouldnt work.
     if (type.kind == Typekind_Invalid) return type;
 
     if (type.kind != Typekind_Procedure) {
@@ -312,299 +271,16 @@ static Datatype validateProcCall(Parser* parser, ProcCall* call) {
     return type.proc_ptr_typenode->procedure.return_type->solvedstate;
 }
 
-static Datatype _validateExpression(Parser* parser, Expression* expr, Datatype expected_type) {
-
-    switch (expr->expressionType) {
-
-        case ExprType_Variable: {
-            VariableExpression* var = (VariableExpression*)expr;
-            var->base.datatype = typeofStatement(var->ref);
-            return var->base.datatype;
-        }
-
-        case ExprType_Deref: {
-            DerefOperator* deref = (DerefOperator*)expr;
-
-            // implicit derefing:
-            if (deref->expr == null) {
-                if (expected_type.kind == Typekind_Enum) {
-                    EnumEntry* entry = getEnumEntry(expected_type._enum, deref->name);
-                    return (Datatype) { Typekind_Enum, ._enum = entry->_enum };
-                }
-
-                error_node(parser, deref, "Cannot infer implicit dereferencing \".%s\".", get_string(deref->name));
-                return type_invalid;
-            }
-
-            Datatype inner_expr_type = validateExpression(parser, deref->expr);
-
-            // when we deref a variable expression
-            if (deref->expr->expressionType == ExprType_Variable) {
-                VariableExpression* var = (VariableExpression*)deref->expr;
-                if (var->ref->statementType == Statement_Enum) {
-                    EnumEntry* entry = getEnumEntry((Enum*)var->ref, deref->name);
-                    return (Datatype) { Typekind_Enum, ._enum = entry->_enum };
-                }
-            }
-
-            if (inner_expr_type.kind == Typekind_Struct) {
-
-                if (inner_expr_type.numPointers > 1) {
-                    error_node(parser, expr, "Attempted to dereference a %dth-degree pointer.", inner_expr_type.numPointers);
-                    return type_invalid;
-                }
-
-                Declaration* field = (Declaration*)getMember(inner_expr_type.stru, deref->name);
-                if (field) return field->type->solvedstate;
-
-                error_node(parser, expr, "Field \"%s\" does not exist on type \"%s\".", get_string(deref->name), get_string(inner_expr_type.stru->name));
-                return type_invalid;
-            }
-
-            if (inner_expr_type.kind == Typekind_Array) {
-                if (deref->name == builtin_string_length) return type_uint32; // TODO: hardcoded type of length field
-            }
-
-            error_node(parser, expr, "Invalid dereferencing.");
-            return type_invalid;
-        } break;
-
-        case ExprType_Indexing: {
-            IndexingExpression* ind = (IndexingExpression*)expr;
-
-            Datatype indexedType = validateExpression(parser, ind->indexed);
-            Datatype indexType = validateExpression(parser, ind->index);
-            // TODO: is indexType a valid integer expression
-
-
-            if (indexedType.numPointers == 0) {
-
-                if ((indexedType.kind == Typekind_Array) ||
-                    (indexedType.kind == Typekind_Fixed_Array) ||
-                    (indexedType.kind == Typekind_Dynamic_Array)) {
-
-                    return indexedType.array_typenode->array.element_type->solvedstate;
-                }
-
-                error_node(parser, expr, "Attempted to index an expression that is not indexable.");
-                return type_invalid;
-            }
-
-
-            Datatype resType = indexedType;
-            resType.numPointers--;
-            return resType;
-        } break;
-
-        case ExprType_Unary_Negate: {
-            UnaryExpression* unary = (UnaryExpression*)expr;
-            Datatype type = validateExpression(parser, unary->expr);
-            // TODO: can type be negated?
-            return type;
-        } break;
-
-        case ExprType_Unary_BitwiseNot: {
-            UnaryExpression* unary = (UnaryExpression*)expr;
-            Datatype type = validateExpression(parser, unary->expr);
-            // TODO: can everything be bit flipped like this?
-            return type;
-        } break;
-
-        case ExprType_Unary_PreIncrement:
-        case ExprType_Unary_PostIncrement:
-        case ExprType_Unary_PreDecrement:
-        case ExprType_Unary_PostDecrement: {
-            UnaryExpression* unary = (UnaryExpression*)expr;
-            Datatype type = validateExpression(parser, unary->expr);
-            // TODO: can type be incremented/decremented?
-            return type;
-        } break;
-
-        case ExprType_Unary_Not: {
-            UnaryExpression* unary = (UnaryExpression*)expr;
-            Datatype type = validateExpression(parser, unary->expr);
-            // TODO: is type a boolean type?
-            return type; // TODO: return boolean
-        } break;
-        case ExprType_Unary_AddressOf: {
-            UnaryExpression* unary = (UnaryExpression*)expr;
-            Datatype type = validateExpression(parser, unary->expr);
-            // TODO: is unary->expr an expression we can take the address of?
-
-            type.numPointers++;
-            return type;
-        } break;
-        case ExprType_Unary_ValueOf: {
-            UnaryExpression* unary = (UnaryExpression*)expr;
-            Datatype type = validateExpression(parser, unary->expr);
-            // TODO: is unary->expr an expression we can take the value of?
-
-            type.numPointers--;
-            return type;
-        } break;
-
-        case ExprType_Less:
-        case ExprType_Greater:
-        case ExprType_LessEquals:
-        case ExprType_GreaterEquals:
-        case ExprType_Equals:
-        case ExprType_NotEquals:
-        case ExprType_BooleanAnd:
-        case ExprType_BooleanOr: {
-            BinaryExpression* bop = (BinaryExpression*)expr;
-            Datatype leftType = validateExpressionEx(parser, bop->left, expected_type);
-            Datatype rightType = validateExpressionEx(parser, bop->right, expected_type);
-
-            // TODO: valid operands?
-
-            (void)leftType;
-            (void)rightType;
-
-            return type_bool;
-        } break;
-
-        case ExprType_Bitwise_And:
-        case ExprType_Bitwise_Or:
-        case ExprType_Bitwise_Xor:
-        case ExprType_Bitwise_Lshift:
-        case ExprType_Bitwise_Rshift:
-        case ExprType_Plus:
-        case ExprType_Minus:
-        case ExprType_Mul:
-        case ExprType_Div:
-        case ExprType_Mod: {
-            BinaryExpression* bop = (BinaryExpression*)expr;
-            Datatype leftType = validateExpressionEx(parser, bop->left, expected_type);
-            Datatype rightType = validateExpressionEx(parser, bop->right, expected_type);
-
-            // TODO: is a valid operator operands pair?
-
-            // TODO: make a list of operators, and search for the existence of an operator given the left and rigth type, this will also facilitate operator overloads
-
-            if (typeEquals(leftType, rightType)) return leftType;
-
-            if (leftType.numPointers) return leftType; // to enable pointer arithmetic
-
-            Datatype numberType = mergeNumberTypes(leftType, rightType);
-            if (numberType.kind != Typekind_Invalid) return numberType;
-
-
-            bool isLeftAssignable = typeAssignable(leftType, rightType);
-            if (isLeftAssignable) return leftType;
-            else {
-                bool isRightAssignable = typeAssignable(rightType, leftType);
-                if (isRightAssignable) return rightType;
-            }
-
-            error_node(parser, expr, "Invalid binary expression.");
-            return type_invalid;
-        } break;
-
-        case ExprType_Alloc: {
-            AllocExpression* alloc = (AllocExpression*)expr;
-
-            // recurse on possibe size-subexpression
-            if (alloc->sizeExpr) {
-                Datatype size = validateExpression(parser, alloc->sizeExpr);
-                // TODO: is this a valid integer expression?
-            }
-
-            Datatype type = alloc->type->solvedstate;
-            type.numPointers++;
-            return type;
-        } break;
-
-        case ExprType_Sizeof: {
-            SizeofExpression* sof = (SizeofExpression*)expr;
-            // return type_uint64;
-            return type_ambiguousInteger;
-        } break;
-
-        case ExprType_Ternary: {
-            TernaryExpression* ter = (TernaryExpression*)expr;
-            Datatype conditionType = validateExpression(parser, ter->condition);
-            Datatype thenType = validateExpression(parser, ter->thenExpr);
-            Datatype elseType = validateExpression(parser, ter->elseExpr);
-
-            // TODO: is condition a valid boolean expression
-            // TODO: does thenExpr and elseExpr have a common type? 
-
-            return thenType;
-        } break;
-
-        case ExprType_ProcCall: {
-            ProcCall* fc = (ProcCall*)expr;
-            return validateProcCall(parser, fc);
-        } break;
-
-        case ExprType_Cast: {
-            CastExpression* cast = (CastExpression*)expr;
-            // TODO: is this a valid casting operation
-
-            Datatype type = validateExpression(parser, cast->expr);
-
-            return cast->castToType->solvedstate;
-        } break;
-
-        { // literals
-            case ExprType_Literal_Integer: return type_ambiguousInteger;
-            case ExprType_Literal_Decimal: return type_ambiguousDecimal;
-            case ExprType_Literal_Char:    return type_char;
-            case ExprType_Literal_String:  return type_charPointer;
-            case ExprType_Literal_True:    return type_bool;
-            case ExprType_Literal_False:   return type_bool;
-            case ExprType_Literal_Null:    return type_voidPointer;
-        }
-
-        case ExprType_Parenthesized: {
-            ParenthesizedExpression* p = (ParenthesizedExpression*)expr;
-            return validateExpression(parser, p->innerExpr);
-        } break;
-
-        case ExprType_Compound: {
-            CompoundExpression* com = (CompoundExpression*)expr;
-
-            if (com->elements) {
-                foreach (el, com->elements) {
-                    validateExpression(parser, el->expr);
-                }
-            }
-
-            // TODO: validate if this compound is compatible with expected_type
-            return expected_type;
-        } break;
-    }
-
-    // this should never happen
-    error_node(parser, expr, "Unknown expression type. This is a bug!");
-    return type_invalid;
-}
-
-static Datatype validateExpression(Parser* parser, Expression* expr) {
-    expr->datatype = _validateExpression(parser, expr, type_invalid);
-    return expr->datatype;
-}
-
-static Datatype validateExpressionEx(Parser* parser, Expression* expr, Datatype expected_type) {
-    expr->datatype = _validateExpression(parser, expr, expected_type);
-    return expr->datatype;
-}
-
 // static void assignment(Datatype toType, Expression* expr) {
-
 // }
 
-static void validateDeclaration(Parser* parser, Declaration* decl) {
+static void validate_declaration(Parser* parser, Declaration* decl) {
     if (decl->expr) {
-
-        Datatype type = validateExpressionEx(parser, decl->expr, decl->type->solvedstate);
+        Datatype type = validate_expr_expect_type(parser, decl->expr, decl->type->solvedstate);
         if (type.kind == Typekind_Invalid) return;
 
-        if (decl->type->node_type == TypeNode_MustInfer) {
-            decl->type->solvedstate = resolveTypeAmbiguity(type);
-        } else {
-            assertAssignability(parser, decl->type->solvedstate, type, decl->expr);
-        }
+        if (decl->type->kind == Node_Type_MustInfer) decl->type->solvedstate = resolveTypeAmbiguity(type);
+        else assertAssignability(parser, decl->type->solvedstate, type, decl->expr);
     }
 }
 
@@ -633,178 +309,247 @@ static void validateEnum(Parser* parser, Enum* en) {
     }
 }
 
-static void validateStatement(Parser* parser, Statement* sta) {
-    switch (sta->statementType) {
 
-        case Statement_Declaration: {
-            Declaration* decl = (Declaration*)sta;
-            validateDeclaration(parser, decl);
-        } break;
-
-        case Statement_Assignment: {
-            Assignment* ass = (Assignment*)sta;
-
-            Datatype toType = validateExpression(parser, ass->assigneeExpr);
-            Datatype fromType = validateExpressionEx(parser, ass->expr, toType);
-
-            // TODO: this only works for normal assignment, but not for += -= etc
-            //       make it so this uses operator list
-            if (ass->assignmentOper == Tok_Assign) assertAssignability(parser, toType, fromType, ass->expr);
-        } break;
-
-        case Statement_Struct: {
-            validateStruct(parser, (Struct*)sta);
-        } break;
-
-        case Statement_Enum: {
-            validateEnum(parser, (Enum*)sta);
-        } break;
-
-        case Statement_Typedef: {
-            Typedef* def = (Typedef*)sta;
-        } break;
-
-        case Statement_Constant: {
-            Declaration* decl = (Declaration*)sta;
-            validateExpression(parser, decl->expr);
-        } break;
-
-
-        case Statement_Scope: {
-            Scope* scope = (Scope*)sta;
-            validateScope(parser, scope);
-        } break;
-
-        case Statement_If: {
-            IfStatement* ifsta = (IfStatement*)sta;
-
-            // TODO: check if condition is a boolean expression
-            validateExpression(parser, ifsta->condition);
-            if (ifsta->then_statement) validateStatement(parser, ifsta->then_statement);
-            if (ifsta->else_statement) validateStatement(parser, ifsta->else_statement);
-
-        } break;
-        case Statement_While: {
-            WhileStatement* whileSta = (WhileStatement*)sta;
-            // TODO: check if condition is a boolean expression
-            validateExpression(parser, whileSta->condition);
-            if (whileSta->statement) validateStatement(parser, whileSta->statement);
-        } break;
-        case Statement_For: {
-            ForStatement* forsta = (ForStatement*)sta;
-
-            if (forsta->iterator_assignment) {
-                Datatype type = validateExpressionEx(parser, forsta->iterator_assignment, forsta->index_type->solvedstate);
-                if (forsta->index_type->node_type == TypeNode_MustInfer) {
-                    forsta->index_type->solvedstate = type;
-                } else {
-                    assertAssignability(parser, forsta->index_type->solvedstate, type, forsta->iterator_assignment);
-                }
-            }
-
-            validateExpression(parser, forsta->min_expr);
-            if (forsta->max_expr) validateExpression(parser, forsta->max_expr);
-
-            Datatype type = forsta->index_type
-                          ? forsta->index_type->solvedstate
-                          : default_for_loop_numeric_type;
-
-            if (forsta->statement) validateStatement(parser, forsta->statement);
-        } break;
-
-        case Statement_Switch: {
-            SwitchStatement* switchSta = (SwitchStatement*)sta;
-            // TODO: check if expr is a valid type to switch on
-            validateExpression(parser, switchSta->expr);
-            validateScope(parser, switchSta->scope);
-        } break;
-
-        case Statement_Procedure: {
-            Procedure* proc = (Procedure*)sta;
-
-            init_typenode_for_proc(proc);
-            validateProcedure(parser, proc);
-        } break;
-
-        case Statement_Break: {
-            // TODO: is inside loop?
-        } break;
-        case Statement_Continue: {
-            // TODO: is inside loop?
-        } break;
-        case Statement_Return: {
-            ReturnStatement* retSta = (ReturnStatement*)sta;
-
-            Datatype type = type_void;
-            if (retSta->returnExpr) type = validateExpressionEx(parser, retSta->returnExpr, parser->procedure->returnType->solvedstate);
-
-            if (type.kind == Typekind_Invalid) break;
-
-            if (parser->procedure->returnType->node_type == TypeNode_MustInfer) {
-                parser->procedure->returnType->solvedstate = resolveTypeAmbiguity(type);
-            } else {
-                if (!typeAssignable(parser->procedure->returnType->solvedstate, type)) {
-                    error_node(parser, sta, "Return type missmatch in function \"%s\".", get_string(parser->procedure->name));
-                }
-            }
-        } break;
-
-        case Statement_Goto: {
-            // TODO: does label exist?
-        } break;
-        case Statement_Label: {
-            // TODO: is label already declared?
-        } break;
-        case Statement_CaseLabel: {
-            CaseLabelStatement* caseLabel = (CaseLabelStatement*)sta;
-
-            if (caseLabel->switch_statement == null) {
-                error_node(parser, caseLabel, "Case label not declared inside switch.");
-                break;
-            }
-
-            validateExpressionEx(parser, caseLabel->expr, caseLabel->switch_statement->expr->datatype);
-
-            // TODO: is compiletime expr?
-        } break;
-        case Statement_DefaultLabel: {
-            // TODO: is inside switch?
-        } break;
-
-        case Statement_Expression: {
-            StatementExpression* staExpr = (StatementExpression*)sta;
-            validateExpression(parser, staExpr->expr);
-        } break;
-
-        case Statement_Argument:
-        case Statement_EnumEntry: {
-            // Unreachable code
-        } break;
-    }
+static void validate_scope(Parser* parser, Scope* scope) {
+    foreach (refp, scope->statements) validate_node(parser, *refp);
 }
 
-static void validateScope(Parser* parser, Scope* scope) {
-    for (u32 i = 0; i < list_length(scope->statements); i++) {
-        Statement* sta = scope->statements[i];
-        validateStatement(parser, sta);
-    }
-}
-
-static void validateProcedure(Parser* parser, Procedure* proc) {
+static void validate_procedure(Parser* parser, Procedure* proc) {
     if (proc->scope) {
         Procedure* otherproc = parser->procedure;
         parser->procedure = proc;
-
-        validateScope(parser, proc->scope);
-
+        validate_scope(parser, proc->scope);
         parser->procedure = otherproc;
     }
 
-    if (proc->returnType->node_type == TypeNode_MustInfer) {
-        proc->returnType->solvedstate = type_void;
-    }
+    if (proc->return_type->kind == Node_Type_MustInfer) proc->return_type->solvedstate = type_void;
 }
 
+static Datatype validate_deref_expr(Parser* parser, DerefExpression* deref, Datatype expected_type) {
+    if (deref->expr == null) { // implicit derefing:
+        if (expected_type.kind == Typekind_Enum && expected_type.numPointers == 0) return expected_type;
+
+        error_node(parser, deref, "Cannot infer implicit dereferencing \".%s\".", get_string(deref->name));
+        return type_invalid;
+    }
+
+    Datatype inner_expr_type = validate_expr(parser, deref->expr);
+
+    // when we deref a variable expression
+    if (deref->expr->kind == Node_Variable) {
+        VariableExpression* var = (VariableExpression*)deref->expr;
+        if (var->ref.node->kind == Node_Enum) return (Datatype) { Typekind_Enum, ._enum = var->ref.Enum };
+    }
+
+    if (inner_expr_type.kind == Typekind_Struct) {
+        if (inner_expr_type.numPointers > 1) {
+            error_node(parser, deref, "Attempted to dereference a %dth-degree pointer.", inner_expr_type.numPointers);
+            return type_invalid;
+        }
+
+        Statement* member = getMember(inner_expr_type.stru, deref->name);
+        if (member) return typeofStatement(member);
+
+        error_node(parser, deref, "Member \"%s\" does not exist in struct \"%s\".", get_string(deref->name), get_string(inner_expr_type.stru->name));
+        return type_invalid;
+    }
+
+    if (inner_expr_type.kind == Typekind_Array) {
+        if (deref->name == builtin_string_length) return type_uint32; // TODO: hardcoded type of length field
+    }
+
+    error_node(parser, deref, "Invalid dereferencing.");
+    return type_invalid;
+}
+
+/* TODOs on validation checks and error messages:
+    - valid expression type in if/while/switch/ternary_expr
+    - is compile-time value in case labels and possibly const declarations
+    - is on correct context (like continue/break/default must be inside a loop/switch)
+*/
+
+static Datatype type_ptr(Datatype type, i32 nump) { type.numPointers += nump; return type; }
+
+static Datatype _validate_expr_base(Parser* parser, Expression* expr, Datatype expected_type) {
+NodeRef p = (NodeRef)expr;
+switch (expr->kind) {
+
+    case Node_Less:
+    case Node_Greater:
+    case Node_LessEquals:
+    case Node_GreaterEquals:
+    case Node_Equals:
+    case Node_NotEquals:
+    case Node_BooleanAnd:
+    case Node_BooleanOr:
+        validate_expr_expect_type(parser, p.Binary->left,  expected_type);
+        validate_expr_expect_type(parser, p.Binary->right, expected_type);
+        return type_bool;
+
+    case Node_Plus:
+    case Node_Minus:
+    case Node_Mul:
+    case Node_Div:
+    case Node_Mod:
+    case Node_Bitwise_And:
+    case Node_Bitwise_Or:
+    case Node_Bitwise_Xor:
+    case Node_Bitwise_Lshift:
+    case Node_Bitwise_Rshift:
+    {
+        Datatype type_l = validate_expr_expect_type(parser, p.Binary->left,  expected_type);
+        Datatype type_r = validate_expr_expect_type(parser, p.Binary->right, expected_type);
+
+        if (type_l.numPointers) return type_l; // to enable pointer arithmetic
+
+        if (typeAssignable(type_l, type_r)) return type_l;
+        if (typeAssignable(type_r, type_l)) return type_r;
+
+        error_node(parser, expr, "Invalid binary expression.");
+        return type_invalid;
+    }
+
+    // TODO: make a list of operators, and search for the existence of an operator given the left and rigth type, this will also facilitate operator overloads
+
+    // TODO: Node_Unary_Negate: can type be negated?
+    // TODO: Node_Unary_BitwiseNot: can everything be bit flipped like this?
+    // TODO: can type be incremented/decremented?
+    // TODO: Node_Unary_Not: is type a boolean type?
+    // TODO: Node_Unary_Not: return boolean
+    case Node_Unary_PreIncrement:
+    case Node_Unary_PostIncrement:
+    case Node_Unary_PreDecrement:
+    case Node_Unary_PostDecrement:
+    case Node_Unary_Not:
+    case Node_Unary_BitwiseNot:
+    case Node_Unary_Negate:
+        return validate_expr_expect_type(parser, p.Unary->expr, expected_type);
+
+    // TODO: is unary->expr an expression we can take the address of?
+    // TODO: is unary->expr an expression we can take the value of?
+    case Node_Unary_AddressOf: return type_ptr(validate_expr(parser, p.Unary->expr), 1); // TODO: we could have an expected type here..
+    case Node_Unary_ValueOf:   return type_ptr(validate_expr(parser, p.Unary->expr), -1);
+
+    case Node_Literal_Integer: return type_ambiguousInteger;
+    case Node_Literal_Decimal: return type_ambiguousDecimal;
+    case Node_Literal_Char:    return type_char;
+    case Node_Literal_String:  return type_charPointer;
+    case Node_Literal_True:    return type_bool;
+    case Node_Literal_False:   return type_bool;
+    case Node_Literal_Null:    return type_voidPointer;
+
+    case Node_Variable: return typeofStatement(p.Variable->ref.stmt);
+    case Node_Alloc: {
+        if (p.Alloc->size_expr) validate_expr(parser, p.Alloc->size_expr); // TODO: is this a valid integer expression?
+        return type_ptr(p.Alloc->type->solvedstate, 1);
+    }
+
+    case Node_Ternary:
+        validate_expr(parser, p.Ternary->condition);
+        validate_expr_expect_type(parser, p.Ternary->then_expr, expected_type);
+        validate_expr_expect_type(parser, p.Ternary->else_expr, expected_type);
+        // TODO: are the then and else types compatible with expected_type? if expexted_type is not applicable: are they compatible with eachother?
+        return p.Ternary->then_expr->datatype; // TODO: determine what type actually needs to be returned here
+
+    case Node_ProcCall: return validateProcCall(parser, p.ProcCall); // TODO: use expected type here to resolve overload with return type
+    case Node_Deref: return validate_deref_expr(parser, p.Deref, expected_type);
+
+    case Node_Indexing: {
+        Datatype type = validate_expr(parser, p.Indexing->indexed);
+        validate_expr(parser, p.Indexing->index); // TODO: is index a valid integer expression?
+        if (type.numPointers) return type_ptr(type, -1);
+        if ((type.kind == Typekind_Array) ||
+            (type.kind == Typekind_Fixed_Array) ||
+            (type.kind == Typekind_Dynamic_Array)) return type.array_typenode->array.element_type->solvedstate;
+        error_node(parser, expr, "Attempted to index an expression that is not indexable.");
+        return type_invalid;
+    }
+
+    case Node_Cast: validate_expr_expect_type(parser, p.Cast->expr, p.Cast->new_type->solvedstate); return p.Cast->new_type->solvedstate; // TODO: is this a valid casting operation
+    case Node_Sizeof: return type_ambiguousInteger;
+    case Node_Parenthesized: return validate_expr_expect_type(parser, p.Parenthesized->inner_expr, expected_type);
+    case Node_Compound: // TODO: validate if this compound is compatible with expected_type
+        if (p.Compound->elements) { foreach (el, p.Compound->elements) validate_expr(parser, el->expr); }
+        return expected_type;
+
+    default:
+        // this should never happen
+        error_node(parser, expr, "Unknown expression type. This is a bug!");
+        return type_invalid;
+}}
+
+
+static Datatype validate_expr_expect_type(Parser* parser, Expression* expr, Datatype expected_type) { return expr->datatype = _validate_expr_base(parser, expr, expected_type); }
+static Datatype validate_expr(Parser* parser, Expression* expr) { return validate_expr_expect_type(parser, expr, type_invalid); }
+
+static void validate_node(Parser* parser, NodeRef p) {
+switch (p.node->kind) {
+
+    case Node_Declaration: validate_declaration(parser, p.Declaration); return;
+    case Node_Constant: validate_expr(parser, p.Constant->expr); return;
+    case Node_Typedef: return;
+    case Node_Procedure: init_typenode_for_proc(p.Procedure); validate_procedure(parser, p.Procedure); return;
+    case Node_Argument: return;
+    case Node_Struct: validateStruct(parser, p.Struct); return;
+    case Node_Enum: validateEnum(parser, p.Enum); return;
+    case Node_EnumEntry: return;
+    case Node_Assignment: {
+        Datatype dst = validate_expr(parser, p.Assignment->dst_expr);
+        Datatype src = validate_expr_expect_type(parser, p.Assignment->src_expr, dst);
+        // TODO: this only works for normal assignment, but not for += -= etc
+        //       make it so this uses operator list
+        assertAssignability(parser, dst, src, p.Assignment->src_expr);
+    } return;
+
+
+    case Node_Scope: validate_scope(parser, p.Scope); return;
+    case Node_IfStmt:
+        validate_expr(parser, p.IfStmt->condition);
+        if (p.IfStmt->then_statement.node) validate_node(parser, p.IfStmt->then_statement);
+        if (p.IfStmt->else_statement.node) validate_node(parser, p.IfStmt->else_statement);
+        return;
+    case Node_WhileStmt: validate_expr(parser, p.WhileStmt->condition); if (p.WhileStmt->statement.node) validate_node(parser, p.WhileStmt->statement); return;
+
+    case Node_ForStmt: {
+        if (p.ForStmt->iterator_assignment) { // TODO: this is doing the job of an assignment, abstract away...
+            Datatype it_type = validate_expr_expect_type(parser, p.ForStmt->iterator_assignment, p.ForStmt->index_type->solvedstate);
+            if (p.ForStmt->index_type->kind == Node_Type_MustInfer) p.ForStmt->index_type->solvedstate = it_type;
+            else assertAssignability(parser, p.ForStmt->index_type->solvedstate, it_type, p.ForStmt->iterator_assignment);
+        }
+        validate_expr(parser, p.ForStmt->min_expr);
+        if (p.ForStmt->max_expr) validate_expr(parser, p.ForStmt->max_expr);
+        if (p.ForStmt->statement.node) validate_node(parser, p.ForStmt->statement);
+    } return;
+
+    case Node_SwitchStmt: validate_expr(parser, p.SwitchStmt->expr); validate_scope(parser, p.SwitchStmt->scope); return;
+    case Node_ContinueStmt: return;
+    case Node_BreakStmt: return;
+    case Node_ReturnStmt: { // TODO: this is kinda similar to an 'assignment' (see TODO in case Node_ForStmt) consider abstracting away
+        Datatype type = type_void;
+        if (p.ReturnStmt->expr) type = validate_expr_expect_type(parser, p.ReturnStmt->expr, parser->procedure->return_type->solvedstate);
+        if (type.kind == Typekind_Invalid) return;
+        if (parser->procedure->return_type->kind == Node_Type_MustInfer) parser->procedure->return_type->solvedstate = resolveTypeAmbiguity(type);
+        else if (!typeAssignable(parser->procedure->return_type->solvedstate, type)) error_node(parser, p.ReturnStmt, "Return type missmatch in function \"%s\".", get_string(parser->procedure->name));
+    } return;
+
+    case Node_GotoStmt: return;
+    case Node_LabelStmt: return;
+
+    case Node_CaseLabelStmt:
+        if (p.CaseLabelStmt->switch_statement) validate_expr_expect_type(parser, p.CaseLabelStmt->expr, p.CaseLabelStmt->switch_statement->expr->datatype);
+        else error_node(parser, p.CaseLabelStmt, "Case label not declared inside switch."); return;
+
+    case Node_DefaultLabelStmt: return;
+
+    case Node_Type_MustInfer: return;
+    case Node_Type_Basic: return;
+    case Node_Type_Procedure: return;
+    case Node_Type_Array: return;
+    case Node_Type_Fixed_Array: return;
+    case Node_Type_Dynamic_Array: return;
+
+    default: validate_expr(parser, p.expr); return;
+}}
 
 static void validate(Parser* parser, Codebase* cb) {
 
@@ -828,6 +573,6 @@ static void validate(Parser* parser, Codebase* cb) {
 
     parser->procedure = null;
     foreach (proc, cb->procedures) {
-        validateProcedure(parser, *proc);
+        validate_procedure(parser, *proc);
     }
 }
