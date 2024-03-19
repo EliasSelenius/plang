@@ -488,7 +488,7 @@ switch (p.node->kind) {
     case Node_Declaration: validate_declaration(parser, p.Declaration); return;
     case Node_Constant: validate_expr(parser, p.Constant->expr); return;
     case Node_Typedef: return;
-    case Node_Procedure: init_typenode_for_proc(p.Procedure); validate_procedure(parser, p.Procedure); return;
+    case Node_Procedure: init_typenode_for_proc(parser, p.Procedure); validate_procedure(parser, p.Procedure); return;
     case Node_Argument: return;
     case Node_Struct: validateStruct(parser, p.Struct); return;
     case Node_Enum: validateEnum(parser, p.Enum); return;

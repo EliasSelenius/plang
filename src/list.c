@@ -20,6 +20,7 @@ u32 list_capacity(void* list) { return ((u32*)list)[-2]; }
 u32 list_stride(void* list)   { return ((u32*)list)[-1]; }
 
 #define list_create(type) _list_create(sizeof(type))
+#define list_init(list) do { (list) = list_create(typeof(*(list))); } while (0)
 void* _list_create(u32 stride) {
     ListHead* head = malloc(
         sizeof(ListHead) +

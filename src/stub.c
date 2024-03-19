@@ -25,7 +25,6 @@
 #include "lexer.h"
 #include "syntax_tree.c"
 #include "globals.c"
-#include "syntax_tree_allocator.c"
 
 
 #include "lexer.c"

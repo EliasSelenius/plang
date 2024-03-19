@@ -1,32 +1,30 @@
 
-#define arena_size 0xFFFFFFFF
+#define arena_size 0x100000000
 
 typedef struct Arena {
-    void* data;
-    u32 allocated;
+    u32 top;
 } Arena;
 
-Arena arena_create() {
-    Arena res;
-    res.data = vmem_reserve(arena_size);
-    res.allocated = 0;
-    return res;
+Arena* arena_create() {
+    Arena* arena = vmem_reserve(arena_size);
+    vmem_commit(arena, arena_size);
+    arena->top = sizeof(Arena);
+    return arena;
 }
 
 void* arena_alloc(Arena* arena, u32 size) {
-    void* res = (void*)(arena->data + arena->allocated);
-    arena->allocated += size;
-    vmem_commit(arena->data, arena->allocated);
+    void* res = arena + arena->top;
+    arena->top += size;
     return res;
 }
 
-void arena_reset(Arena* arena) {
-    vmem_decommit(arena->data, arena->allocated);
-    arena->allocated = 0;
-}
+// void arena_reset(Arena* arena) {
+//     // TODO: this decommit then commit thing am not sure about
+//     vmem_decommit(arena, arena->top);
+//     vmem_commit(arena, arena_size);
+//     arena->top = 0;
+// }
 
-void arena_destroy(Arena* arena) {
-    vmem_release(arena->data);
-    arena->data = null;
-    arena->allocated = 0;
+void arena_release(Arena* arena) {
+    vmem_release(arena);
 }

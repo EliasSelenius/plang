@@ -1,26 +1,20 @@
 
 
 static Scope* expectScope(Parser* parser);
-static Expression* parseExpression(Parser* parser);
 static Expression* expectExpression(Parser* parser);
-static Statement* expectStatement(Parser* parser);
 static void validate(Parser* parser, Codebase* cb);
 
 
-static Identifier identifier(Parser* parser) {
-    Token token = peek(parser);
-    if (token.type != Tok_Word) {
-        fatal_parse_error(parser, "Invalid identifier: %s", TokenType_Names[token.type]);
-        return -1;
-    }
-    advance(parser);
-    return token.data.string;
+static Token expect(Parser* parser, TokenType type) {
+    Token token = advance(parser);
+    if (token.type == type) return token;
+    fatal_parse_error(parser, "Unexpected token type %s. Expected: %s.", TokenType_Names[token.type], TokenType_Names[type]);
 }
 
-static void expect(Parser* parser, TokenType type) {
-    if (advance(parser).type != type) {
-        fatal_parse_error(parser, "Unexpected token type %s.", TokenType_Names[peek(parser).type]);
-    }
+static Identifier identifier(Parser* parser) {
+    Token token = advance(parser);
+    if (token.type == Tok_Word) return token.data.string;
+    fatal_parse_error(parser, "Invalid identifier: %s", TokenType_Names[token.type]);
 }
 
 
@@ -56,32 +50,13 @@ static Token* anyof(Parser* parser, u32 count, ...) {
 }
 
 
-static Datatype get_type_from_statement(Statement* sta) {
-
-    if (sta == null) return type_invalid;
-    if (sta->statementType == Statement_Struct) return (Datatype) { .kind = Typekind_Struct, .data_ptr = sta };
-    if (sta->statementType == Statement_Enum) return (Datatype) { .kind = Typekind_Enum, .data_ptr = sta };
-    if (sta->statementType == Statement_Typedef) return (Datatype) { .kind = Typekind_Typedef, .data_ptr = sta };
-
-    return type_invalid;
-}
-
-
-static Type* newTypeNode_(TypeNode node_type, Node nodebase) {
-    Type* res = calloc(1, sizeof(Type)); // TODO: use arena allocator
-    res->nodebase = nodebase;
-    res->node_type = node_type;
-    return res;
-}
-static Type* newTypeNode(Parser* parser, TypeNode node_type) { return newTypeNode_(node_type, node_init(parser)); }
-
 static Type* type_modifier(Parser* parser, Type* type);
 
 static Type* parseTypeNode(Parser* parser) {
-    Type* type = newTypeNode(parser, TypeNode_Normal);
+    Type* type = alloc_node(parser, Node_Type_Basic).Type; // TODO: very important: we are allocing Type_Basic but this may be overwriten, not a problem now, but may be problem later
 
     if (tok(parser, Tok_Keyword_Let)) {
-        type->node_type = TypeNode_MustInfer;
+        type->kind = Node_Type_MustInfer;
         return type;
     }
 
@@ -95,7 +70,7 @@ static Type* parseTypeNode(Parser* parser) {
 
 static Type* type_modifier(Parser* parser, Type* type) {
     if (tok(parser, Tok_OpenParen)) {
-        Type* mod = newTypeNode(parser, TypeNode_Procedure);
+        Type* mod = alloc_node(parser, Node_Type_Procedure).Type;
         mod->procedure.return_type = type;
         mod->solvedstate.numPointers = 1;
         if (tok(parser, Tok_CloseParen)) return mod;
@@ -116,15 +91,15 @@ static Type* type_modifier(Parser* parser, Type* type) {
     }
 
     if (tok(parser, Tok_OpenSquare)) {
-        Type* mod = newTypeNode(parser, TypeNode_Array);
+        Type* mod = alloc_node(parser, Node_Type_Array).Type;
         mod->array.element_type = type;
 
         if (tok(parser, Tok_CloseSquare)) return mod;
 
         if (tok(parser, Tok_Dotdot)) {
-            mod->node_type = TypeNode_Dynamic_Array;
+            mod->kind = Node_Type_Dynamic_Array;
         } else {
-            mod->node_type = TypeNode_Fixed_Array;
+            mod->kind = Node_Type_Fixed_Array;
             mod->array.size_expr = expectExpression(parser);
         }
 
@@ -136,13 +111,13 @@ static Type* type_modifier(Parser* parser, Type* type) {
 }
 
 static void print_typenode(Type* type) {
-    switch (type->node_type) {
-        case TypeNode_MustInfer: printf("let"); break;
-        case TypeNode_Normal: {
+    switch (type->kind) {
+        case Node_Type_MustInfer: printf("let"); break;
+        case Node_Type_Basic: {
             printf("%s", get_string(type->name));
         } break;
 
-        case TypeNode_Procedure: {
+        case Node_Type_Procedure: {
             print_typenode(type->procedure.return_type);
             printf("(");
             Type* arg = type->procedure.first_argument;
@@ -158,15 +133,15 @@ static void print_typenode(Type* type) {
             printf(")");
         } break;
 
-        case TypeNode_Array: {
+        case Node_Type_Array: {
             print_typenode(type->array.element_type);
             printf("[]");
         } break;
-        case TypeNode_Fixed_Array: {
+        case Node_Type_Fixed_Array: {
             print_typenode(type->array.element_type);
             printf("[%d]", 0); // TODO: print proper size
         } break;
-        case TypeNode_Dynamic_Array: {
+        case Node_Type_Dynamic_Array: {
             print_typenode(type->array.element_type);
             printf("[..]");
         } break;
@@ -180,12 +155,12 @@ static void resolve_typenode(Parser* parser, Type* type, Codebase* codebase) {
 
     Datatype datatype = type_invalid;
 
-    switch (type->node_type) {
+    switch (type->kind) {
 
-        case TypeNode_Normal: {
+        case Node_Type_Basic: {
 
             if (codebase) {
-                datatype = get_type_from_statement(get_global_type(type->name, codebase));
+                datatype = get_global_type(type->name, codebase);
                 break;
             }
 
@@ -202,10 +177,10 @@ static void resolve_typenode(Parser* parser, Type* type, Codebase* codebase) {
             if (type->name == type_name_char)    { datatype = type_char; break; }
             if (type->name == type_name_void)    { datatype = type_void; break; }
 
-            datatype = get_type_from_statement(get_local_type(parser, type->name));
+            datatype = get_local_type(parser, type->name);
         } break;
 
-        case TypeNode_Procedure: {
+        case Node_Type_Procedure: {
 
             resolve_typenode(parser, type->procedure.return_type, codebase);
 
@@ -219,25 +194,25 @@ static void resolve_typenode(Parser* parser, Type* type, Codebase* codebase) {
             datatype.proc_ptr_typenode = type;
         } break;
 
-        case TypeNode_Array: {
+        case Node_Type_Array: {
             resolve_typenode(parser, type->array.element_type, codebase);
             datatype.kind = Typekind_Array;
             datatype.array_typenode = type;
         } break;
 
-        case TypeNode_Fixed_Array: {
+        case Node_Type_Fixed_Array: {
             resolve_typenode(parser, type->array.element_type, codebase);
             datatype.kind = Typekind_Fixed_Array;
             datatype.array_typenode = type;
         } break;
 
-        case TypeNode_Dynamic_Array: {
+        case Node_Type_Dynamic_Array: {
             resolve_typenode(parser, type->array.element_type, codebase);
             datatype.kind = Typekind_Dynamic_Array;
             datatype.array_typenode = type;
         } break;
 
-        case TypeNode_MustInfer:
+        case Node_Type_MustInfer:
         default: datatype = type_invalid;
     }
 
@@ -253,16 +228,17 @@ static void resolve_typenode(Parser* parser, Type* type, Codebase* codebase) {
 static Type* expectType(Parser* parser) {
     Type* type = parseTypeNode(parser);
 
-    if (type->node_type == TypeNode_MustInfer) return type;
+    if (type->kind == Node_Type_MustInfer) return type;
 
     resolve_typenode(parser, type, null);
 
     return type;
 }
 
-static void init_typenode_for_proc(Procedure* proc) {
-    Type* type = newTypeNode_(TypeNode_Procedure, proc->base.nodebase);
-    type->procedure.return_type = proc->returnType;
+static void init_typenode_for_proc(Parser* parser, Procedure* proc) {
+    Type* type = alloc_node(parser, Node_Type_Procedure).Type; // TODO: very important: this is using the wrong arenas
+    type->loc = proc->loc;
+    type->procedure.return_type = proc->return_type;
     type->solvedstate.proc_ptr_typenode = type;
 
     if (proc->arguments) {
@@ -279,9 +255,8 @@ static void init_typenode_for_proc(Procedure* proc) {
 }
 
 
-static Statement* expectEnum(Parser* parser) {
-
-    Enum* en = allocStatement(parser, Statement_Enum);
+static NodeRef expectEnum(Parser* parser) {
+    Enum* en = alloc_node(parser, Node_Enum).Enum;
     en->entries = list_create(EnumEntry);
 
     advance(parser);
@@ -291,8 +266,8 @@ static Statement* expectEnum(Parser* parser) {
 
     while (!tok(parser, Tok_CloseCurl)) {
         EnumEntry entry = {0};
-        entry.base.nodebase = node_init(parser);
-        entry.base.statementType = Statement_EnumEntry;
+        entry.loc = get_code_location_here(parser);
+        entry.kind = Node_EnumEntry;
         entry._enum = en;
         entry.name = identifier(parser);
         if (tok(parser, Tok_Assign)) entry.expr = expectExpression(parser);
@@ -301,11 +276,11 @@ static Statement* expectEnum(Parser* parser) {
         list_add(en->entries, entry);
     }
 
-    return (Statement*)en;
+    return (NodeRef)en;
 }
 
-static Statement* expectStruct(Parser* parser) {
-    Struct* stru = allocStatement(parser, Statement_Struct);
+static NodeRef expectStruct(Parser* parser) {
+    Struct* stru = alloc_node(parser, Node_Struct).Struct;
     stru->fields = list_create(Declaration);
 
     advance(parser);
@@ -314,8 +289,8 @@ static Statement* expectStruct(Parser* parser) {
 
     do {
         Declaration field;
-        field.base.nodebase = node_init(parser);
-        field.base.statementType = Statement_Declaration;
+        field.loc = get_code_location_here(parser);
+        field.kind = Node_Declaration;
 
         field.include_context = tok(parser, Tok_Keyword_With);
         field.type = expectType(parser);
@@ -323,7 +298,7 @@ static Statement* expectStruct(Parser* parser) {
         list_add(stru->fields, field);
 
         while (tok(parser, Tok_Comma)) {
-            field.base.nodebase.loc.line = peek(parser).line;
+            field.loc.line = peek(parser).line;
             field.name = identifier(parser);
             list_add(stru->fields, field);
         }
@@ -333,40 +308,38 @@ static Statement* expectStruct(Parser* parser) {
 
     advance(parser);
 
-    return (Statement*)stru;
+    return (NodeRef)stru;
 }
 
-static Statement* expectTypedef(Parser* parser) {
-    Typedef* def = allocStatement(parser, Statement_Typedef);
+static NodeRef expectTypedef(Parser* parser) {
+    Typedef* def = alloc_node(parser, Node_Typedef).Typedef;
     advance(parser);
     def->name = identifier(parser);
     if (tok(parser, Tok_Assign)) def->type = expectType(parser);
     semicolon(parser);
-    return (Statement*)def;
+    return (NodeRef)def;
 }
 
-static Statement* expectConst(Parser* parser) {
-    Declaration* decl = allocStatement(parser, Statement_Constant);
+static NodeRef expectConst(Parser* parser) {
+    Constant* co = alloc_node(parser, Node_Constant).Constant;
     advance(parser);
-    decl->name = identifier(parser);
+    co->name = identifier(parser);
     expect(parser, Tok_Assign);
-    decl->expr = expectExpression(parser);
+    co->expr = expectExpression(parser);
     semicolon(parser);
-    return (Statement*)decl;
+    return (NodeRef)co;
 }
 
-static ProcArg* expectProcArguments(Parser* parser) {
+static Argument* expectArgument(Parser* parser) {
 
-    if (tok(parser, Tok_CloseParen)) {
-        return null;
-    }
+    if (tok(parser, Tok_CloseParen))  return null;
 
-    ProcArg* res = list_create(ProcArg);
-    ProcArg arg;
-    arg.base.statementType = Statement_Argument;
+    Argument* res = list_create(Argument);
+    Argument arg;
+    arg.kind = Node_Argument;
     do {
         tok(parser, Tok_Keyword_With);
-        arg.base.nodebase = node_init(parser);
+        arg.loc = get_code_location_here(parser);
         arg.type = expectType(parser);
         arg.name = identifier(parser);
         list_add(res, arg);
@@ -376,21 +349,21 @@ static ProcArg* expectProcArguments(Parser* parser) {
     return res;
 }
 
-static Statement* proc_or_var(Parser* parser, bool declare_localy) {
+static NodeRef proc_or_var(Parser* parser, bool declare_localy) {
 
-    Node node = node_init(parser);
+    CodeLocation loc = get_code_location_here(parser);
     Type* type = expectType(parser);
     Identifier name = identifier(parser);
 
     if (tok(parser, Tok_OpenParen)) {
 
-        Procedure* proc = allocStatement(parser, Statement_Procedure);
-        proc->base.nodebase = node;
-        proc->returnType = type;
+        Procedure* proc = alloc_node(parser, Node_Procedure).Procedure;
+        proc->loc = loc;
+        proc->return_type = type;
         proc->name = name;
-        proc->arguments = expectProcArguments(parser);
+        proc->arguments = expectArgument(parser);
 
-        if (declare_localy) declare_symbol(parser, (Statement*)proc);
+        if (declare_localy) declare_symbol(parser, (NodeRef)proc);
 
         if (tok(parser, Tok_Semicolon)) {
             proc->scope = null;
@@ -399,7 +372,7 @@ static Statement* proc_or_var(Parser* parser, bool declare_localy) {
             u32 num_args = 0;
             if (proc->arguments) {
                 foreach (arg, proc->arguments) {
-                    declare_symbol(parser, (Statement*)arg);
+                    declare_symbol(parser, (NodeRef)arg);
                 }
                 num_args = arg_count;
             }
@@ -408,19 +381,19 @@ static Statement* proc_or_var(Parser* parser, bool declare_localy) {
             stack_pop(parser, num_args);
         }
 
-        return (Statement*)proc;
+        return (NodeRef)proc;
     }
 
 
-    Declaration* decl = allocStatement(parser, Statement_Declaration);
-    decl->base.nodebase = node;
+    Declaration* decl = alloc_node(parser, Node_Declaration).Declaration;
+    decl->loc = loc;
     decl->type = type;
     decl->name = name;
 
     if (tok(parser, Tok_Assign)) decl->expr = expectExpression(parser);
 
     semicolon(parser);
-    return (Statement*)decl;
+    return (NodeRef)decl;
 }
 
 
@@ -435,60 +408,30 @@ static Statement* proc_or_var(Parser* parser, bool declare_localy) {
 //     }
 // }
 
-static Statement* parse_top_level_statement(Parser* parser) {
-
-    switch (peek(parser).type) {
-
-        case Tok_Keyword_Include: {
-            advance(parser);
-            expect(parser, Tok_String);
-            Identifier file_name = peek_at(parser, -1).data.string;
-            printf("include \"%s\"\n", get_string(file_name));
-            list_add(parser->current_unit->included_files, file_name);
-            semicolon(parser);
-        } break;
-
-        case Tok_Keyword_Struct: return expectStruct(parser);
-        case Tok_Keyword_Enum: return expectEnum(parser);
-        case Tok_Keyword_Type: return expectTypedef(parser);
-        case Tok_Keyword_Const: return expectConst(parser);
-
-        case Tok_Keyword_Let:
-        case Tok_Word: return proc_or_var(parser, false);
-
-        case Tok_EOF: return null;
-
-        default: {
-            fatal_parse_error(parser, "Unexpected token.");
-        } break;
-    }
-
-    return null;
-}
 
 static void parse_unit(Parser* parser) {
     Unit* unit = list_add_empty(parser->units);
     parser->current_unit = unit;
 
     unit->arena = arena_create();
-    unit->top_level_statements = list_create(Statement*);
-    unit->external_symbols = list_create(VariableExpression*);
-    unit->external_types = list_create(Type*);
-    unit->included_files = list_create(Identifier);
+    list_init(unit->top_level_nodes);
+    list_init(unit->external_symbols);
+    list_init(unit->external_types);
+    list_init(unit->included_files);
 
     reset_parser(parser);
 
     while (peek(parser).type != Tok_EOF) {
         list_clear(parser->local_symbols);
-        Statement* top_lvl_sta = parse_top_level_statement(parser);
-        if (top_lvl_sta) list_add(unit->top_level_statements, top_lvl_sta);
+        NodeRef ref = expectStatement(parser);
+        if (ref.node) list_add(unit->top_level_nodes, ref);
     }
 
     foreach (item, parser->unresolved_variables) {
         VariableExpression* var = *item;
         var->ref = get_global_symbol(var->name, unit);
 
-        if (!var->ref) list_add(unit->external_symbols, var);
+        if (!var->ref.node) list_add(unit->external_symbols, var);
     }
 
     Identifier* includes = unit->included_files;
@@ -532,17 +475,16 @@ void bind_units(Parser* parser, Codebase* cb) {
     #undef ensure_list
 
     foreach (unit, parser->units) {
-        foreach (top_lvl_sta, unit->top_level_statements) {
-            Statement* sta = *top_lvl_sta;
+        foreach (top_lvl_sta, unit->top_level_nodes) {
+            NodeRef ref = (NodeRef)(*top_lvl_sta);
 
-            switch (sta->statementType) {
-                case Statement_Procedure: list_add(cb->procedures, sta); break;
-
-                case Statement_Constant: list_add(cb->global_consts, sta); break;
-                case Statement_Declaration: list_add(cb->global_vars, sta); break;
-                case Statement_Struct: list_add(cb->structs, sta); break;
-                case Statement_Enum: list_add(cb->enums, sta); break;
-                case Statement_Typedef: list_add(cb->type_defs, sta); break;
+            switch (ref.node->kind) {
+                case Node_Procedure:   list_add(cb->procedures,    ref); break;
+                case Node_Constant:    list_add(cb->global_consts, ref); break;
+                case Node_Declaration: list_add(cb->global_vars,   ref); break;
+                case Node_Struct:      list_add(cb->structs,       ref); break;
+                case Node_Enum:        list_add(cb->enums,         ref); break;
+                case Node_Typedef:     list_add(cb->type_defs,     ref); break;
 
                 default: break;
             }
@@ -569,7 +511,7 @@ void bind_units(Parser* parser, Codebase* cb) {
 
             foreach (item, u1->external_symbols) {
                 VariableExpression* var = *item;
-                if (var->ref) continue; // TODO: why am I doing this? figure out and leave a comment
+                if (var->ref.node) continue; // TODO: why am I doing this? figure out and leave a comment
                 var->ref = get_global_symbol(var->name, u2);
             }
         }
@@ -580,7 +522,7 @@ void bind_units(Parser* parser, Codebase* cb) {
 
         foreach (item, u->external_symbols) {
             VariableExpression* var = *item;
-            if (var->ref == null) error_node(parser, var, "Undeclared symbol \"%s\".", get_string(var->name));
+            if (var->ref.node == null) error_node(parser, var, "Undeclared symbol \"%s\".", get_string(var->name));
         }
     }
 
@@ -599,7 +541,7 @@ void bind_units(Parser* parser, Codebase* cb) {
         for (u32 i = 0; i < procs_length; i++) {
             Procedure* p1 = cb->procedures[i];
 
-            init_typenode_for_proc(p1);
+            init_typenode_for_proc(parser, p1);
 
             if (p1->overload) continue;
 

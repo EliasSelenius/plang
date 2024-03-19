@@ -97,7 +97,7 @@ static Procedure* builtin_procedures;
 static Procedure create_builtin_proc(char* name) {
     Procedure proc = {0};
     proc.name = register_string(spFrom(name));
-    proc.base.statementType = Statement_Procedure;
+    proc.kind = Node_Procedure;
     init_typenode_for_proc(&proc);
     return proc;
 }
@@ -120,15 +120,14 @@ static Procedure create_builtin_proc(char* name) {
 */
 
 typedef struct Unit {
-    Arena arena; // TODO: make use of this arena
-    Statement** top_level_statements; // list
+    Arena* arena;
+    NodeRef* top_level_nodes; // list
     VariableExpression** external_symbols; // list
     Type** external_types; // list
     Identifier* included_files; // list
 } Unit;
 
 typedef struct Parser {
-
     Token* tokens; // list
     u32 token_index;
 
@@ -140,8 +139,8 @@ typedef struct Parser {
     Scope* scope;         // current scope being parsed
     Procedure* procedure; // current procedure that is being validated
 
-    Statement** local_symbols; // all the things a VariableExpression might refer to
-    Statement** local_types;
+    NodeRef* local_symbols; // all the things a VariableExpression might refer to
+    NodeRef* local_types;
 
     VariableExpression** unresolved_variables; // list
     Type** unresolved_types; // list
@@ -160,21 +159,9 @@ static inline Token peek_at(Parser* parser, i32 offset) { return parser->tokens[
 static inline Token peek(Parser* parser) { return peek_at(parser, 0); }
 static inline Token advance(Parser* parser) { return parser->tokens[parser->token_index++]; }
 
-
-
-
-static void gen_errorv(Parser* parser, CodeLocation loc, const char* format, va_list args) {
-    Error e = {0};
-    e.location = loc;
-    e.message = alloc_vprintf(format, args);
-    list_add(parser->errors, e);
-}
-
-static void gen_error(Parser* parser, CodeLocation loc, const char* format, ...) {
-    va_list args;
-    va_start(args, format);
-    gen_errorv(parser, loc, format, args);
-    va_end(args);
+static CodeLocation get_code_location_here(Parser* parser) {
+    Token tok = peek(parser);
+    return (CodeLocation) { .file_name = parser->current_file_name, .line = tok.line, .column = tok.column };
 }
 
 static void print_errors(Parser* parser) {
@@ -183,36 +170,28 @@ static void print_errors(Parser* parser) {
     }
 }
 
+static void gen_errorv(Parser* parser, CodeLocation loc, const char* format, va_list args) {
+    Error e = {0};
+    e.location = loc;
+    e.message = alloc_vprintf(format, args);
+    list_add(parser->errors, e);
+}
+
+#define gen_error_m(parser, loc) do {\
+    va_list args; va_start(args, format);\
+    gen_errorv(parser, loc, format, args);\
+    va_end(args);\
+    } while (0)
+
+static void gen_error(Parser* parser, CodeLocation loc, const char* format, ...) { gen_error_m(parser, loc); }
+static void error_token(Parser* parser, char* format, ...) { gen_error_m(parser, get_code_location_here(parser)); }
+static void error_node(Parser* parser, void* ref, char* format, ...) { gen_error_m(parser, ((NodeRef)ref).node->loc); }
 static void fatal_parse_error(Parser* parser, char* format, ...) {
-    Token tok = peek(parser);
-    CodeLocation loc = { .file_name = parser->current_file_name, .line = tok.line, .column = tok.column };
-
-    va_list args;
-    va_start(args, format);
-    gen_errorv(parser, loc, format, args);
-    va_end(args);
-
+    gen_error_m(parser, get_code_location_here(parser));
     longjmp(parser->jump_location, 1);
 }
 
-static void error_token(Parser* parser, char* format, ...) {
-    Token tok = peek(parser);
-    CodeLocation loc = { .file_name = parser->current_file_name, .line = tok.line, .column = tok.column };
-
-    va_list args;
-    va_start(args, format);
-    gen_errorv(parser, loc, format, args);
-    va_end(args);
-}
-
-static void error_node(Parser* parser, void* node, char* format, ...) {
-    Node* n = (Node*)node;
-
-    va_list args;
-    va_start(args, format);
-    gen_errorv(parser, n->loc, format, args);
-    va_end(args);
-}
+#undef gen_error_m
 
 
 
@@ -234,18 +213,14 @@ Parser* init_parser() {
 
     Parser* parser = calloc(1, sizeof(Parser));
 
-    parser->tokens = list_create(Token);
     parser->token_index = 0;
-
-    parser->units = list_create(Unit);
-
-    parser->local_symbols = list_create(Statement*);
-    parser->local_types = list_create(Statement*);
-
-    parser->unresolved_variables = list_create(VariableExpression*);
-    parser->unresolved_types = list_create(Type*);
-
-    parser->errors = list_create(Error);
+    list_init(parser->tokens);
+    list_init(parser->units);
+    list_init(parser->local_symbols);
+    list_init(parser->local_types);
+    list_init(parser->unresolved_variables);
+    list_init(parser->unresolved_types);
+    list_init(parser->errors);
 
     return parser;
 }
@@ -255,30 +230,21 @@ void free_parser(Parser* parser) {
 }
 
 
-static Identifier getNameOfStatement(Statement* sta) {
-    switch (sta->statementType) {
-        case Statement_Declaration: return ((Declaration*)sta)->name;
-        case Statement_Constant: return ((Declaration*)sta)->name;
-        case Statement_Argument: return ((ProcArg*)sta)->name;
-        case Statement_For: return ((ForStatement*)sta)->index_name;
-        case Statement_Procedure: return ((Procedure*)sta)->name;
-
-        case Statement_Struct: return ((Struct*)sta)->name;
-        case Statement_Enum: return ((Enum*)sta)->name;
-        case Statement_Typedef: return ((Typedef*)sta)->name;
+static Identifier getNameOfStatement(NodeRef ref) {
+    switch (ref.node->kind) {
+        case Node_Declaration: return ref.Declaration->name;
+        case Node_Constant:    return ref.Constant->name;
+        case Node_Argument:    return ref.Argument->name;
+        case Node_ForStmt:     return ref.ForStmt->index_name;
+        case Node_Procedure:   return ref.Procedure->name;
+        case Node_Struct:      return ref.Struct->name;
+        case Node_Enum:        return ref.Enum->name;
+        case Node_Typedef:     return ref.Typedef->name;
 
         default: return 0;
     }
 }
 
-
-static Statement* get_global_type(Identifier name, Codebase* codebase) {
-    foreach (stru, codebase->structs)   if ((*stru)->name == name) return (Statement*)(*stru);
-    foreach (tdef, codebase->type_defs) if ((*tdef)->name == name) return (Statement*)(*tdef);
-    foreach (enom, codebase->enums)     if ((*enom)->name == name) return (Statement*)(*enom);
-
-    return null;
-}
 
 static Statement* get_global_symbol_from_codebase(Identifier name, Codebase* cb) {
     foreach (prc, cb->procedures)    if ((*prc)->name == name) return (Statement*)(*prc);
@@ -288,51 +254,63 @@ static Statement* get_global_symbol_from_codebase(Identifier name, Codebase* cb)
     return null;
 }
 
-static Statement* get_global_symbol(Identifier name, Unit* unit) {
-    foreach (item, unit->top_level_statements) {
-        Statement* sta = *item;
-        if (name == getNameOfStatement(sta)) return sta;
+static NodeRef get_global_symbol(Identifier name, Unit* unit) {
+    foreach (item, unit->top_level_nodes) if (name == getNameOfStatement(*item)) return *item;
+    return null_node;
+}
+
+
+
+static Datatype get_datatype_from_statement(NodeRef ref) {
+    if (ref.node == null) return type_invalid;
+    switch (ref.node->kind) {
+        case Node_Struct:  return (Datatype) { .kind = Typekind_Struct, .data_ptr = ref.void_ptr };
+        case Node_Enum:    return (Datatype) { .kind = Typekind_Enum, .data_ptr = ref.void_ptr };
+        case Node_Typedef: return (Datatype) { .kind = Typekind_Typedef, .data_ptr = ref.void_ptr };
     }
-
-    return null;
+    return type_invalid;
 }
 
-static void declare_local_type(Parser* parser, Statement* sta) {
-    // TODO: already declared error
-    list_add(parser->local_types, sta);
-}
-
-static Statement* get_local_type(Parser* parser, Identifier name) {
+static Datatype get_local_type(Parser* parser, Identifier name) {
     i32 len = (i32)list_length(parser->local_types);
     for (i32 i = len-1; i >= 0; i--) {
-        Statement* sta = parser->local_types[i];
-        if (name == getNameOfStatement(sta)) return sta;
+        NodeRef ref = parser->local_types[i];
+        if (name == getNameOfStatement(ref)) return get_datatype_from_statement(ref);
     }
-
-    return null;
+    return type_invalid;
 }
 
-static Statement* get_symbol(Parser* parser, Identifier name) {
+static Datatype get_global_type(Identifier name, Codebase* codebase) {
+    foreach (stru, codebase->structs)   if ((*stru)->name == name) return (Datatype) { .kind = Typekind_Struct, .data_ptr = *stru };
+    foreach (tdef, codebase->type_defs) if ((*tdef)->name == name) return (Datatype) { .kind = Typekind_Typedef, .data_ptr = *tdef };
+    foreach (enom, codebase->enums)     if ((*enom)->name == name) return (Datatype) { .kind = Typekind_Enum, .data_ptr = *enom };
+    return type_invalid;
+}
 
+
+static void declare_local_type(Parser* parser, NodeRef ref) {
+    // TODO: already declared error
+    list_add(parser->local_types, ref);
+}
+
+static NodeRef get_symbol(Parser* parser, Identifier name) {
     i32 len = (i32)list_length(parser->local_symbols);
     for (i32 i = len-1; i >= 0; i--) {
-        Statement* sta = parser->local_symbols[i];
-        if (name == getNameOfStatement(sta)) return sta;
+        NodeRef ref = parser->local_symbols[i];
+        if (name == getNameOfStatement(ref)) return ref;
     }
 
     u32 builtin_procs_len = list_length(builtin_procedures);
     for (u32 i = 0; i < builtin_procs_len; i++) {
-        if (builtin_procedures[i].name == name) return (Statement*)(&builtin_procedures[i]);
+        if (builtin_procedures[i].name == name) return (NodeRef)(&builtin_procedures[i]);
     }
 
-    return null;
+    return null_node;
 }
 
-static void declare_symbol(Parser* parser, Statement* sta) {
-
+static void declare_symbol(Parser* parser, NodeRef ref) {
     // TODO: already declared error
-
-    list_add(parser->local_symbols, sta);
+    list_add(parser->local_symbols, ref);
 }
 
 static void stack_pop(Parser* parser, u32 num) {

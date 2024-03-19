@@ -53,6 +53,10 @@ typedef enum Nodekind {
 } Nodekind;
 #undef node_enum_entry
 
+#define index_initializer_string(name, value) [Node_##name] = #name,
+static char* node_names[] = { for_each_node(index_initializer_string, ) };
+#undef index_initializer_string
+
 #define node_cases(name, a) case Node_##name:
 
 #define for_each_node_struct(X)\
@@ -73,12 +77,15 @@ typedef struct AstNode { AstNodeFields } AstNode;
 
 #define AstNodePointer_field(name, a) name##a* name;
 typedef union NodeRef {
+    void* void_ptr;
     AstNode* node;
     Expression* expr;
     Statement* stmt;
     for_each_node_struct(AstNodePointer_field)
 } NodeRef;
 #undef AstNodePointer_field
+
+#define null_node ((NodeRef)null)
 
 
 // ----Types---------------------------------------------
@@ -347,7 +354,7 @@ typedef struct CompoundElement {
 
 DefineExpressionNode(Compound,      { CompoundElement* elements;                                                     })
 DefineExpressionNode(Literal,       { Tokendata        data;                                                         })
-DefineExpressionNode(Unary,         { Expression*      expr;                                                         })
+DefineExpressionNode(Unary,         { Expression*      inner_expr;                                                   })
 DefineExpressionNode(Binary,        { Expression*      left;       Expression* right;                                })
 DefineExpressionNode(Parenthesized, { Expression*      inner_expr;                                                   })
 DefineExpressionNode(Indexing,      { Expression*      indexed;    Expression* index;                                })
@@ -361,7 +368,7 @@ DefineExpressionNode(ProcCall,      { Expression*      proc_expr;  Expression** 
 
 // ----Statements----------------------------------------------
 DefineStatementNode(Typedef,        { Type*       type;         Identifier name;                                     })
-DefineStatementNode(Assignment,     { Expression* dst_expr;     TokenType  operator;        Expression* src_expr;    })
+DefineStatementNode(Assignment,     { Expression* dst_expr;     Expression* src_expr;       TokenType  operator;     })
 DefineStatementNode(Scope,          { Scope*      parentScope;  NodeRef*   statements; /* list */                    })
 DefineStatementNode(WhileStmt,      { Expression* condition;    NodeRef    statement;                                })
 DefineStatementNode(IfStmt,         { Expression* condition;    NodeRef    then_statement;  NodeRef else_statement;  })
@@ -371,7 +378,12 @@ DefineStatementNode(GotoStmt,       { Identifier  label;                        
 DefineStatementNode(LabelStmt,      { Identifier  label;                                                             })
 DefineStatementNode(CaseLabelStmt,  { Expression* expr;         SwitchStmt* switch_statement;                        })
 DefineStatementNode(Argument,       { Type*       type;         Identifier  name;                                    })
-DefineStatementNode(Constant,       { Expression* expr;                                                              })
+DefineStatementNode(Constant,       { Expression* expr;         Identifier  name;                                    })
+DefineStatementNode(DefaultLabelStmt, {})
+DefineStatementNode(ContinueStmt,   {})
+DefineStatementNode(BreakStmt,      {})
+
+
 
 DefineStatementNode(Declaration, {
     Type*       type;
@@ -473,33 +485,29 @@ static Datatype dealiasType(Datatype type) {
     return type;
 }
 
-// #define index_initializer(name, value) [Node_##name] = value,
-// #define index_initializer_binary(name)      index_initializer(name, sizeof(BinaryExpression))
-// #define index_initializer_unary(name)       index_initializer(name, sizeof(UnaryExpression))
-// #define index_initializer_literal(name)     index_initializer(name, sizeof(LiteralExpression))
-// #define index_initializer_other_expr(name)  index_initializer(name, sizeof(name##Expression))
-// #define index_initializer_stmt(name)        index_initializer(name, sizeof(name##Stmt))
 
-// static u32 node_struct_sizes[] = {
-//     for_each_binary_node(index_initializer_binary)
-//     for_each_unary_node(index_initializer_unary)
-//     for_each_literal_node(index_initializer_literal)
-//     for_each_other_expr_node(index_initializer_other_expr)
-//     for_each_stmt_node(index_initializer_stmt)
-// };
+#define index_initializer(name, value) [Node_##name] = sizeof(name##value),
+#define index_initializer_const(name, value) [Node_##name] = sizeof(value),
+static u32 node_struct_sizes[] = {
+    for_each_binary_node      (index_initializer_const, BinaryExpression)
+    for_each_unary_node       (index_initializer_const, UnaryExpression)
+    for_each_literal_node     (index_initializer_const, LiteralExpression)
+    for_each_other_expr_node  (index_initializer, Expression)
+    for_each_stmt_node        (index_initializer, )
+};
+#undef index_initializer
+#undef index_initializer_const
 
-// #undef index_initializer_binary
-// #undef index_initializer_unary
-// #undef index_initializer_literal
-// #undef index_initializer_other_expr
-// #undef index_initializer_stmt
 
-// #define index_initializer_string(name) index_initializer(name, #name)
-// static char* node_names[] = {
-//     for_each_node(index_initializer_string)
-// };
-// #undef index_initializer_string
-// #undef index_initializer
+static NodeRef alloc_node(Parser* parser, Nodekind kind) {
+    NodeRef ref = (NodeRef)arena_alloc(parser->current_unit->arena, node_struct_sizes[kind]);
+    ref.node->kind = kind;
+    ref.node->loc = get_code_location_here(parser);
+    return ref;
+}
+
+
+
 
 static bool isCompiletimeExpression(Expression* expr) {
     NodeRef e = (NodeRef)expr;
@@ -517,7 +525,7 @@ static bool isCompiletimeExpression(Expression* expr) {
         case Node_Unary_BitwiseNot:
         case Node_Unary_Negate:
         case Node_Unary_ValueOf:
-            return isCompiletimeExpression(e.Unary->expr);
+            return isCompiletimeExpression(e.Unary->inner_expr);
 
         case Node_Unary_AddressOf: return false;
 
