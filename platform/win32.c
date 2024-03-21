@@ -103,10 +103,10 @@ void print_file(FileInfo info, void* user_data) {
 // ---------Virtual-Memory------------------------------
 
 
-void* vmem_reserve(u32 size) { return VirtualAlloc(null, size, MEM_RESERVE, PAGE_NOACCESS); }
+void* vmem_reserve(u64 size) { return VirtualAlloc(null, size, MEM_RESERVE, PAGE_NOACCESS); }
 void vmem_release(void* address) { VirtualFree(address, 0, MEM_RELEASE); }
-void vmem_commit(void* address, u32 size) { VirtualAlloc(address, size, MEM_COMMIT, PAGE_READWRITE); }
-void vmem_decommit(void* address, u32 size) { VirtualFree(address, size, MEM_DECOMMIT); }
+void vmem_commit(void* address, u64 size) { VirtualAlloc(address, size, MEM_COMMIT, PAGE_READWRITE); }
+void vmem_decommit(void* address, u64 size) { VirtualFree(address, size, MEM_DECOMMIT); }
 
 
 // -------Timer---------------------------------------

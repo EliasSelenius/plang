@@ -355,7 +355,7 @@ void repl_init(REPL* repl, Codebase* cb) {
 u64 repl_input(char* code, REPL* repl) {
     lex(repl->parser, code);
     reset_parser(repl->parser);
-    Statement* sta = expectStatement(repl->parser);
+    Statement* sta = expect_node(repl->parser);
 
     foreach (var, repl->parser->unresolved_variables) {
         (*var)->ref = get_global_symbol_from_codebase((*var)->name, repl->codebase);

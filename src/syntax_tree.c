@@ -79,13 +79,13 @@ typedef struct AstNode { AstNodeFields } AstNode;
 typedef union NodeRef {
     void* void_ptr;
     AstNode* node;
-    Expression* expr;
-    Statement* stmt;
+    struct Expression* expr;
+    struct Statement* stmt;
     for_each_node_struct(AstNodePointer_field)
 } NodeRef;
 #undef AstNodePointer_field
 
-#define null_node ((NodeRef)null)
+#define null_node ((NodeRef){null})
 
 
 // ----Types---------------------------------------------
@@ -180,7 +180,7 @@ struct Type {
 
         struct {
             struct Type* element_type;
-            struct Expression* size_expr;
+            NodeRef size_expr;
         } array;
     };
 
@@ -344,7 +344,7 @@ typedef struct Statement {
 #define default_for_loop_numeric_type type_int32
 
 typedef struct CompoundElement {
-    Expression* expr;
+    NodeRef expr;
     Identifier name;
 } CompoundElement;
 
@@ -354,31 +354,31 @@ typedef struct CompoundElement {
 
 DefineExpressionNode(Compound,      { CompoundElement* elements;                                                     })
 DefineExpressionNode(Literal,       { Tokendata        data;                                                         })
-DefineExpressionNode(Unary,         { Expression*      inner_expr;                                                   })
-DefineExpressionNode(Binary,        { Expression*      left;       Expression* right;                                })
-DefineExpressionNode(Parenthesized, { Expression*      inner_expr;                                                   })
-DefineExpressionNode(Indexing,      { Expression*      indexed;    Expression* index;                                })
-DefineExpressionNode(Alloc,         { Expression*      size_expr;  Type*       type;                                 })
-DefineExpressionNode(Deref,         { Expression*      expr;       Identifier  name;                                 })
+DefineExpressionNode(Unary,         { NodeRef          inner_expr;                                                   })
+DefineExpressionNode(Binary,        { NodeRef          left;       NodeRef     right;                                })
+DefineExpressionNode(Parenthesized, { NodeRef          inner_expr;                                                   })
+DefineExpressionNode(Indexing,      { NodeRef          indexed;    NodeRef     index;                                })
+DefineExpressionNode(Alloc,         { NodeRef          size_expr;  Type*       type;                                 })
+DefineExpressionNode(Deref,         { NodeRef          expr;       Identifier  name;                                 })
 DefineExpressionNode(Variable,      { Identifier       name;       NodeRef     ref;                                  }) // ref = procedure, global, enum
-DefineExpressionNode(Cast,          { Expression*      expr;       Type*       new_type;                             })
+DefineExpressionNode(Cast,          { NodeRef          expr;       Type*       new_type;                             })
 DefineExpressionNode(Sizeof,        { Type*            type;                                                         })
-DefineExpressionNode(Ternary,       { Expression*      condition;  Expression* then_expr;   Expression* else_expr;   })
-DefineExpressionNode(ProcCall,      { Expression*      proc_expr;  Expression** args;       Procedure* proc;         }) // args = list, can be null. proc = can be null if this ProcCall is calling a procptr
+DefineExpressionNode(Ternary,       { NodeRef          condition;  NodeRef     then_expr;   NodeRef    else_expr;    })
+DefineExpressionNode(ProcCall,      { NodeRef          proc_expr;  NodeRef*    args;        Procedure* proc;         }) // args = list, can be null. proc = can be null if this ProcCall is calling a procptr
 
 // ----Statements----------------------------------------------
 DefineStatementNode(Typedef,        { Type*       type;         Identifier name;                                     })
-DefineStatementNode(Assignment,     { Expression* dst_expr;     Expression* src_expr;       TokenType  operator;     })
-DefineStatementNode(Scope,          { Scope*      parentScope;  NodeRef*   statements; /* list */                    })
-DefineStatementNode(WhileStmt,      { Expression* condition;    NodeRef    statement;                                })
-DefineStatementNode(IfStmt,         { Expression* condition;    NodeRef    then_statement;  NodeRef else_statement;  })
-DefineStatementNode(SwitchStmt,     { Expression* expr;         Scope*     scope;                                    })
-DefineStatementNode(ReturnStmt,     { Expression* expr;                                                              })
+DefineStatementNode(Assignment,     { NodeRef     dst_expr;     NodeRef    src_expr;        TokenType  operator;     })
+DefineStatementNode(Scope,          { Scope*      parentScope;  NodeRef*   statements;                               })
+DefineStatementNode(WhileStmt,      { NodeRef     condition;    NodeRef    statement;                                })
+DefineStatementNode(IfStmt,         { NodeRef     condition;    NodeRef    then_statement;  NodeRef else_statement;  })
+DefineStatementNode(SwitchStmt,     { NodeRef     expr;         Scope*     scope;                                    })
+DefineStatementNode(ReturnStmt,     { NodeRef     expr;                                                              })
 DefineStatementNode(GotoStmt,       { Identifier  label;                                                             })
 DefineStatementNode(LabelStmt,      { Identifier  label;                                                             })
-DefineStatementNode(CaseLabelStmt,  { Expression* expr;         SwitchStmt* switch_statement;                        })
+DefineStatementNode(CaseLabelStmt,  { NodeRef     expr;         SwitchStmt* switch_statement;                        })
 DefineStatementNode(Argument,       { Type*       type;         Identifier  name;                                    })
-DefineStatementNode(Constant,       { Expression* expr;         Identifier  name;                                    })
+DefineStatementNode(Constant,       { NodeRef     expr;         Identifier  name;                                    })
 DefineStatementNode(DefaultLabelStmt, {})
 DefineStatementNode(ContinueStmt,   {})
 DefineStatementNode(BreakStmt,      {})
@@ -386,8 +386,8 @@ DefineStatementNode(BreakStmt,      {})
 
 
 DefineStatementNode(Declaration, {
-    Type*       type;
-    Expression* expr; /* can be null */
+    Type*   type;
+    NodeRef expr; /* can be null */
     Identifier name;
     bool include_context; /* TODO: flags */
     bool is_static;
@@ -396,9 +396,9 @@ DefineStatementNode(Declaration, {
 DefineStatementNode(ForStmt, {
     Type*       index_type;   /* can be null */
     Identifier  index_name;
-    Expression* iterator_assignment;
-    union { Expression* min_expr; Expression* condition; };
-    union { Expression* max_expr; Expression* iterator_update; };
+    NodeRef iterator_assignment;
+    union { NodeRef min_expr; NodeRef condition; };
+    union { NodeRef max_expr; NodeRef iterator_update; };
     NodeRef statement;
 })
 
@@ -437,7 +437,7 @@ DefineStatementNode(Struct, {
 
 DefineStatementNode(EnumEntry, {
     Enum* _enum;
-    Expression* expr; // can be null
+    NodeRef expr; // can be null
     u64 value;
     Identifier name;
 })
@@ -499,19 +499,10 @@ static u32 node_struct_sizes[] = {
 #undef index_initializer_const
 
 
-static NodeRef alloc_node(Parser* parser, Nodekind kind) {
-    NodeRef ref = (NodeRef)arena_alloc(parser->current_unit->arena, node_struct_sizes[kind]);
-    ref.node->kind = kind;
-    ref.node->loc = get_code_location_here(parser);
-    return ref;
-}
 
-
-
-
-static bool isCompiletimeExpression(Expression* expr) {
-    NodeRef e = (NodeRef)expr;
+static bool isCompiletimeExpression(NodeRef e) {
     switch (e.node->kind) {
+        default: return false;
 
         for_each_binary_node(node_cases,) return isCompiletimeExpression(e.Binary->left) && isCompiletimeExpression(e.Binary->right);
 

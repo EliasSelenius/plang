@@ -2,7 +2,6 @@
 
 #define init_expr_type(type) do { p = alloc_node(parser, Node_##type); token = advance(parser); } while (0)
 
-static NodeRef expect_expr(Parser* parser);
 
 static NodeRef expect_leaf(Parser* parser) {
     NodeRef p = null_node;
@@ -19,7 +18,7 @@ static NodeRef expect_leaf(Parser* parser) {
             init_expr_type(Alloc);
             p.Alloc->type = expectType(parser);
             if (!tok(parser, Tok_OpenSquare)) break;
-            p.Alloc->size_expr = expect_expr(parser).expr;
+            p.Alloc->size_expr = expect_expr(parser);
             expect(parser, Tok_CloseSquare);
         } break;
 
@@ -32,7 +31,7 @@ static NodeRef expect_leaf(Parser* parser) {
 
         case Tok_OpenParen: {
             init_expr_type(Parenthesized);
-            p.Parenthesized->inner_expr = expect_expr(parser).expr;
+            p.Parenthesized->inner_expr = expect_expr(parser);
             expect(parser, Tok_CloseParen);
         } break;
 
@@ -53,7 +52,7 @@ static NodeRef expect_leaf(Parser* parser) {
                     advance(parser);
                 }
 
-                el.expr = expect_expr(parser).expr;
+                el.expr = expect_expr(parser);
                 list_add(p.Compound->elements, el);
             } while (tok(parser, Tok_Comma));
 
@@ -76,25 +75,25 @@ static NodeRef expect_leaf(Parser* parser) {
     switch (peek(parser).type) {
         case Tok_Period: {
             init_expr_type(Deref);
-            p.Deref->expr = inner_node.expr;
+            p.Deref->expr = inner_node;
             p.Deref->name = identifier(parser);
         } goto again;
 
         case Tok_OpenSquare: {
             init_expr_type(Indexing);
-            p.Indexing->indexed = inner_node.expr;
-            p.Indexing->index = expect_expr(parser).expr;
+            p.Indexing->indexed = inner_node;
+            p.Indexing->index = expect_expr(parser);
             expect(parser, Tok_CloseSquare);
         } goto again;
 
         case Tok_OpenParen: {
             init_expr_type(ProcCall);
-            p.ProcCall->proc_expr = inner_node.expr;
+            p.ProcCall->proc_expr = inner_node;
 
             if (tok(parser, Tok_CloseParen)) goto again;
             list_init(p.ProcCall->args);
             do {
-                Expression* arg = expectExpression(parser);
+                NodeRef arg = expect_expr(parser);
                 list_add(p.ProcCall->args, arg);
             } while (tok(parser, Tok_Comma));
             expect(parser, Tok_CloseParen);
@@ -122,19 +121,19 @@ static NodeRef expect_unary(Parser* parser) {
 
     NodeRef inner = expect_leaf(parser);
     if (p.node) {
-        p.Unary->inner_expr = inner.expr;
+        p.Unary->inner_expr = inner;
         inner = p;
     }
 
     switch (peek(parser).type) {
-        case Tok_PlusPlus:   init_expr_type(Unary_PostIncrement); p.Unary->inner_expr = inner.expr; inner = p; break;
-        case Tok_MinusMinus: init_expr_type(Unary_PostDecrement); p.Unary->inner_expr = inner.expr; inner = p; break;
+        case Tok_PlusPlus:   init_expr_type(Unary_PostIncrement); p.Unary->inner_expr = inner; inner = p; break;
+        case Tok_MinusMinus: init_expr_type(Unary_PostDecrement); p.Unary->inner_expr = inner; inner = p; break;
         default: break;
     }
 
     if (peek(parser).type == Tok_Keyword_As) {
         init_expr_type(Cast);
-        p.Cast->expr = inner.expr;
+        p.Cast->expr = inner;
         p.Cast->new_type = expectType(parser);
     }
 

@@ -15,7 +15,7 @@ void enumerate_files(char* path, enumerate_files_callback callback, void* user_d
 void startPerf();
 i64 endPerf();
 
-void* vmem_reserve(u32 size);
+void* vmem_reserve(u64 size);
 void vmem_release(void* address);
-void vmem_commit(void* address, u32 size);
-void vmem_decommit(void* address, u32 size);
+void vmem_commit(void* address, u64 size);
+void vmem_decommit(void* address, u64 size);

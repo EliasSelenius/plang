@@ -1,7 +1,8 @@
 
+static NodeRef expect_expr(Parser* parser);
+static NodeRef expect_node(Parser* parser);
 
 static Scope* expectScope(Parser* parser);
-static Expression* expectExpression(Parser* parser);
 static void validate(Parser* parser, Codebase* cb);
 
 
@@ -100,7 +101,7 @@ static Type* type_modifier(Parser* parser, Type* type) {
             mod->kind = Node_Type_Dynamic_Array;
         } else {
             mod->kind = Node_Type_Fixed_Array;
-            mod->array.size_expr = expectExpression(parser);
+            mod->array.size_expr = expect_expr(parser);
         }
 
         expect(parser, Tok_CloseSquare);
@@ -145,6 +146,8 @@ static void print_typenode(Type* type) {
             print_typenode(type->array.element_type);
             printf("[..]");
         } break;
+
+        default: abort();
     }
 
     printf("%.*s", type->solvedstate.numPointers, "***********");
@@ -270,7 +273,7 @@ static NodeRef expectEnum(Parser* parser) {
         entry.kind = Node_EnumEntry;
         entry._enum = en;
         entry.name = identifier(parser);
-        if (tok(parser, Tok_Assign)) entry.expr = expectExpression(parser);
+        if (tok(parser, Tok_Assign)) entry.expr = expect_expr(parser);
         semicolon(parser);
 
         list_add(en->entries, entry);
@@ -325,7 +328,7 @@ static NodeRef expectConst(Parser* parser) {
     advance(parser);
     co->name = identifier(parser);
     expect(parser, Tok_Assign);
-    co->expr = expectExpression(parser);
+    co->expr = expect_expr(parser);
     semicolon(parser);
     return (NodeRef)co;
 }
@@ -390,7 +393,7 @@ static NodeRef proc_or_var(Parser* parser, bool declare_localy) {
     decl->type = type;
     decl->name = name;
 
-    if (tok(parser, Tok_Assign)) decl->expr = expectExpression(parser);
+    if (tok(parser, Tok_Assign)) decl->expr = expect_expr(parser);
 
     semicolon(parser);
     return (NodeRef)decl;
@@ -423,7 +426,7 @@ static void parse_unit(Parser* parser) {
 
     while (peek(parser).type != Tok_EOF) {
         list_clear(parser->local_symbols);
-        NodeRef ref = expectStatement(parser);
+        NodeRef ref = expect_node(parser);
         if (ref.node) list_add(unit->top_level_nodes, ref);
     }
 
@@ -496,7 +499,7 @@ void bind_units(Parser* parser, Codebase* cb) {
         Type* type = *tp;
         resolve_typenode(parser, type, cb);
         if (type->solvedstate.kind == Typekind_Invalid) {
-            error_node(parser, type, "Failed to resolve type");
+            error_node(parser, (NodeRef)type, "Failed to resolve type");
             printf("    "); print_typenode(type); printf("\n");
         }
     }
@@ -522,7 +525,7 @@ void bind_units(Parser* parser, Codebase* cb) {
 
         foreach (item, u->external_symbols) {
             VariableExpression* var = *item;
-            if (var->ref.node == null) error_node(parser, var, "Undeclared symbol \"%s\".", get_string(var->name));
+            if (var->ref.node == null) error_node(parser, (NodeRef)var, "Undeclared symbol \"%s\".", get_string(var->name));
         }
     }
 

@@ -20,8 +20,16 @@ void main() {
 
     for int32 i = 0, i < 3, i++ print(i, " "); print("\n");
 
-    Node* list = gen_list(3);
-    void advance(Node** n) { @n = (@n).next; }
-    for (let node = list, node, advance(*node)) print(node.num, " "); print("\n");
+
+    {
+        Node* list = gen_list(3);
+        void advance(Node** n) { @n = (@n).next; }
+        for (let node = list, node, advance(*node)) print(node.num, " "); print("\n");
+    }
+
+    {
+        Node* list = gen_list(3);
+        for (let node = list, node, node = node.next) print(node.num, " "); print("\n");
+    }
 
 }

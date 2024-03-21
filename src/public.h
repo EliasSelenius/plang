@@ -4,7 +4,7 @@ typedef struct Codebase {
 
     struct Procedure** procedures; // list
     struct Declaration** global_vars; // list
-    struct Declaration** global_consts; // list
+    struct Constant** global_consts; // list
     struct Struct** structs; // list
     struct Enum** enums; // list
     struct Typedef** type_defs; // list

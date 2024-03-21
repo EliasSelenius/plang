@@ -90,7 +90,7 @@ static void init_string_table() {
 }
 
 
-static void init_typenode_for_proc(Procedure* proc); // TODO: put all forward-decl in same file
+static void init_typenode_for_proc(Parser* parser, Procedure* proc); // TODO: put all forward-decl in same file
 
 static Procedure* builtin_procedures;
 
@@ -98,7 +98,7 @@ static Procedure create_builtin_proc(char* name) {
     Procedure proc = {0};
     proc.name = register_string(spFrom(name));
     proc.kind = Node_Procedure;
-    init_typenode_for_proc(&proc);
+    // init_typenode_for_proc(parser, &proc);
     return proc;
 }
 
@@ -164,6 +164,13 @@ static CodeLocation get_code_location_here(Parser* parser) {
     return (CodeLocation) { .file_name = parser->current_file_name, .line = tok.line, .column = tok.column };
 }
 
+static NodeRef alloc_node(Parser* parser, Nodekind kind) {
+    NodeRef ref = (NodeRef)arena_alloc(parser->current_unit->arena, node_struct_sizes[kind]);
+    ref.node->kind = kind;
+    ref.node->loc = get_code_location_here(parser);
+    return ref;
+}
+
 static void print_errors(Parser* parser) {
     foreach (err, parser->errors) {
         printf("%s:%d:%d: error: %s\n", err->location.file_name, err->location.line, err->location.column, err->message);
@@ -185,8 +192,8 @@ static void gen_errorv(Parser* parser, CodeLocation loc, const char* format, va_
 
 static void gen_error(Parser* parser, CodeLocation loc, const char* format, ...) { gen_error_m(parser, loc); }
 static void error_token(Parser* parser, char* format, ...) { gen_error_m(parser, get_code_location_here(parser)); }
-static void error_node(Parser* parser, void* ref, char* format, ...) { gen_error_m(parser, ((NodeRef)ref).node->loc); }
-static void fatal_parse_error(Parser* parser, char* format, ...) {
+static void error_node(Parser* parser, NodeRef ref, char* format, ...) { gen_error_m(parser, ref.node->loc); }
+_Noreturn static void fatal_parse_error(Parser* parser, char* format, ...) {
     gen_error_m(parser, get_code_location_here(parser));
     longjmp(parser->jump_location, 1);
 }
@@ -267,8 +274,8 @@ static Datatype get_datatype_from_statement(NodeRef ref) {
         case Node_Struct:  return (Datatype) { .kind = Typekind_Struct, .data_ptr = ref.void_ptr };
         case Node_Enum:    return (Datatype) { .kind = Typekind_Enum, .data_ptr = ref.void_ptr };
         case Node_Typedef: return (Datatype) { .kind = Typekind_Typedef, .data_ptr = ref.void_ptr };
+        default: return type_invalid;
     }
-    return type_invalid;
 }
 
 static Datatype get_local_type(Parser* parser, Identifier name) {

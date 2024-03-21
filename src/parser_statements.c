@@ -49,9 +49,9 @@ static u32 peekType(Parser* parser) {
 }
 
 
-static NodeRef optional_sub_node(Parser* parser) { return tok(parser, Tok_Semicolon) ? null_node : expectStatement(parser); }
+static NodeRef optional_sub_node(Parser* parser) { return tok(parser, Tok_Semicolon) ? null_node : expect_node(parser); }
 
-static NodeRef expectStatement(Parser* parser) {
+static NodeRef expect_node(Parser* parser) {
     switch (peek(parser).type) {
 
         case Tok_OpenCurl: return (NodeRef)expectScope(parser);
@@ -60,7 +60,7 @@ static NodeRef expectStatement(Parser* parser) {
             WhileStmt* whileStatement = alloc_node(parser, Node_WhileStmt).WhileStmt;
             advance(parser);
 
-            whileStatement->condition = expectExpression(parser);
+            whileStatement->condition = expect_expr(parser);
             whileStatement->statement = optional_sub_node(parser);
 
             return (NodeRef)whileStatement;
@@ -70,9 +70,9 @@ static NodeRef expectStatement(Parser* parser) {
             IfStmt* res = alloc_node(parser, Node_IfStmt).IfStmt;
             advance(parser);
 
-            res->condition = expectExpression(parser);
+            res->condition = expect_expr(parser);
             res->then_statement = optional_sub_node(parser);
-            if (tok(parser, Tok_Keyword_Else)) res->else_statement = expectStatement(parser);
+            if (tok(parser, Tok_Keyword_Else)) res->else_statement = expect_node(parser);
 
             return (NodeRef)res;
         }
@@ -99,7 +99,7 @@ static NodeRef expectStatement(Parser* parser) {
                 forsta->index_type = expectType(parser);
                 forsta->index_name = identifier(parser);
                 advance(parser); // advance over '='
-                forsta->iterator_assignment = expectExpression(parser);
+                forsta->iterator_assignment = expect_expr(parser);
                 expect(parser, Tok_Comma);
             } else if (tt == Tok_Comma) { // for uint32 i,
                 forsta->index_type = expectType(parser);
@@ -112,8 +112,8 @@ static NodeRef expectStatement(Parser* parser) {
 
             declare_symbol(parser, (NodeRef)forsta);
 
-            forsta->condition = expectExpression(parser);
-            if (tok(parser, expected_token)) forsta->iterator_update = expectExpression(parser);
+            forsta->condition = expect_expr(parser);
+            if (tok(parser, expected_token)) forsta->iterator_update = expect_expr(parser);
 
             if (must_close) expect(parser, Tok_CloseParen);
 
@@ -129,7 +129,7 @@ static NodeRef expectStatement(Parser* parser) {
                 SwitchStmt* switchStatement = alloc_node(parser, Node_SwitchStmt).SwitchStmt;
                 advance(parser);
 
-                switchStatement->expr = expectExpression(parser);
+                switchStatement->expr = expect_expr(parser);
 
                 SwitchStmt* temp = current_switch;
                 current_switch = switchStatement;
@@ -142,7 +142,7 @@ static NodeRef expectStatement(Parser* parser) {
             case Tok_Keyword_Case: {
                 CaseLabelStmt* caseLabel = alloc_node(parser, Node_CaseLabelStmt).CaseLabelStmt;
                 advance(parser);
-                caseLabel->expr = expectExpression(parser);
+                caseLabel->expr = expect_expr(parser);
                 caseLabel->switch_statement = current_switch;
                 expect(parser, Tok_Colon);
                 return (NodeRef)caseLabel;
@@ -174,7 +174,7 @@ static NodeRef expectStatement(Parser* parser) {
         case Tok_Keyword_Return: {
             ReturnStmt* ret = alloc_node(parser, Node_ReturnStmt).ReturnStmt;
             advance(parser);
-            if (peek(parser).type != Tok_Semicolon) ret->expr = expectExpression(parser);
+            if (peek(parser).type != Tok_Semicolon) ret->expr = expect_expr(parser);
             semicolon(parser);
             return (NodeRef)ret;
         }
@@ -198,7 +198,7 @@ static NodeRef expectStatement(Parser* parser) {
             decl->type = expectType(parser);
             decl->name = identifier(parser);
             decl->is_static = true;
-            if (tok(parser, Tok_Assign)) decl->expr = expectExpression(parser);
+            if (tok(parser, Tok_Assign)) decl->expr = expect_expr(parser);
             semicolon(parser);
             return (NodeRef)decl;
         }
@@ -232,7 +232,7 @@ static NodeRef expectStatement(Parser* parser) {
     }
 
 
-    Expression* expr = expectExpression(parser);
+    NodeRef expr = expect_expr(parser);
 
     Token* token = anyof(parser, 8, Tok_Assign,
                                     Tok_PlusAssign,
@@ -247,14 +247,14 @@ static NodeRef expectStatement(Parser* parser) {
         Assignment* ass = alloc_node(parser, Node_Assignment).Assignment;
         ass->dst_expr = expr;
         ass->operator = token->type;
-        ass->src_expr = expectExpression(parser);
+        ass->src_expr = expect_expr(parser);
         semicolon(parser);
         return (NodeRef)ass;
     }
 
     semicolon(parser);
 
-    switch (expr->kind) {
+    switch (expr.node->kind) {
         case Node_Unary_PreIncrement: break;
         case Node_Unary_PostIncrement: break;
         case Node_Unary_PreDecrement: break;
@@ -264,7 +264,7 @@ static NodeRef expectStatement(Parser* parser) {
         default: if (!parser->allow_lonely_expressions) error_token(parser, "This expression is all by its lonesome.");
     }
 
-    return (NodeRef)expr;
+    return expr;
 }
 
 static Scope* expectScope(Parser* parser) {
@@ -279,13 +279,13 @@ static Scope* expectScope(Parser* parser) {
 
     expect(parser, Tok_OpenCurl);
     while (!tok(parser, Tok_CloseCurl)) {
-        NodeRef ref = expectStatement(parser);
+        NodeRef ref = expect_node(parser);
         if (!ref.node) continue; // there must have been an error.
 
         list_add(scope->statements, ref);
 
         switch (ref.node->kind) {
-            // case Node_ForStmt: // declare_symbol() is called in expectStatement(parser) for for-loops, because it must be called before we parse inner statement
+            // case Node_ForStmt: // declare_symbol() is called in expect_node(parser) for for-loops, because it must be called before we parse inner statement
             // case Node_Procedure: // declare_symbol() is called in proc_or_var() for same reason as above
 
             case Node_Declaration:
