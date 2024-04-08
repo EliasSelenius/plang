@@ -253,12 +253,12 @@ static Identifier getNameOfStatement(NodeRef ref) {
 }
 
 
-static Statement* get_global_symbol_from_codebase(Identifier name, Codebase* cb) {
-    foreach (prc, cb->procedures)    if ((*prc)->name == name) return (Statement*)(*prc);
-    foreach (var, cb->global_vars)   if ((*var)->name == name) return (Statement*)(*var);
-    foreach (con, cb->global_consts) if ((*con)->name == name) return (Statement*)(*con);
+static NodeRef get_global_symbol_from_codebase(Identifier name, Codebase* cb) {
+    foreach (prc, cb->procedures)    if ((*prc)->name == name) return (NodeRef)(*prc);
+    foreach (var, cb->global_vars)   if ((*var)->name == name) return (NodeRef)(*var);
+    foreach (con, cb->global_consts) if ((*con)->name == name) return (NodeRef)(*con);
 
-    return null;
+    return null_node;
 }
 
 static NodeRef get_global_symbol(Identifier name, Unit* unit) {

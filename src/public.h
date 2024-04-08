@@ -13,7 +13,7 @@ typedef struct Codebase {
 
 typedef struct REPL {
     Codebase* codebase; // can be null
-    struct ScopeContext* context;
+    struct ReplScope* context;
     struct Parser* parser;
 } REPL;
 

@@ -27,14 +27,14 @@ typedef struct ReplVariable {
     Value value;
 } ReplVariable;
 
-typedef struct ScopeContext {
-    struct ScopeContext* enclosing_context;
+typedef struct ReplScope {
+    struct ReplScope* enclosing_context;
     ReplVariable* variables; // list
-} ScopeContext;
+} ReplScope;
 
 
 
-static Value interpret_expression(Expression* expr, ScopeContext* context);
+static Value interpret_expression(NodeRef e, ReplScope* context);
 
 
 
@@ -83,21 +83,21 @@ static void print_value(Value value) {
 }
 
 
-static ScopeContext* push_scope(ScopeContext* enclosing) {
-    ScopeContext* res = malloc(sizeof(ScopeContext));
+static ReplScope* push_scope(ReplScope* enclosing) {
+    ReplScope* res = malloc(sizeof(ReplScope));
     res->enclosing_context = enclosing;
     res->variables = list_create(ReplVariable);
     return res;
 }
 
-static ScopeContext* pop_scope(ScopeContext* context) {
+static ReplScope* pop_scope(ReplScope* context) {
     list_delete(context->variables);
-    ScopeContext* res = context->enclosing_context;
+    ReplScope* res = context->enclosing_context;
     free(context);
     return res;
 }
 
-static ReplVariable* scope_context_get(ScopeContext* context, Identifier name) {
+static ReplVariable* scope_context_get(ReplScope* context, Identifier name) {
     foreach (var, context->variables) {
         if (var->name == name) return var;
     }
@@ -106,11 +106,11 @@ static ReplVariable* scope_context_get(ScopeContext* context, Identifier name) {
     return null;
 }
 
-static void scope_context_set(ScopeContext* context, Identifier name, Value v) {
+static void scope_context_set(ReplScope* context, Identifier name, Value v) {
     scope_context_get(context, name)->value = v;
 }
 
-static void scope_context_declare(ScopeContext* context, Identifier name, Value v) {
+static void scope_context_declare(ReplScope* context, Identifier name, Value v) {
 
     // TODO: already declared error? or maybe this is already handled by parser
 
@@ -148,7 +148,7 @@ static u64 datatype_bytesize(Datatype type) {
 }
 
 
-static Value interpret_procedure(ProcCall* call, ScopeContext* context) {
+static Value interpret_procedure(ProcCallExpression* call, ReplScope* context) {
     if (call->proc->name == builtin_string_print) {
         if (call->args) {
             foreach (arg, call->args) {
@@ -160,107 +160,92 @@ static Value interpret_procedure(ProcCall* call, ScopeContext* context) {
     return value_invalid;
 }
 
-static Value interpret_expression(Expression* expr, ScopeContext* context) {
-    ExprPointer e = (ExprPointer)expr;
+static Value interpret_expression(NodeRef e, ReplScope* context) {
+    switch (e.node->kind) {
 
-    switch (expr->expressionType) {
+        #define C(type, op) case Typekind_##type: value.type = left.type op right.type; break;
 
         #define integer(op) \
-                case Typekind_uint8:   value.uint8   = left.uint8   op right.uint8;   break; \
-                case Typekind_uint16:  value.uint16  = left.uint16  op right.uint16;  break; \
-                case Typekind_uint32:  value.uint32  = left.uint32  op right.uint32;  break; \
-                case Typekind_uint64:  value.uint64  = left.uint64  op right.uint64;  break; \
-                case Typekind_int8:    value.int8    = left.int8    op right.int8;    break; \
-                case Typekind_int16:   value.int16   = left.int16   op right.int16;   break; \
-                case Typekind_int32:   value.int32   = left.int32   op right.int32;   break; \
-                case Typekind_int64:   value.int64   = left.int64   op right.int64;   break; \
-                case Typekind_AmbiguousInteger: value.uint64 = left.uint64 op right.uint64; break;
+            C(uint8, op) C(uint16, op) C(uint32, op) C(uint64, op)\
+            C(int8,  op) C(int16,  op) C(int32,  op) C(int64,  op)\
+            case Typekind_AmbiguousInteger: value.uint64 = left.uint64 op right.uint64; break;
 
         #define numeric(op) \
-                case Typekind_uint8:   value.uint8   = left.uint8   op right.uint8;   break; \
-                case Typekind_uint16:  value.uint16  = left.uint16  op right.uint16;  break; \
-                case Typekind_uint32:  value.uint32  = left.uint32  op right.uint32;  break; \
-                case Typekind_uint64:  value.uint64  = left.uint64  op right.uint64;  break; \
-                case Typekind_int8:    value.int8    = left.int8    op right.int8;    break; \
-                case Typekind_int16:   value.int16   = left.int16   op right.int16;   break; \
-                case Typekind_int32:   value.int32   = left.int32   op right.int32;   break; \
-                case Typekind_int64:   value.int64   = left.int64   op right.int64;   break; \
-                case Typekind_float32: value.float32 = left.float32 op right.float32; break; \
-                case Typekind_float64: value.float64 = left.float64 op right.float64; break; \
-                case Typekind_AmbiguousInteger: value.uint64 = left.uint64 op right.uint64; break; \
-                case Typekind_AmbiguousDecimal: value.float64 = left.float64 op right.float64; break;
+            integer(op) C(float32, op) C(float64, op) \
+            case Typekind_AmbiguousDecimal: value.float64 = left.float64 op right.float64; break;
 
-        #define binary_expr(cases) {                             \
-            Value left = interpret_expression(e.binary->left, context);   \
-            Value right = interpret_expression(e.binary->right, context); \
-            Value value = {0};                                   \
-            value.type = expr->datatype;                         \
-            switch (expr->datatype.kind) {                       \
-                cases                                            \
-                default: break;                                  \
-            }                                                    \
-            return value;                                        \
+        #define binary_expr(cases) {                                       \
+            Value left = interpret_expression(e.Binary->left, context);    \
+            Value right = interpret_expression(e.Binary->right, context);  \
+            Value value = {0};                                             \
+            value.type = e.expr->datatype;                                 \
+            switch (e.expr->datatype.kind) {                               \
+                cases                                                      \
+                default: break;                                            \
+            }                                                              \
+            return value;                                                  \
         }
 
-        case ExprType_Plus:           binary_expr(numeric(+))
-        case ExprType_Minus:          binary_expr(numeric(-))
-        case ExprType_Mul:            binary_expr(numeric(*))
-        case ExprType_Div:            binary_expr(numeric(/))
-        case ExprType_Mod:            binary_expr(integer(%))
-        case ExprType_Less:           binary_expr(numeric(<))
-        case ExprType_Greater:        binary_expr(numeric(>))
-        case ExprType_LessEquals:     binary_expr(numeric(<=))
-        case ExprType_GreaterEquals:  binary_expr(numeric(>=))
-        case ExprType_Equals:         binary_expr(numeric(==))
-        case ExprType_NotEquals:      binary_expr(numeric(!=))
-        case ExprType_BooleanAnd:     binary_expr(numeric(&&)) // TODO: boolean and & or change control-flow, the right-hand side of the expression should not be interpreted in certain cases
-        case ExprType_BooleanOr:      binary_expr(numeric(||))
-        case ExprType_Bitwise_And:    binary_expr(integer(&))
-        case ExprType_Bitwise_Or:     binary_expr(integer(|))
-        case ExprType_Bitwise_Xor:    binary_expr(integer(^))
-        case ExprType_Bitwise_Lshift: binary_expr(integer(<<))
-        case ExprType_Bitwise_Rshift: binary_expr(integer(>>))
+        case Node_Plus:           binary_expr(numeric(+))
+        case Node_Minus:          binary_expr(numeric(-))
+        case Node_Mul:            binary_expr(numeric(*))
+        case Node_Div:            binary_expr(numeric(/))
+        case Node_Mod:            binary_expr(integer(%))
+        case Node_Less:           binary_expr(numeric(<))
+        case Node_Greater:        binary_expr(numeric(>))
+        case Node_LessEquals:     binary_expr(numeric(<=))
+        case Node_GreaterEquals:  binary_expr(numeric(>=))
+        case Node_Equals:         binary_expr(numeric(==))
+        case Node_NotEquals:      binary_expr(numeric(!=))
+        case Node_BooleanAnd:     binary_expr(numeric(&&)) // TODO: boolean and & or change control-flow, the right-hand side of the expression should not be interpreted in certain cases
+        case Node_BooleanOr:      binary_expr(numeric(||))
+        case Node_Bitwise_And:    binary_expr(integer(&))
+        case Node_Bitwise_Or:     binary_expr(integer(|))
+        case Node_Bitwise_Xor:    binary_expr(integer(^))
+        case Node_Bitwise_Lshift: binary_expr(integer(<<))
+        case Node_Bitwise_Rshift: binary_expr(integer(>>))
 
         #undef binary_expr
         #undef integer
         #undef numeric
+        #undef C
 
-        case ExprType_Unary_PreIncrement: break;
-        case ExprType_Unary_PostIncrement: break;
-        case ExprType_Unary_PreDecrement: break;
-        case ExprType_Unary_PostDecrement: break;
+        case Node_Unary_PreIncrement: break;
+        case Node_Unary_PostIncrement: break;
+        case Node_Unary_PreDecrement: break;
+        case Node_Unary_PostDecrement: break;
 
 
-        case ExprType_Unary_Not: {
-            Value v = interpret_expression(e.unary->expr, context);
+        case Node_Unary_Not: {
+            Value v = interpret_expression(e.Unary->inner_expr, context);
             v.uint64 = !v.uint64;
             return v;
         }
-        case ExprType_Unary_BitwiseNot: {
-            Value v = interpret_expression(e.unary->expr, context);
+        case Node_Unary_BitwiseNot: {
+            Value v = interpret_expression(e.Unary->inner_expr, context);
             v.uint64 = ~v.uint64;
             return v;
         }
-        case ExprType_Unary_AddressOf: break;
-        case ExprType_Unary_ValueOf: break;
-        case ExprType_Unary_Negate: {
-            Value v = interpret_expression(e.unary->expr, context);
+        case Node_Unary_AddressOf: break;
+        case Node_Unary_ValueOf: break;
+        case Node_Unary_Negate: {
+            Value v = interpret_expression(e.Unary->inner_expr, context);
             v.uint64 = -v.uint64;
             return v;
         }
 
 
-        case ExprType_Literal_Integer: return (Value) { .type = type_ambiguousInteger, .uint64 = e.literal->data.integer };
-        case ExprType_Literal_Decimal: return (Value) { .type = type_ambiguousDecimal, .float64 = e.literal->data.decimal };
-        case ExprType_Literal_Char:    return (Value) { .type = type_char, .character = e.literal->data.character };
-        case ExprType_Literal_String:  return (Value) { .type = type_charPointer, .pointer = get_string(e.literal->data.string) };
-        case ExprType_Literal_True:    return (Value) { .type = type_bool, .uint64 = true };
-        case ExprType_Literal_False:   return (Value) { .type = type_bool, .uint64 = false };
-        case ExprType_Literal_Null:    return (Value) { .type = type_voidPointer, .pointer = null };
+        case Node_Literal_Integer: return (Value) { .type = type_ambiguousInteger, .uint64 = e.Literal->data.integer };
+        case Node_Literal_Decimal: return (Value) { .type = type_ambiguousDecimal, .float64 = e.Literal->data.decimal };
+        case Node_Literal_Char:    return (Value) { .type = type_char, .character = e.Literal->data.character };
+        case Node_Literal_String:  return (Value) { .type = type_charPointer, .pointer = get_string(e.Literal->data.string) };
+        case Node_Literal_True:    return (Value) { .type = type_bool, .uint64 = true };
+        case Node_Literal_False:   return (Value) { .type = type_bool, .uint64 = false };
+        case Node_Literal_Null:    return (Value) { .type = type_voidPointer, .pointer = null };
 
-        case ExprType_Variable: {
-            if (e.var->ref == null) {
-                ReplVariable* var = scope_context_get(context, e.var->name);
+        case Node_Variable: {
+            if (e.Variable->ref.node == null) {
+                ReplVariable* var = scope_context_get(context, e.Variable->name);
                 if (var) return var->value;
 
                 printf("Could not find reference\n");
@@ -269,78 +254,77 @@ static Value interpret_expression(Expression* expr, ScopeContext* context) {
             
 
         } break;
-        case ExprType_Alloc: {
-            u64 size = datatype_bytesize(e.alloc->type->solvedstate);
+        case Node_Alloc: {
+            u64 size = datatype_bytesize(e.Alloc->type->solvedstate);
             Value v = {0};
             v.pointer = malloc(size);
-            v.type = expr->datatype;
+            v.type = e.expr->datatype;
             return v;
         }
-        case ExprType_Ternary: {
-            Value c = interpret_expression(e.ternary->condition, context);
-            if (c.pointer) return interpret_expression(e.ternary->thenExpr, context);
-            return interpret_expression(e.ternary->elseExpr, context);
+        case Node_Ternary: {
+            Value c = interpret_expression(e.Ternary->condition, context);
+            if (c.pointer) return interpret_expression(e.Ternary->then_expr, context);
+            return interpret_expression(e.Ternary->else_expr, context);
         }
-        case ExprType_ProcCall: {
-            return interpret_procedure(e.call, context);
+        case Node_ProcCall: {
+            return interpret_procedure(e.ProcCall, context);
         }
-        case ExprType_Deref: break;
-        case ExprType_Indexing: break;
-        case ExprType_Cast: break;
-        case ExprType_Sizeof: return (Value) { .type = type_ambiguousInteger, .uint64 = datatype_bytesize(e.size_of->type->solvedstate) };
-        case ExprType_Parenthesized: return interpret_expression(e.parenth->innerExpr, context);
-        case ExprType_Compound: break;
+        case Node_Deref: break;
+        case Node_Indexing: break;
+        case Node_Cast: break;
+        case Node_Sizeof: return (Value) { .type = type_ambiguousInteger, .uint64 = datatype_bytesize(e.Sizeof->type->solvedstate) };
+        case Node_Parenthesized: return interpret_expression(e.Parenthesized->inner_expr, context);
+        case Node_Compound: break;
     }
 
     return value_invalid;
 }
 
 
-static Value interpret_statement(Statement* sta, ScopeContext* context) {
-    StmtPointer s = (StmtPointer)sta;
-
-    switch (sta->statementType) {
-        case Statement_Declaration: {
+static Value interpret_statement(NodeRef e, ReplScope* context) {
+    switch (e.node->kind) {
+        case Node_Declaration: {
             Value v = {0};
-            if (s.decl->expr) v = interpret_expression(s.decl->expr, context);
-            scope_context_declare(context, s.decl->name, v);
+            if (e.Declaration->expr.node) v = interpret_expression(e.Declaration->expr, context);
+            scope_context_declare(context, e.Declaration->name, v);
         } break;
-        case Statement_Constant: break;
-        case Statement_Typedef: break;
-        case Statement_Procedure: break;
-        case Statement_Argument: break;
-        case Statement_Struct: break;
-        case Statement_Enum: break;
-        case Statement_EnumEntry: break;
-        case Statement_Assignment: {
+        case Node_Constant: break;
+        case Node_Typedef: break;
+        case Node_Procedure: break;
+        case Node_Argument: break;
+        case Node_Struct: break;
+        case Node_Enum: break;
+        case Node_EnumEntry: break;
+        case Node_Assignment: {
         } break;
-        case Statement_Expression: {
-            return interpret_expression(s.expr->expr, context);
-        } break;
-        case Statement_Scope: {
-            ScopeContext* inner_scope = push_scope(context);
-            foreach (sta, s.scope->statements) {
+        case Node_Scope: {
+            ReplScope* inner_scope = push_scope(context);
+            foreach (sta, e.Scope->statements) {
                 interpret_statement(*sta, inner_scope);
             }
             pop_scope(inner_scope);
         } break;
-        case Statement_If: {
-            Value v = interpret_expression(s.if_sta->condition, context);
-            if (v.pointer) interpret_statement(s.if_sta->then_statement, context);
-            else interpret_statement(s.if_sta->else_statement, context);
+        case Node_IfStmt: {
+            Value v = interpret_expression(e.IfStmt->condition, context);
+            if (v.pointer) interpret_statement(e.IfStmt->then_statement, context);
+            else interpret_statement(e.IfStmt->else_statement, context);
         } break;
-        case Statement_While: break;
-        case Statement_For: break;
-        case Statement_Switch: break;
-        case Statement_Continue: break;
-        case Statement_Break: break;
-        case Statement_Return: break;
-        case Statement_Goto: break;
-        case Statement_Label: break;
-        case Statement_CaseLabel: break;
-        case Statement_DefaultLabel: break;
+        case Node_WhileStmt: break;
+        case Node_ForStmt: break;
+        case Node_SwitchStmt: break;
+        case Node_ContinueStmt: break;
+        case Node_BreakStmt: break;
+        case Node_ReturnStmt: break;
+        case Node_GotoStmt: break;
+        case Node_LabelStmt: break;
+        case Node_CaseLabelStmt: break;
+        case Node_DefaultLabelStmt: break;
     }
 
+    return (Value) { .type = type_invalid, .pointer = null };
+}
+
+static Value interpret_node(NodeRef p, ReplScope* scope) {
     return (Value) { .type = type_invalid, .pointer = null };
 }
 
@@ -355,20 +339,17 @@ void repl_init(REPL* repl, Codebase* cb) {
 u64 repl_input(char* code, REPL* repl) {
     lex(repl->parser, code);
     reset_parser(repl->parser);
-    Statement* sta = expect_node(repl->parser);
+    NodeRef node = expect_node(repl->parser);
 
     foreach (var, repl->parser->unresolved_variables) {
         (*var)->ref = get_global_symbol_from_codebase((*var)->name, repl->codebase);
         // if ((*var)->ref == null) printf("unresolved var\n");
     }
 
-    validateStatement(repl->parser, sta);
-
-    Value v = interpret_statement(sta, repl->context);
-    if (sta->statementType == Statement_Expression) {
-        print_value(v);
-        printf("\n");
-    }
+    validate_node(repl->parser, node);
+    Value v = interpret_node(node, repl->context);
+    print_value(v);
+    printf("\n");
 
     return v.uint64;
 }

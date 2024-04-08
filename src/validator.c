@@ -364,6 +364,7 @@ static Datatype validate_deref_expr(Parser* parser, DerefExpression* deref, Data
     - valid expression type in if/while/switch/ternary_expr
     - is compile-time value in case labels and possibly const declarations
     - is on correct context (like continue/break/default must be inside a loop/switch)
+    - ambigious dereference caused by contextual inclusion
 */
 
 static Datatype type_ptr(Datatype type, i32 nump) { type.numPointers += nump; return type; }

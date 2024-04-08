@@ -1,11 +1,5 @@
 
 
-static void transpileScope(Scope* scope);
-static void transpileExpression(Expression* expr);
-static void transpileStatement(Statement* statement);
-static void transpileProcedure(Procedure* proc);
-
-
 typedef struct C_Transpiler {
     Declaration** static_decls; // list
     StringBuilder sb;
@@ -15,11 +9,15 @@ typedef struct C_Transpiler {
 #define tr_write(c_str) sbAppend(&tr->sb, c_str)
 #define tr_writef(format, ...) sb_append_format(&tr->sb, format, __VA_ARGS__)
 
+
 static inline void newline(C_Transpiler* tr) {
-    tr_writef("\n");
+    tr_write("\n");
     u32 t = tr->tabing;
-    while (t--) tr_writef("    ");
+    while (t--) tr_write("    ");
 }
+
+static void transpile_procedure(C_Transpiler* tr, Procedure* proc);
+static void transpile_node(C_Transpiler* tr, NodeRef p);
 
 
 static char* getTypeCname(Datatype type) {
@@ -59,15 +57,15 @@ static char* getTypeCname(Datatype type) {
     return null;
 }
 
-static void _transpileDatatype(Datatype type, Identifier name);
-static void transpileDatatype(Datatype type);
-static void transpileType(Type* type) { transpileDatatype(type->solvedstate); }
+static void _transpileDatatype(C_Transpiler* tr, Datatype type, Identifier name);
+static void transpileDatatype(C_Transpiler* tr, Datatype type);
+static void transpileType(C_Transpiler* tr, Type* type) { transpileDatatype(tr, type->solvedstate); }
 
-static void transpileProcSigStart(Type* proc_type) {
+static void transpileProcSigStart(C_Transpiler* tr, Type* proc_type) {
     if (proc_type->procedure.return_type->solvedstate.kind == Typekind_Procedure) {
-        transpileProcSigStart(proc_type->procedure.return_type);
+        transpileProcSigStart(tr, proc_type->procedure.return_type);
     } else {
-        transpileDatatype(proc_type->procedure.return_type->solvedstate);
+        transpileDatatype(tr, proc_type->procedure.return_type->solvedstate);
         tr_write(" ");
     }
 
@@ -76,29 +74,29 @@ static void transpileProcSigStart(Type* proc_type) {
     while (np-- > 0) tr_write("*");
 }
 
-static void transpileProcArguments(Type* proc_type) {
+static void transpileProcArguments(C_Transpiler* tr, Type* proc_type) {
     tr_write("(");
     Type* arg = proc_type->procedure.first_argument;
     while (arg) {
-        transpileDatatype(arg->solvedstate);
+        transpileDatatype(tr, arg->solvedstate);
         if (arg->next) tr_write(", ");
         arg = arg->next;
     }
     tr_write(")");
 }
 
-static void transpileProcSigEnd(Type* proc_type) {
+static void transpileProcSigEnd(C_Transpiler* tr, Type* proc_type) {
     tr_write(")");
-    transpileProcArguments(proc_type);
+    transpileProcArguments(tr, proc_type);
 
     while (proc_type->procedure.return_type->solvedstate.kind == Typekind_Procedure) {
         tr_write(")");
         proc_type = proc_type->procedure.return_type;
-        transpileProcArguments(proc_type);
+        transpileProcArguments(tr, proc_type);
     }
 }
 
-static void transpileTypeStart(Datatype type) {
+static void transpileTypeStart(C_Transpiler* tr, Datatype type) {
 
     if (type.kind == Typekind_Array) {
         tr_write("Array");
@@ -111,14 +109,14 @@ static void transpileTypeStart(Datatype type) {
     if ((type.kind == Typekind_Fixed_Array) ||
         (type.kind == Typekind_Dynamic_Array)) {
 
-        transpileTypeStart(type.array_typenode->array.element_type->solvedstate);
+        transpileTypeStart(tr, type.array_typenode->array.element_type->solvedstate);
         tr_write("*");
         return;
     }
 
 
     if (type.kind == Typekind_Procedure) {
-        transpileProcSigStart(type.proc_ptr_typenode);
+        transpileProcSigStart(tr, type.proc_ptr_typenode);
     } else {
         tr_write(getTypeCname(type));
         u32 np = type.numPointers;
@@ -127,20 +125,32 @@ static void transpileTypeStart(Datatype type) {
     }
 }
 
-static void transpileTypeEnd(Datatype type) {
-    if (type.kind == Typekind_Procedure) transpileProcSigEnd(type.proc_ptr_typenode);
+static void transpileTypeEnd(C_Transpiler* tr, Datatype type) {
+    if (type.kind == Typekind_Procedure) transpileProcSigEnd(tr, type.proc_ptr_typenode);
 }
 
-static void transpileDatatype(Datatype type) {
-    transpileTypeStart(type);
-    transpileTypeEnd(type);
+
+/*
+    void *name
+        name is pointer
+    void (*name)()
+        name is pointer to function() returning void
+    void (*name)(int)
+        name is pointer to function(int) returning void
+    void (*(*name)(int))(int)
+        name is pointer to function(int) returning pointer to function(int) returning void
+*/
+
+static void transpileDatatype(C_Transpiler* tr, Datatype type) {
+    transpileTypeStart(tr, type);
+    transpileTypeEnd(tr, type);
 }
 
-static void _transpileDatatype(Datatype type, Identifier name) {
-    transpileTypeStart(type);
+static void _transpileDatatype(C_Transpiler* tr, Datatype type, Identifier name) {
+    transpileTypeStart(tr, type);
     if (name && type.kind != Typekind_Procedure) tr_write(" ");
     tr_write(get_string(name));
-    transpileTypeEnd(type);
+    transpileTypeEnd(tr, type);
 }
 
 
@@ -185,26 +195,8 @@ static void _transpileDatatype(Datatype type, Identifier name) {
 //     }
 // }
 
-static void transpileFuncCall(ProcCallExpression* call) {
 
-    transpileExpression(call->proc_expr);
-    if (call->proc && call->proc->overload) sbAppendSpan(sb, numberToString((u64)call->proc->overload));
-
-    tr_write("(");
-    if (call->args) {
-        transpileExpression(call->args[0]);
-
-        u32 len = list_length(call->args);
-        for (u32 i = 1; i < len; i++) {
-            tr_write(", ");
-            transpileExpression(call->args[i]);
-        }
-    }
-    tr_write(")");
-}
-
-
-static void transpilePrintFormat(Datatype type) {
+static void transpilePrintFormat(C_Transpiler* tr, Datatype type) {
     type = dealiasType(type);
 
     if (type.numPointers == 1) {
@@ -241,10 +233,10 @@ static void transpilePrintFormat(Datatype type) {
         foreach (field, stru->fields) {
             tr_write(get_string(field->name));
             tr_write(" = ");
-            transpilePrintFormat(field->type->solvedstate);
+            transpilePrintFormat(tr, field->type->solvedstate);
             tr_write(", ");
         }
-        sb->length -= 2;
+        tr->sb.length -= 2;
         tr_write("}");
         return;
     }
@@ -252,19 +244,16 @@ static void transpilePrintFormat(Datatype type) {
     tr_write("<print_error>");
 }
 
-static void transpilePrint(Expression** args) {
+static void transpile_print_call(C_Transpiler* tr, ProcCallExpression* call) {
     tr_write("printf(\"");
     {
-        foreach (item, args) {
-            Expression* arg = *item;
-            transpilePrintFormat(arg->datatype);
-        }
+        foreach (item, call->args) transpilePrintFormat(tr, item->expr->datatype);
     }
     tr_write("\"");
 
 
-    foreach (item, args) {
-        Expression* arg = *item;
+    foreach (item, call->args) {
+        Expression* arg = item->expr;
         tr_write(", ");
         if (arg->datatype.kind == Typekind_Struct && arg->datatype.numPointers == 0) {
             foreach (field, arg->datatype.stru->fields) {
@@ -273,300 +262,45 @@ static void transpilePrint(Expression** args) {
                     // TODO: print struct inside struct
                 }
 
-                transpileExpression(arg);
-                tr_write(".");
-                tr_write(get_string(field->name));
-                tr_write(", ");
+                transpile_node(tr, *item);
+                tr_writef(".%s, ", get_string(field->name));
             }
-            sb->length -= 2;
+            tr->sb.length -= 2;
         } else {
-            if (arg->expressionType == ExprType_Sizeof) tr_write("(uint32)");
-            transpileExpression(arg);
+            if (arg->kind == Node_Sizeof) tr_write("(uint32)");
+            transpile_node(tr, *item);
         }
     }
 
     tr_write(")");
 }
 
-static void transpileExpression(Expression* expr) {
+static void transpile_proccall(C_Transpiler* tr, ProcCallExpression* call) {
 
-    switch (expr->expressionType) {
-
-        { // Binary & Unary Expressions
-
-            case ExprType_Unary_PostIncrement: {
-                UnaryExpression* unary = (UnaryExpression*)expr;
-                transpileExpression(unary->expr);
-                tr_write("++");
-            } break;
-            case ExprType_Unary_PostDecrement: {
-                UnaryExpression* unary = (UnaryExpression*)expr;
-                transpileExpression(unary->expr);
-                tr_write("--");
-            } break;
-
-
-            char* operator = null;
-
-            case ExprType_Unary_PreIncrement: operator = "++"; goto unary;
-            case ExprType_Unary_PreDecrement: operator = "--"; goto unary;
-            case ExprType_Unary_Not:          operator = "!"; goto unary;
-            case ExprType_Unary_AddressOf:    operator = "&"; goto unary;
-            case ExprType_Unary_ValueOf:      operator = "*"; goto unary;
-            case ExprType_Unary_Negate:       operator = "-"; goto unary;
-            case ExprType_Unary_BitwiseNot:   operator = "~"; goto unary;
-
-            case ExprType_Bitwise_And: operator = " & "; goto binary;
-            case ExprType_Bitwise_Or: operator = " | "; goto binary;
-            case ExprType_Bitwise_Xor: operator = " ^ "; goto binary;
-            case ExprType_Bitwise_Lshift: operator = " << "; goto binary;
-            case ExprType_Bitwise_Rshift: operator = " >> "; goto binary;
-
-            case ExprType_Plus:  operator = " + "; goto binary;
-            case ExprType_Minus: operator = " - "; goto binary;
-            case ExprType_Mul:   operator = " * "; goto binary;
-            case ExprType_Div:   operator = " / "; goto binary;
-            case ExprType_Mod:   operator = " % "; goto binary;
-
-            case ExprType_Less:          operator = " < ";  goto binary;
-            case ExprType_Greater:       operator = " > ";  goto binary;
-            case ExprType_LessEquals:    operator = " <= "; goto binary;
-            case ExprType_GreaterEquals: operator = " >= "; goto binary;
-            case ExprType_Equals:        operator = " == "; goto binary;
-            case ExprType_NotEquals:     operator = " != "; goto binary;
-            case ExprType_BooleanAnd:    operator = " && "; goto binary;
-            case ExprType_BooleanOr:     operator = " || "; goto binary;
-
-            unary: {
-                UnaryExpression* unary = (UnaryExpression*)expr;
-                tr_write(operator);
-                transpileExpression(unary->expr);
-            } break;
-
-            binary: {
-                BinaryExpression* bop = (BinaryExpression*)expr;
-                tr_write("(");
-                transpileExpression(bop->left);
-                tr_write(operator);
-                transpileExpression(bop->right);
-                tr_write(")");
-            } break;
+    // special cases:
+    if (call->proc_expr.node->kind == Node_Variable) {
+        if (call->proc_expr.Variable->name == builtin_string_print) {
+            transpile_print_call(tr, call);
+            return;
         }
-
-        case ExprType_Variable: {
-            VariableExpression* var = (VariableExpression*)expr;
-
-            if (var->ref) {
-                StatementType ref_type = var->ref->statementType;
-                if (ref_type == Statement_Constant) {
-                    transpileExpression(((Declaration*)var->ref)->expr);
-                    break;
-                }
-
-                if (ref_type == Statement_Enum) break;
-            }
-
-            tr_write(get_string(var->name));
-        } break;
-
-        case ExprType_Deref: {
-            DerefExpression* deref = (DerefExpression*)expr;
-
-            if (deref->base.datatype.kind == Typekind_Enum) {
-                EnumEntry* entry = getEnumEntry(deref->base.datatype._enum, deref->name);
-                if (entry) { // TODO: this introduces a bug if there is an enumentry that coincidentaly has the same name as a struct field, solution: use deref->ref
-                    sbAppendSpan(sb, numberToString(entry->value));
-                    break;
-                }
-            }
-
-            transpileExpression(deref->expr);
-
-            if (deref->expr->datatype.numPointers) tr_write("->");
-            else tr_write(".");
-
-
-
-            // I belive this had to do with contextual inclusion of fields
-            // if (deref->expr->datatype.kind == Typekind_Struct) {
-            //     Struct* stru = deref->expr->datatype.stru;
-            //     foreach (field, stru->fields) {
-            //         if (field->name == deref->name) goto done;
-                    
-            //     }
-            // }
-            // done:
-
-            tr_write(get_string(deref->name));
-        } break;
-
-        case ExprType_Indexing: {
-            IndexingExpression* ind = (IndexingExpression*)expr;
-
-            if (ind->indexed->datatype.kind == Typekind_Array) {
-                tr_write("((");
-                Datatype elm_type = ind->indexed->datatype.array_typenode->array.element_type->solvedstate;
-                elm_type.numPointers++;
-                transpileDatatype(elm_type);
-                tr_write(")");
-                transpileExpression(ind->indexed);
-                tr_write(".data)");
-            } else {
-                transpileExpression(ind->indexed);
-            }
-
-            tr_write("[");
-            transpileExpression(ind->index);
-            tr_write("]");
-        } break;
-
-        case ExprType_Literal_Null: {
-            tr_write("0");
-        } break;
-
-        case ExprType_Literal_String: {
-            LiteralExpression* lit = (LiteralExpression*)expr;
-            tr_write("\"");
-            tr_write(get_string(lit->data.string));
-            tr_write("\"");
-        } break;
-
-        case ExprType_Literal_Char: {
-            LiteralExpression* lit = (LiteralExpression*)expr;
-            sbAppendChar(sb, '\'');
-
-            switch (lit->data.character) {
-                case '\n': tr_write("\\n"); break;
-                case '\t': tr_write("\\t"); break;
-                case '\\': tr_write("\\\\"); break;
-                case '\'': tr_write("\\'"); break;
-
-                default:
-                    sbAppendChar(sb, lit->data.character);
-                    break;
-            }
-
-            sbAppendChar(sb, '\'');
-        } break;
-
-        case ExprType_Literal_True: tr_write("1"); break;
-        case ExprType_Literal_False: tr_write("0"); break;
-
-        case ExprType_Literal_Integer: {
-            LiteralExpression* lit = (LiteralExpression*)expr;
-            sbAppendSpan(sb, numberToString(lit->data.integer));
-        } break;
-
-        case ExprType_Literal_Decimal: {
-            LiteralExpression* lit = (LiteralExpression*)expr;
-            char temp_buffer[24];
-            u32 i = snprintf(temp_buffer, 23, "%f", lit->data.decimal);
-            temp_buffer[i] = '\0';
-            tr_write(temp_buffer);
-        } break;
-
-        case ExprType_Alloc: {
-            AllocExpression* allocExpr = (AllocExpression*)expr;
-            tr_write("malloc(sizeof(");
-            transpileType(allocExpr->type);
-            tr_write(")");
-            if (allocExpr->sizeExpr) {
-                tr_write(" * ");
-                transpileExpression(allocExpr->sizeExpr);
-            }
-            tr_write(")");
-        } break;
-
-        case ExprType_Sizeof: {
-            SizeofExpression* sof = (SizeofExpression*)expr;
-            tr_write("sizeof(");
-            transpileType(sof->type);
-            tr_write(")");
-        } break;
-
-        case ExprType_Cast: {
-            CastExpression* cast = (CastExpression*)expr;
-            tr_write("(");
-            transpileType(cast->castToType);
-            tr_write(")");
-            transpileExpression(cast->expr);
-        } break;
-
-        case ExprType_Ternary: {
-            TernaryExpression* ter = (TernaryExpression*)expr;
-            transpileExpression(ter->condition);
-            tr_write(" ? ");
-            transpileExpression(ter->thenExpr);
-            tr_write(" : ");
-            transpileExpression(ter->elseExpr);
-        } break;
-
-        case ExprType_ProcCall: {
-            ProcCall* fc = (ProcCall*)expr;
-
-            if (fc->proc_expr->expressionType == ExprType_Variable) {
-                VariableExpression* var = (VariableExpression*)fc->proc_expr;
-                if (var->name == builtin_string_print) {
-                    transpilePrint(fc->args);
-                    break;
-                }
-            }
-
-            transpileFuncCall(fc);
-        } break;
-
-        case ExprType_Parenthesized: {
-            ParenthesizedExpression* p = (ParenthesizedExpression*)expr;
-            if (isBinaryExpression(p->innerExpr)) {
-                transpileExpression(p->innerExpr);
-            } else {
-                tr_write("(");
-                transpileExpression(p->innerExpr);
-                tr_write(")");
-            }
-        } break;
-
-        case ExprType_Compound: {
-            CompoundExpression* com = (CompoundExpression*)expr;
-
-            if (com->base.datatype.kind != Typekind_Invalid) {
-                tr_write("(");
-                transpileDatatype(com->base.datatype);
-                tr_write(") ");
-
-                if (com->base.datatype.kind == Typekind_Array) {
-                    tr_write("{ .length = ");
-                    u32 len = com->elements ? list_length(com->elements) : 0;
-                    sbAppendSpan(sb, numberToString(len));
-                    tr_write(", .data = (");
-                    transpileDatatype(com->base.datatype.array_typenode->array.element_type->solvedstate);
-                    tr_write("[])");
-                }
-            }
-
-            tr_write("{");
-            if (com->elements) {
-                foreach (elm, com->elements) {
-                    if (elm->name) {
-                        tr_write(".");
-                        tr_write(get_string(elm->name));
-                        tr_write(" = ");
-                    }
-                    transpileExpression(elm->expr);
-                    tr_write(", ");
-                }
-                sb->length -= 2;
-            } else {
-                tr_write("0");
-            }
-            tr_write("}");
-
-            if (com->base.datatype.kind == Typekind_Array) tr_write("}");
-        } break;
     }
 
-}
 
+    transpile_node(tr, call->proc_expr);
+    if (call->proc && call->proc->overload) tr_writef("%d", call->proc->overload);
+
+    tr_write("(");
+    if (call->args) {
+        transpile_node(tr, call->args[0]);
+
+        u32 len = list_length(call->args);
+        for (u32 i = 1; i < len; i++) {
+            tr_write(", ");
+            transpile_node(tr, call->args[i]);
+        }
+    }
+    tr_write(")");
+}
 
 static void transpile_condition_expr(C_Transpiler* tr, NodeRef ref) {
     if (ref.node->kind == Node_Parenthesized || is_binary_expr(ref)) transpile_node(tr, ref);
@@ -574,178 +308,47 @@ static void transpile_condition_expr(C_Transpiler* tr, NodeRef ref) {
 }
 
 
-static void transpileStruct(Struct* stru) {
+static void transpile_struct(C_Transpiler* tr, Struct* stru) {
     tr_writef("struct %s {", get_string(stru->name));
-
     tr->tabing++;
 
     foreach (field, stru->fields) {
-        newline();
-        _transpileDatatype(field->type->solvedstate, field->name);
+        newline(tr);
+        _transpileDatatype(tr, field->type->solvedstate, field->name);
         tr_write(";");
     }
 
-    tr->tabing--;
-    newline();
-
+    tr->tabing--; newline(tr);
     tr_write("};");
 }
 
-static void transpileTypedef(Typedef* def) {
+static void transpile_typedef(C_Transpiler* tr, Typedef* def) {
     tr_write("typedef ");
     if (def->type) {
-        _transpileDatatype(def->type->solvedstate, def->name);
+        _transpileDatatype(tr, def->type->solvedstate, def->name);
     } else {
-        tr_write("struct ");
         char* name = get_string(def->name);
-        tr_write(name);
-        tr_write(" ");
-        tr_write(name);
+        tr_writef("struct %s %s", name, name);
     }
     tr_write(";");
 }
 
-static void transpileVarDecl(Declaration* decl) {
-
+static void transpile_declaration(C_Transpiler* tr, Declaration* decl) {
     if (decl->is_static) {
-        list_add(static_decls, decl);
+        list_add(tr->static_decls, decl);
         tr_write("// static decl");
         return;
     }
 
-    _transpileDatatype(decl->type->solvedstate, decl->name);
-    if (decl->expr) {
+    _transpileDatatype(tr, decl->type->solvedstate, decl->name);
+    if (decl->expr.node) {
         tr_write(" = ");
-        transpileExpression(decl->expr);
+        transpile_node(tr, decl->expr);
     }
 
     tr_write(";");
 }
 
-static void transpileStatement(Statement* statement) {
-    switch (statement->statementType) {
-        case Statement_Declaration: {
-            Declaration* decl = (Declaration*)statement;
-            transpileVarDecl(decl);
-        } break;
-
-        case Statement_Struct: {
-            Struct* stru = (Struct*)statement;
-            tr_write("typedef struct ");
-            tr_write(get_string(stru->name));
-            tr_write(" ");
-            tr_write(get_string(stru->name));
-            tr_write(";");
-            newline();
-            transpileStruct(stru);
-        } break;
-
-        case Statement_Enum: {
-            Enum* en = (Enum*)statement;
-            tr_write("typedef uint32 ");
-            tr_write(get_string(en->name));
-            tr_write(";");
-        } break;
-
-        case Statement_Typedef: {
-            transpileTypedef((Typedef*)statement);
-        } break;
-
-        case Statement_Constant: {
-            tr_write("/* local constant */");
-        } break;
-
-        case Statement_Assignment: {
-            Assignment* ass = (Assignment*)statement;
-            transpileExpression(ass->assigneeExpr);
-
-            switch (ass->assignmentOper) {
-                case Tok_Assign: tr_write(" = "); break;
-                case Tok_PlusAssign: tr_write(" += "); break;
-                case Tok_MinusAssign: tr_write(" -= "); break;
-                case Tok_MulAssign: tr_write(" *= "); break;
-                case Tok_DivAssign: tr_write(" /= "); break;
-                case Tok_BitAndAssign: tr_write(" &= "); break;
-                case Tok_BitOrAssign: tr_write(" |= "); break;
-                case Tok_BitXorAssign: tr_write(" ^= "); break;
-                default: break;
-            }
-
-            transpileExpression(ass->expr);
-            tr_write(";");
-        } break;
-
-
-        case Statement_For: {
-            ForStatement* forsta = (ForStatement*)statement;
-            char* name = get_string(forsta->index_name);
-
-            tr_write("for (");
-
-            if (forsta->index_type) transpileType(forsta->index_type);
-            else transpileDatatype(default_for_loop_numeric_type);
-
-            tr_write(" ");
-            tr_write(name);
-            tr_write(" = ");
-
-            if (forsta->iterator_assignment) {
-
-                transpileExpression(forsta->iterator_assignment);
-                tr_write("; ");
-                transpileExpression(forsta->condition);
-                tr_write("; ");
-                if (forsta->iterator_update) transpileExpression(forsta->iterator_update);
-                tr_write(")");
-
-            } else {
-                transpileExpression(forsta->min_expr);
-                tr_write("; ");
-
-                tr_write(name);
-                tr_write(" < ");
-                transpileExpression(forsta->max_expr);
-                tr_write("; ");
-
-                tr_write(name);
-                tr_write("++)");
-            }
-
-            if (forsta->statement) {
-                tr_write(" ");
-                transpileStatement(forsta->statement);
-            } else tr_write(";");
-        } break;
-
-        case Statement_Procedure: {
-            tr_write("// local procedure");
-        } break;
-
-
-
-
-        case Statement_Argument:
-        case Statement_EnumEntry: {
-            // Unreachable code
-        } break;
-    }
-}
-
-static void transpileScope(Scope* scope) {
-    tr_write("{");
-    tr->tabing++;
-
-    u32 len = list_length(scope->statements);
-    for (u32 i = 0; i < len; i++) {
-        newline();
-        transpileStatement(scope->statements[i]);
-    }
-
-    tr->tabing--;
-    newline();
-
-    tr_write("}");
-}
 
 static void transpile_scope(C_Transpiler* tr, Scope* scope) {
     tr_write("{"); tr->tabing++;
@@ -759,74 +362,80 @@ static void transpile_scope(C_Transpiler* tr, Scope* scope) {
     tr_write("}");
 }
 
-static void transpileFunctionSignature(Procedure* proc) {
-
+static void transpile_proc_signature(C_Transpiler* tr, Procedure* proc) {
 
     if (proc->name != builtin_string_main && proc->scope) tr_write("static ");
-    transpileType(proc->returnType);
+    transpileType(tr, proc->return_type);
     tr_write(" ");
 
     if (proc->name == builtin_string_main) tr_write("__main");
     else tr_write(get_string(proc->name));
 
-    if (proc->overload) sbAppendSpan(sb, numberToString((u64)proc->overload));
+    if (proc->overload) tr_writef("%u", proc->overload);
 
     tr_write("(");
     if (proc->arguments) {
         foreach (arg, proc->arguments) {
-            _transpileDatatype(arg->type->solvedstate, arg->name);
+            _transpileDatatype(tr, arg->type->solvedstate, arg->name);
             tr_write(", ");
         }
-        sb->length -= 2;
+        tr->sb.length -= 2;
     }
     tr_write(")");
 }
 
-static void transpileLocalProcedures(Statement* statement) {
-    if (!statement) return;
-    if (statement->statementType != Statement_Scope) return;
-    Scope* scope = (Scope*)statement;
-    foreach (s, scope->statements) {
-        Statement* sta = *s;
-        switch (sta->statementType) {
-            case Statement_Procedure: transpileProcedure((Procedure*)sta); break;
-            case Statement_Scope:     transpileLocalProcedures(sta); break;
-            case Statement_If:        transpileLocalProcedures(((IfStatement*)sta)->then_statement);
-                                      transpileLocalProcedures(((IfStatement*)sta)->else_statement); break;
-            case Statement_While:     transpileLocalProcedures(((WhileStatement*)sta)->statement); break;
-            case Statement_For:       transpileLocalProcedures(((ForStatement*)sta)->statement); break;
+static void transpile_local_procedures(C_Transpiler* tr, NodeRef ref) {
+    if (ref.node == null) return;
+    if (ref.node->kind != Node_Scope) return;
+
+    foreach (s, ref.Scope->statements) {
+        switch (s->node->kind) {
+            case Node_Procedure: transpile_procedure(tr, s->Procedure); break;
+            case Node_Scope:     transpile_local_procedures(tr, *s); break;
+            case Node_IfStmt:    transpile_local_procedures(tr, s->IfStmt->then_statement);
+                                 transpile_local_procedures(tr, s->IfStmt->else_statement); break;
+            case Node_WhileStmt: transpile_local_procedures(tr, s->WhileStmt->statement); break;
+            case Node_ForStmt:   transpile_local_procedures(tr, s->ForStmt->statement); break;
             default: break;
         }
     }
 }
 
-static void transpileProcedure(Procedure* proc) {
-
-    transpileLocalProcedures((Statement*)proc->scope);
-
-    transpileFunctionSignature(proc);
+static void transpile_procedure(C_Transpiler* tr, Procedure* proc) {
+    transpile_local_procedures(tr, (NodeRef)proc->scope);
+    transpile_proc_signature(tr, proc);
     tr_write(" ");
-    transpileScope(proc->scope);
-    newline();
+    transpile_scope(tr, proc->scope);
+    newline(tr);
 }
 
+static void transpile_for_loop(C_Transpiler* tr, ForStmt* forsta) {
+    tr_write("for (");
+    if (forsta->index_type) transpileType(tr, forsta->index_type);
+    else transpileDatatype(tr, default_for_loop_numeric_type);
 
+    char* name = get_string(forsta->index_name);
+    tr_writef(" %s = ", name);
 
-static u32 countStructDependencies(Struct* stru) {
-    u32 deps = 0;
-    u32 fieldsLen = list_length(stru->fields);
-    for (u32 f = 0; f < fieldsLen; f++) {
-        Datatype datatype = stru->fields[f].type->solvedstate;
-        if (datatype.numPointers) continue;
-        if (datatype.kind != Typekind_Struct) continue;
-
-        deps++;
-        deps += countStructDependencies(datatype.stru);
+    if (forsta->iterator_assignment.node) {
+        transpile_node(tr, forsta->iterator_assignment);
+        tr_write("; ");
+        transpile_node(tr, forsta->condition);
+        tr_write("; ");
+        if (forsta->iterator_update.node) transpile_node(tr, forsta->iterator_update);
+        tr_write(")");
+    } else {
+        transpile_node(tr, forsta->min_expr);
+        tr_writef("; %s < ", name);
+        transpile_node(tr, forsta->max_expr);
+        tr_writef("; %s++)", name);
     }
 
-    return deps;
+    if (forsta->statement.node) {
+        tr_write(" ");
+        transpile_node(tr, forsta->statement);
+    } else tr_write(";");
 }
-
 
 static void transpile_node(C_Transpiler* tr, NodeRef p) {
 char* operator = null;
@@ -850,19 +459,20 @@ switch (p.node->kind) {
     binary:
         tr_write("(");
         transpile_node(tr, p.Binary->left);
-        tr_write(get_c_operator_symbol(p.node->kind));
+        tr_writef(" %s ", operator);
         transpile_node(tr, p.Binary->right);
         tr_write(")");
         return;
     unary:
-        tr_write(get_c_operator_symbol(p.node->kind));
+        tr_writef("%s", operator);
         transpile_node(tr, p.Unary->inner_expr);
         return;
     post_unary:
         transpile_node(tr, p.Unary->inner_expr);
-        tr_write(get_c_operator_symbol(p.node->kind));
+        tr_writef("%s", operator);
         return;
 
+// Node_Literal_Char:
 // case '\n': tr_write("\\n"); break;
 // case '\t': tr_write("\\t"); break;
 // case '\\': tr_write("\\\\"); break;
@@ -875,31 +485,96 @@ switch (p.node->kind) {
     case Node_Literal_False:   tr_write("0"); return;
     case Node_Literal_Null:    tr_write("0"); return;
 
-    case Node_Variable: return;
-    case Node_Alloc: return;
-    case Node_Ternary: return;
-    case Node_ProcCall: return;
-    case Node_Deref: return;
-    case Node_Indexing: return;
-    case Node_Cast: return;
-    case Node_Sizeof: return;
-    case Node_Parenthesized: return;
-    case Node_Compound: return;
+    case Node_Variable: {
+        if (p.Variable->ref.node) { // TODO: there is a null-check here. Which cases may ref be null? maybe put a comment here
+            if (p.Variable->ref.node->kind == Node_Constant) { transpile_node(tr, p.Variable->ref.Constant->expr); return; }
+            if (p.Variable->ref.node->kind == Node_Enum) return;
+        }
+        tr_write(get_string(p.Variable->name));
+    } return;
+    case Node_Alloc:          tr_write("malloc(sizeof("); transpileType(tr, p.Alloc->type); tr_write(")"); if (p.Alloc->size_expr.node) { tr_write(" * "); transpile_node(tr, p.Alloc->size_expr); } tr_write(")"); return;
+    case Node_Ternary:        transpile_node(tr, p.Ternary->condition); tr_write(" ? "); transpile_node(tr, p.Ternary->then_expr); tr_write(" : "); transpile_node(tr, p.Ternary->else_expr); return;
+    case Node_ProcCall:       transpile_proccall(tr, p.ProcCall); return;
+    case Node_Deref: {
 
-/*
+        if (p.Deref->datatype.kind == Typekind_Enum) {
+            EnumEntry* entry = getEnumEntry(p.Deref->datatype._enum, p.Deref->name);
+            if (entry) { // TODO: this introduces a bug if there is an enumentry that coincidentaly has the same name as a struct field, solution: use deref->ref
+                tr_writef("%llu", entry->value);
+                return;
+            }
+        }
 
-*/
+        transpile_node(tr, p.Deref->expr);
+        if (p.Deref->expr.expr->datatype.numPointers) tr_write("->");
+        else tr_write(".");
+        tr_write(get_string(p.Deref->name));
+    } return;
+    case Node_Indexing: {
+        if (p.Indexing->datatype.kind == Typekind_Array) {
+            tr_write("((");
+            Datatype elm_type = p.Indexing->indexed.expr->datatype.array_typenode->array.element_type->solvedstate;
+            elm_type.numPointers++;
+            transpileDatatype(tr, elm_type);
+            tr_write(")");
+            transpile_node(tr, p.Indexing->indexed);
+            tr_write(".data)");
+        } else {
+            transpile_node(tr, p.Indexing->indexed);
+        }
 
-    case Node_Declaration:      return;
-    case Node_Constant:         return;
-    case Node_Typedef:          return;
-    case Node_Procedure:        return;
-    case Node_Argument:         return;
-    case Node_Struct:           return;
-    case Node_Enum:             return;
-    case Node_EnumEntry:        return;
-    case Node_Assignment:       return;
-    case Node_Scope:            transpile_scope(tr, p.Scope); return;
+        tr_write("["); transpile_node(tr, p.Indexing->index); tr_write("]");
+    } return;
+    case Node_Cast:           tr_write("("); transpileType(tr, p.Cast->new_type); tr_write(")"); transpile_node(tr, p.Cast->expr); return;
+    case Node_Sizeof:         tr_write("sizeof("); transpileType(tr, p.Sizeof->type); tr_write(")"); return;
+    case Node_Parenthesized:  if (is_binary_expr(p.Parenthesized->inner_expr)) transpile_node(tr, p.Parenthesized->inner_expr);
+                              else { tr_write("("); transpile_node(tr, p.Parenthesized->inner_expr); tr_write(")"); } return;
+    case Node_Compound: {
+        if (p.Compound->datatype.kind != Typekind_Invalid) {
+            tr_write("("); transpileDatatype(tr, p.Compound->datatype); tr_write(") ");
+            if (p.Compound->datatype.kind == Typekind_Array) {
+                tr_writef("{ .length = %d, .data = (", p.Compound->elements ? list_length(p.Compound->elements) : 0);
+                transpileDatatype(tr, p.Compound->datatype.array_typenode->array.element_type->solvedstate);
+                tr_write("[])");
+            }
+        }
+
+        tr_write("{");
+        if (p.Compound->elements) {
+            foreach (elm, p.Compound->elements) {
+                if (elm->name) tr_writef(".%s = ", get_string(elm->name));
+                transpile_node(tr, elm->expr);
+                tr_write(", ");
+            }
+            tr->sb.length -= 2;
+        } else tr_write("0");
+        tr_write("}");
+
+        if (p.Compound->datatype.kind == Typekind_Array) tr_write("}");
+    } return;
+
+    case Node_Declaration:  transpile_declaration(tr, p.Declaration); return;
+    case Node_Constant:     tr_write("/* local constant */"); return;
+    case Node_Typedef:      transpile_typedef(tr, p.Typedef); return;
+    case Node_Procedure:    tr_write("/* local procedure */"); return;
+    case Node_Argument:     return;
+    case Node_Struct:       tr_writef("typedef struct %s %s;", get_string(p.Struct->name), get_string(p.Struct->name)); newline(tr); transpile_struct(tr, p.Struct); return;
+    case Node_Enum:         tr_writef("typedef uint32 %s;", get_string(p.Enum->name)); return;
+    case Node_EnumEntry:    return;
+
+    static const char* assignment_operator[] = {
+        [Tok_Assign]       = "=",
+        [Tok_PlusAssign]   = "+=",
+        [Tok_MinusAssign]  = "-=",
+        [Tok_MulAssign]    = "*=",
+        [Tok_DivAssign]    = "/=",
+        [Tok_BitAndAssign] = "&=",
+        [Tok_BitOrAssign]  = "|=",
+        [Tok_BitXorAssign] = "^=",
+    };
+
+    case Node_Assignment:   transpile_node(tr, p.Assignment->dst_expr); tr_writef(" %s ", assignment_operator[p.Assignment->operator]); transpile_node(tr, p.Assignment->src_expr); tr_write(";"); return;
+    case Node_Scope:        transpile_scope(tr, p.Scope); return;
 
     case Node_IfStmt:
         tr_write("if ");
@@ -914,7 +589,7 @@ switch (p.node->kind) {
         else tr_write(";");
         return;
 
-    case Node_ForStmt:          return;
+    case Node_ForStmt:          transpile_for_loop(tr, p.ForStmt); return;
     case Node_SwitchStmt:       tr_write("switch "); transpile_condition_expr(tr, p.SwitchStmt->expr); tr_write(" "); transpile_scope(tr, p.SwitchStmt->scope); return;
     case Node_ContinueStmt:     tr_write("continue;"); return;
     case Node_BreakStmt:        tr_write("break;"); return;
@@ -930,7 +605,25 @@ switch (p.node->kind) {
     case Node_Type_Array: return;
     case Node_Type_Fixed_Array: return;
     case Node_Type_Dynamic_Array: return;
+
+    case Node_Invalid: return;
+    case Nodekind_Count: return;
 }}
+
+static u32 countStructDependencies(Struct* stru) {
+    u32 deps = 0;
+    u32 fieldsLen = list_length(stru->fields);
+    for (u32 f = 0; f < fieldsLen; f++) {
+        Datatype datatype = stru->fields[f].type->solvedstate;
+        if (datatype.numPointers) continue;
+        if (datatype.kind != Typekind_Struct) continue;
+
+        deps++;
+        deps += countStructDependencies(datatype.stru);
+    }
+
+    return deps;
+}
 
 void transpile(Codebase* codebase) {
     // TODO: use a higer initial capacity for the string builder
@@ -976,7 +669,7 @@ void transpile(Codebase* codebase) {
 
     tr_write("\n// Type aliases\n");
     foreach (type_def, codebase->type_defs) {
-        transpileTypedef(*type_def);
+        transpile_typedef(tr, *type_def);
         tr_write("\n");
     }
 
@@ -993,7 +686,7 @@ void transpile(Codebase* codebase) {
             for (u32 i = 0; i < structs_count; i++) {
                 Struct* stru = codebase->structs[i];
                 if (stru->deps == dep) {
-                    transpileStruct(stru);
+                    transpile_struct(tr, stru);
                     tr_write("\n");
                     transpiled++;
                 }
@@ -1005,7 +698,7 @@ void transpile(Codebase* codebase) {
     tr_write("\n// Forward declarations\n");
     u32 procs_count = list_length(codebase->procedures);
     for (u32 i = 0; i < procs_count; i++) {
-        transpileFunctionSignature(codebase->procedures[i]);
+        transpile_proc_signature(tr, codebase->procedures[i]);
         tr_write(";\n");
     }
 
@@ -1019,35 +712,35 @@ void transpile(Codebase* codebase) {
         }
 
         tr_write("static ");
-        _transpileDatatype(decl->type->solvedstate, decl->name);
+        _transpileDatatype(tr, decl->type->solvedstate, decl->name);
         if (decl->expr.node) {
             tr_write(" = ");
-            transpileExpression(decl->expr);
+            transpile_node(tr, decl->expr);
         }
         tr_write(";\n");
     }
 
     {
         StringBuilder impl_sb = sbCreate(); // I am such a dirty trickster
-        StringBuilder* temp = sb;
-        sb = &impl_sb;
+        StringBuilder temp = tr->sb;
+        tr->sb = impl_sb;
 
         tr_write("\n// Implementations\n");
         for (u32 i = 0; i < procs_count; i++) {
             Procedure* proc = codebase->procedures[i];
             if (proc->scope == null) continue;
-            transpileProcedure(proc);
+            transpile_procedure(tr, proc);
         }
 
-        sb = temp;
+        tr->sb = temp;
 
-        foreach (static_decl, static_decls) {
+        foreach (static_decl, tr->static_decls) {
             Declaration* decl = *static_decl;
             tr_write("static ");
-            _transpileDatatype(decl->type->solvedstate, decl->name);
-            if (decl->expr && isCompiletimeExpression(decl->expr)) {
+            _transpileDatatype(tr, decl->type->solvedstate, decl->name);
+            if (decl->expr.node && isCompiletimeExpression(decl->expr)) {
                 tr_write(" = ");
-                transpileExpression(decl->expr);
+                transpile_node(tr, decl->expr);
             }
             tr_write(";\n");
         }
@@ -1058,17 +751,17 @@ void transpile(Codebase* codebase) {
 
     tr_write("static void __static_init() {");
     tr->tabing++;
-    foreach (static_decl, static_decls) {
+    foreach (static_decl, tr->static_decls) {
         Declaration* decl = *static_decl;
-        if (decl->expr && isCompiletimeExpression(decl->expr)) continue;
-        newline();
+        if (decl->expr.node && isCompiletimeExpression(decl->expr)) continue;
+        newline(tr);
         tr_write(get_string(decl->name));
         tr_write(" = ");
-        transpileExpression(decl->expr);
+        transpile_node(tr, decl->expr);
         tr_write(";");
     }
     tr->tabing--;
-    newline();
+    newline(tr);
     tr_write("}\n");
 
     char* c_main_code =
@@ -1083,11 +776,11 @@ void transpile(Codebase* codebase) {
 
     FILE* file;
     if ( !fopen_s(&file, "output.g.c", "w") ) {
-        fprintf(file, "%s", sb->content);
+        fprintf(file, "%s", tr->sb.content);
         fclose(file);
     } else {
         printf("Could not write to output.g.c\n");
     }
 
-    sbDestroy(sb);
+    sbDestroy(&tr->sb);
 }
