@@ -404,7 +404,7 @@ switch (p.node->kind) {
         if (typeAssignable(type_l, type_r)) return type_l;
         if (typeAssignable(type_r, type_l)) return type_r;
 
-        error_node(parser, p, "Invalid binary expression.");
+        error_node(parser, p, "Invalid binary expression. operator %s (%s, %s)", "", construct_type_string(type_l, temp_builder()), construct_type_string(type_r, temp_builder()));
         return type_invalid;
     }
 
@@ -483,7 +483,8 @@ switch (p.node->kind) {
     case Node_Declaration: validate_declaration(parser, p.Declaration); return;
     case Node_Constant: validate_expr(parser, p.Constant->expr); return;
     case Node_Typedef: return;
-    case Node_Procedure: init_typenode_for_proc(parser, p.Procedure); validate_procedure(parser, p.Procedure); return;
+                        // TODO: init_typenode_for_proc should not be here
+    case Node_Procedure: init_typenode_for_proc(p.Procedure); validate_procedure(parser, p.Procedure); return;
     case Node_Argument: return;
     case Node_Struct: validateStruct(parser, p.Struct); return;
     case Node_Enum: validateEnum(parser, p.Enum); return;

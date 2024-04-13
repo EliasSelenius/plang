@@ -494,6 +494,7 @@ static u32 node_struct_sizes[] = {
     for_each_literal_node     (index_initializer_const, LiteralExpression)
     for_each_other_expr_node  (index_initializer, Expression)
     for_each_stmt_node        (index_initializer, )
+    for_each_type_node        (index_initializer_const, Type)
 };
 #undef index_initializer
 #undef index_initializer_const

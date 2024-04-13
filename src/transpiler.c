@@ -319,7 +319,7 @@ static void transpile_struct(C_Transpiler* tr, Struct* stru) {
     }
 
     tr->tabing--; newline(tr);
-    tr_write("};");
+    tr_write("}");
 }
 
 static void transpile_typedef(C_Transpiler* tr, Typedef* def) {
@@ -345,10 +345,28 @@ static void transpile_declaration(C_Transpiler* tr, Declaration* decl) {
         tr_write(" = ");
         transpile_node(tr, decl->expr);
     }
-
-    tr_write(";");
 }
 
+static bool should_terminate_with_semicolon(NodeRef p) {
+    switch (p.node->kind) {
+        case Node_SwitchStmt:
+        case Node_Scope: return false;
+
+        case Node_IfStmt:
+            if (p.IfStmt->else_statement.node) return should_terminate_with_semicolon(p.IfStmt->else_statement);
+            if (p.IfStmt->then_statement.node) return should_terminate_with_semicolon(p.IfStmt->then_statement);
+            return true;
+        case Node_WhileStmt: if (p.WhileStmt->statement.node) return should_terminate_with_semicolon(p.WhileStmt->statement); else return true;
+        case Node_ForStmt: if (p.ForStmt->statement.node) return should_terminate_with_semicolon(p.ForStmt->statement); else return true;
+
+        default: return true;
+    }
+}
+
+static void transpile_semicolon_after_node(C_Transpiler* tr, NodeRef p) {
+    if (p.node != null && should_terminate_with_semicolon(p) == false) return;
+    tr_write(";");
+}
 
 static void transpile_scope(C_Transpiler* tr, Scope* scope) {
     tr_write("{"); tr->tabing++;
@@ -356,6 +374,7 @@ static void transpile_scope(C_Transpiler* tr, Scope* scope) {
     foreach (refp, scope->statements) {
         newline(tr);
         transpile_node(tr, *refp);
+        transpile_semicolon_after_node(tr, *refp);
     }
 
     tr->tabing--; newline(tr);
@@ -434,7 +453,7 @@ static void transpile_for_loop(C_Transpiler* tr, ForStmt* forsta) {
     if (forsta->statement.node) {
         tr_write(" ");
         transpile_node(tr, forsta->statement);
-    } else tr_write(";");
+    }
 }
 
 static void transpile_node(C_Transpiler* tr, NodeRef p) {
@@ -447,8 +466,8 @@ switch (p.node->kind) {
         X(Bitwise_And, "&", binary) X(Bitwise_Or, "|", binary) X(Bitwise_Xor, "^", binary) X(Bitwise_Lshift, "<<", binary) X(Bitwise_Rshift, ">>", binary)\
         X(Unary_PreIncrement, "++", unary) X(Unary_PostIncrement, "++", post_unary)\
         X(Unary_PreDecrement, "--", unary) X(Unary_PostDecrement, "--", post_unary)\
-        X(Unary_Not, "!", unary) X(Unary_BitwiseNot, "~", unary) X(Unary_AddressOf, "*", unary)\
-        X(Unary_ValueOf, "@", unary) X(Unary_Negate, "-", unary)\
+        X(Unary_Not, "!", unary) X(Unary_BitwiseNot, "~", unary) X(Unary_AddressOf, "&", unary)\
+        X(Unary_ValueOf, "*", unary) X(Unary_Negate, "-", unary)\
 
     #define entry(op, str, label) case Node_##op: operator = str; goto label;
     foreach_c_operator(entry)
@@ -472,14 +491,17 @@ switch (p.node->kind) {
         tr_writef("%s", operator);
         return;
 
-// Node_Literal_Char:
-// case '\n': tr_write("\\n"); break;
-// case '\t': tr_write("\\t"); break;
-// case '\\': tr_write("\\\\"); break;
-// case '\'': tr_write("\\'"); break;
     case Node_Literal_Integer: tr_writef("%llu", p.Literal->data.integer); return;
     case Node_Literal_Decimal: tr_writef("%lf", p.Literal->data.decimal); return;
-    case Node_Literal_Char:    tr_writef("'%c'", p.Literal->data.character); return; // TODO: escape sequences
+    case Node_Literal_Char: {
+        switch (p.Literal->data.character) { // TODO: escape sequences
+            case '\n': tr_write("'\\n'"); return;
+            case '\t': tr_write("'\\t'"); return;
+            case '\\': tr_write("'\\\\'"); return;
+            case '\'': tr_write("'\\''"); return;
+        }
+        tr_writef("'%c'", p.Literal->data.character);
+    } return;
     case Node_Literal_String:  tr_writef("\"%s\"", get_string(p.Literal->data.string)); return;
     case Node_Literal_True:    tr_write("1"); return;
     case Node_Literal_False:   tr_write("0"); return;
@@ -559,7 +581,7 @@ switch (p.node->kind) {
     case Node_Procedure:    tr_write("/* local procedure */"); return;
     case Node_Argument:     return;
     case Node_Struct:       tr_writef("typedef struct %s %s;", get_string(p.Struct->name), get_string(p.Struct->name)); newline(tr); transpile_struct(tr, p.Struct); return;
-    case Node_Enum:         tr_writef("typedef uint32 %s;", get_string(p.Enum->name)); return;
+    case Node_Enum:         tr_writef("typedef uint32 %s", get_string(p.Enum->name)); return;
     case Node_EnumEntry:    return;
 
     static const char* assignment_operator[] = {
@@ -573,30 +595,29 @@ switch (p.node->kind) {
         [Tok_BitXorAssign] = "^=",
     };
 
-    case Node_Assignment:   transpile_node(tr, p.Assignment->dst_expr); tr_writef(" %s ", assignment_operator[p.Assignment->operator]); transpile_node(tr, p.Assignment->src_expr); tr_write(";"); return;
+    case Node_Assignment:   transpile_node(tr, p.Assignment->dst_expr); tr_writef(" %s ", assignment_operator[p.Assignment->operator]); transpile_node(tr, p.Assignment->src_expr); return;
     case Node_Scope:        transpile_scope(tr, p.Scope); return;
 
     case Node_IfStmt:
         tr_write("if ");
         transpile_condition_expr(tr, p.IfStmt->condition);
-        if (p.IfStmt->then_statement.node) { tr_write(" "); transpile_node(tr, p.IfStmt->then_statement); } else tr_write(";");
-        if (p.IfStmt->else_statement.node) { tr_write(" else "); transpile_node(tr, p.IfStmt->else_statement); }
+        if (p.IfStmt->then_statement.node) { tr_write(" "); transpile_node(tr, p.IfStmt->then_statement); }
+        if (p.IfStmt->else_statement.node) { transpile_semicolon_after_node(tr, p.IfStmt->then_statement); tr_write(" else "); transpile_node(tr, p.IfStmt->else_statement); }
         return;
 
     case Node_WhileStmt:
         tr_write("while "); transpile_condition_expr(tr, p.WhileStmt->condition);
         if (p.WhileStmt->statement.node) { tr_write(" "); transpile_node(tr, p.WhileStmt->statement); }
-        else tr_write(";");
         return;
 
     case Node_ForStmt:          transpile_for_loop(tr, p.ForStmt); return;
     case Node_SwitchStmt:       tr_write("switch "); transpile_condition_expr(tr, p.SwitchStmt->expr); tr_write(" "); transpile_scope(tr, p.SwitchStmt->scope); return;
-    case Node_ContinueStmt:     tr_write("continue;"); return;
-    case Node_BreakStmt:        tr_write("break;"); return;
-    case Node_ReturnStmt:       tr_write("return"); if (p.ReturnStmt->expr.node) { tr_write(" "); transpile_node(tr, p.ReturnStmt->expr); } tr_write(";"); return;
-    case Node_GotoStmt:         tr_writef("goto %s;", get_string(p.GotoStmt->label)); return;
+    case Node_ContinueStmt:     tr_write("continue"); return;
+    case Node_BreakStmt:        tr_write("break"); return;
+    case Node_ReturnStmt:       tr_write("return"); if (p.ReturnStmt->expr.node) { tr_write(" "); transpile_node(tr, p.ReturnStmt->expr); } return;
+    case Node_GotoStmt:         tr_writef("goto %s", get_string(p.GotoStmt->label)); return;
     case Node_LabelStmt:        tr_writef("%s:", get_string(p.LabelStmt->label)); return;
-    case Node_CaseLabelStmt:    tr_write("case: "); transpile_node(tr, p.CaseLabelStmt->expr); tr_write(":"); return;
+    case Node_CaseLabelStmt:    tr_write("case "); transpile_node(tr, p.CaseLabelStmt->expr); tr_write(":"); return;
     case Node_DefaultLabelStmt: tr_write("default:"); return;
 
     case Node_Type_MustInfer: return;
@@ -687,7 +708,7 @@ void transpile(Codebase* codebase) {
                 Struct* stru = codebase->structs[i];
                 if (stru->deps == dep) {
                     transpile_struct(tr, stru);
-                    tr_write("\n");
+                    tr_write(";\n");
                     transpiled++;
                 }
             }
@@ -721,9 +742,8 @@ void transpile(Codebase* codebase) {
     }
 
     {
-        StringBuilder impl_sb = sbCreate(); // I am such a dirty trickster
         StringBuilder temp = tr->sb;
-        tr->sb = impl_sb;
+        tr->sb = sbCreate(); // I am such a dirty trickster
 
         tr_write("\n// Implementations\n");
         for (u32 i = 0; i < procs_count; i++) {
@@ -732,6 +752,7 @@ void transpile(Codebase* codebase) {
             transpile_procedure(tr, proc);
         }
 
+        StringBuilder impl_sb = tr->sb;
         tr->sb = temp;
 
         foreach (static_decl, tr->static_decls) {

@@ -90,7 +90,7 @@ static void init_string_table() {
 }
 
 
-static void init_typenode_for_proc(Parser* parser, Procedure* proc); // TODO: put all forward-decl in same file
+static void init_typenode_for_proc(Procedure* proc); // TODO: put all forward-decl in same file
 
 static Procedure* builtin_procedures;
 
@@ -98,7 +98,7 @@ static Procedure create_builtin_proc(char* name) {
     Procedure proc = {0};
     proc.name = register_string(spFrom(name));
     proc.kind = Node_Procedure;
-    // init_typenode_for_proc(parser, &proc);
+    init_typenode_for_proc(&proc);
     return proc;
 }
 
@@ -173,7 +173,11 @@ static NodeRef alloc_node(Parser* parser, Nodekind kind) {
 
 static void print_errors(Parser* parser) {
     foreach (err, parser->errors) {
-        printf("%s:%d:%d: error: %s\n", err->location.file_name, err->location.line, err->location.column, err->message);
+        printf("%s:%d:%d: error: %s\n",
+            err->location.file_name,
+            err->location.line,
+            err->location.column,
+            err->message);
     }
 }
 

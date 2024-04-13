@@ -17,5 +17,6 @@ i64 endPerf();
 
 void* vmem_reserve(u64 size);
 void vmem_release(void* address);
-void vmem_commit(void* address, u64 size);
+void* vmem_commit(void* address, u64 size);
 void vmem_decommit(void* address, u64 size);
+void* vmem_reserve_and_commit(u64 size);

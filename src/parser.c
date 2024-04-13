@@ -216,7 +216,9 @@ static void resolve_typenode(Parser* parser, Type* type, Codebase* codebase) {
         } break;
 
         case Node_Type_MustInfer:
-        default: datatype = type_invalid;
+            printf("MustInfer\n");
+        default:
+            datatype = type_invalid;
     }
 
     if (datatype.kind == Typekind_Invalid) {
@@ -238,8 +240,10 @@ static Type* expectType(Parser* parser) {
     return type;
 }
 
-static void init_typenode_for_proc(Parser* parser, Procedure* proc) {
-    Type* type = alloc_node(parser, Node_Type_Procedure).Type; // TODO: very important: this is using the wrong arenas
+static void init_typenode_for_proc(Procedure* proc) {
+    Type* type = malloc(sizeof(Type)); // TODO: malloc to remove here
+    *type = (Type){0};
+    type->kind = Node_Type_Procedure;
     type->loc = proc->loc;
     type->procedure.return_type = proc->return_type;
     type->solvedstate.proc_ptr_typenode = type;
@@ -439,7 +443,7 @@ static void parse_unit(Parser* parser) {
 
     Identifier* includes = unit->included_files;
     foreach (include, includes) {
-        char* file_name = get_string(*include);
+        char* file_name = alloc_string_copy(get_string(*include)); // TODO: temporary fix. buffer of string returned from get_string() may be realloced
         printf("NOW including: \"%s\"\n", file_name);
         parser_parse_file(parser, file_name);
     }
@@ -499,8 +503,9 @@ void bind_units(Parser* parser, Codebase* cb) {
         Type* type = *tp;
         resolve_typenode(parser, type, cb);
         if (type->solvedstate.kind == Typekind_Invalid) {
+            // TODO: include type in error message
             error_node(parser, (NodeRef)type, "Failed to resolve type");
-            printf("    "); print_typenode(type); printf("\n");
+            // printf("    "); print_typenode(type); printf("\n");
         }
     }
 
@@ -544,7 +549,7 @@ void bind_units(Parser* parser, Codebase* cb) {
         for (u32 i = 0; i < procs_length; i++) {
             Procedure* p1 = cb->procedures[i];
 
-            init_typenode_for_proc(parser, p1);
+            init_typenode_for_proc(p1);
 
             if (p1->overload) continue;
 
