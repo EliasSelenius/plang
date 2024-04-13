@@ -1,29 +1,9 @@
 
-// T* add(with $T[..]* list, T item) {
-//     return list_add(list as void**, *item as void*, sizeof T);
-// }
-
-struct Transform {
-    float32 x, y;
-}
-
-struct Entity {
-    with Transform tr;
-}
 
 void main() {
-    // uint32[..] numbers = alloc uint32[..];
+    uint32[] numbers = { 69, 420, 12, 42 };
 
-    // add(numbers, 12);
-    // add(numbers, 645);
-
-
-    // for 0 .. numbers.length {
-    //     print(it, "\n");
-    // }
-
-    Entity e;
-    e.x = 21;
-    e.tr.x = 6;
-    e.tr = {};
+    for 0 .. numbers.length {
+        print("[", it, "] = ", numbers[it], "\n");
+    }
 }

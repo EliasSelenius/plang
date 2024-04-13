@@ -533,7 +533,7 @@ switch (p.node->kind) {
         tr_write(get_string(p.Deref->name));
     } return;
     case Node_Indexing: {
-        if (p.Indexing->datatype.kind == Typekind_Array) {
+        if (p.Indexing->indexed.expr->datatype.kind == Typekind_Array) {
             tr_write("((");
             Datatype elm_type = p.Indexing->indexed.expr->datatype.array_typenode->array.element_type->solvedstate;
             elm_type.numPointers++;
