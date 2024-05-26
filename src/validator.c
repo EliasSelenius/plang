@@ -365,6 +365,8 @@ static Datatype validate_deref_expr(Parser* parser, DerefExpression* deref, Data
     - is compile-time value in case labels and possibly const declarations
     - is on correct context (like continue/break/default must be inside a loop/switch)
     - ambigious dereference caused by contextual inclusion
+    - error on use of uninitialized variable (very important)
+    - propegate expected type in compound literals (for arrays and structs)
 */
 
 static Datatype type_ptr(Datatype type, i32 nump) { type.numPointers += nump; return type; }
@@ -467,9 +469,12 @@ switch (p.node->kind) {
     case Node_Cast: validate_expr_expect_type(parser, p.Cast->expr, p.Cast->new_type->solvedstate); return p.Cast->new_type->solvedstate; // TODO: is this a valid casting operation
     case Node_Sizeof: return type_ambiguousInteger;
     case Node_Parenthesized: return validate_expr_expect_type(parser, p.Parenthesized->inner_expr, expected_type);
-    case Node_Compound: // TODO: validate if this compound is compatible with expected_type
-        if (p.Compound->elements) { foreach (el, p.Compound->elements) validate_expr(parser, el->expr); }
+    case Node_Compound: {
+        Datatype inner_expected_type = type_invalid; // TODO: propegate expected type for structs aswell
+        if (expected_type.kind == Typekind_Array) inner_expected_type = expected_type.array_typenode->array.element_type->solvedstate;
+        if (p.Compound->elements) { foreach (el, p.Compound->elements) validate_expr_expect_type(parser, el->expr, inner_expected_type); }
         return expected_type;
+    }
 
     default:
         // this should never happen

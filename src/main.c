@@ -27,77 +27,9 @@
     InProgress:
         - print structs
         *- file name in errors
-        - modules or namespaces ?
         *- array literal
         *- struct literal
         - contextual inclusion (the with keyword on struct fields)
-
-
-    DONE list:
-        *- line numbers in validation errors
-        *- clasic for loop: for uint32 i = 0, i < 10, i++ { }
-        - global variable runtime expression assignment
-        - it keyword
-        *- enums
-        - localy defined structs
-        - localy defined type aliases
-        - local consts
-        - nesting funcptr types inside funcptrs arguments. void(void*(char*), uint) seems to produce a bug
-        - localy defined procedures
-        - allow underscores in number literals
-        - "plang build" CLI. build all .pog files in directory.
-        *- for in range loop: for i in 0..10 { }
-        *- implicit casts of numeric types
-        *- built-in print() function
-        *- switch statements
-        *- bitwise assignments
-        *- transpile decimal literals
-        *- parse hex literals
-        - omit curl brackets in if/while etc. for single statement block
-        - construct list of all string identifiers during tokenizing, to allow for faster string equals and to free the file buffer.
-        - function overloads
-        *- goto statement and labels
-        *- unary minus operation
-        *- modulus operator
-        *- bitwise operators
-        *- sizeof()
-        *- pre/post increment/decrement
-        *- a way to do stack allocation of arrays
-        - function pointers
-        - declare function pointer type in local scope
-        *- char literal
-        *- hex literal
-        *- type agnostic constants (const pi = 3.14)
-        *- casting (my_var as uint)
-        *- better number literal type inference: 10 => int, 10.0 => f32, 10d => f64 ?
-        - make void* implicitly castable to any other same degree pointer 
-        - return type inference
-        *- global variables
-        *- unary not operator
-        *- address-of operator *
-        *- value-of operator @
-        *- not equals operator
-        *- boolean operators
-        *- boolean comparisons 
-        *- multiple files 
-        *- struct self-reference
-        *- restructure expression types
-        - scopes
-        - type missmatch in assignments and declarations
-        *- declare statement (declare function signature without implementation)
-        *- function call 
-        *- function arguments
-        *- transpile forward declarations
-        - ternary operator
-        *- deref structs/pointers: foo.bar
-        *- indexing: p[2]
-        *- else if
-        *- assignments
-        *- while
-        - return statement
-        *- break, continue
-        - null literal
-
 
 upcoming todos:
  - make sure the parser_parse_source() never exits
@@ -106,6 +38,13 @@ upcoming todos:
  - lists in arenas?
 
  - include paths relative to file
+
+
+ - NodeRef in Datatype
+     - remove init_typenode_for_proc
+ - for loop parsing
+ - get operator string (for Invalid binary expression error)
+
 
 */
 

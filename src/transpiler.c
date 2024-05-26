@@ -459,21 +459,35 @@ static void transpile_for_loop(C_Transpiler* tr, ForStmt* forsta) {
 static void transpile_node(C_Transpiler* tr, NodeRef p) {
 char* operator = null;
 switch (p.node->kind) {
-    #define foreach_c_operator(X)\
-        X(Plus, "+", binary) X(Minus, "-", binary) X(Mul, "*", binary) X(Div, "/", binary) X(Mod, "%", binary)\
-        X(Less, "<", binary) X(Greater, ">", binary) X(LessEquals, "<=", binary) X(GreaterEquals, ">=", binary)\
-        X(Equals, "==", binary) X(NotEquals, "!=", binary) X(BooleanAnd, "&&", binary) X(BooleanOr, "||", binary)\
-        X(Bitwise_And, "&", binary) X(Bitwise_Or, "|", binary) X(Bitwise_Xor, "^", binary) X(Bitwise_Lshift, "<<", binary) X(Bitwise_Rshift, ">>", binary)\
-        X(Unary_PreIncrement, "++", unary) X(Unary_PostIncrement, "++", post_unary)\
-        X(Unary_PreDecrement, "--", unary) X(Unary_PostDecrement, "--", post_unary)\
-        X(Unary_Not, "!", unary) X(Unary_BitwiseNot, "~", unary) X(Unary_AddressOf, "&", unary)\
-        X(Unary_ValueOf, "*", unary) X(Unary_Negate, "-", unary)\
-
     #define entry(op, str, label) case Node_##op: operator = str; goto label;
-    foreach_c_operator(entry)
-
+    entry(Plus,                "+",     binary)
+    entry(Minus,               "-",     binary)
+    entry(Mul,                 "*",     binary)
+    entry(Div,                 "/",     binary)
+    entry(Mod,                 "%",     binary)
+    entry(Less,                "<",     binary)
+    entry(Greater,             ">",     binary)
+    entry(LessEquals,          "<=",    binary)
+    entry(GreaterEquals,       ">=",    binary)
+    entry(Equals,              "==",    binary)
+    entry(NotEquals,           "!=",    binary)
+    entry(BooleanAnd,          "&&",    binary)
+    entry(BooleanOr,           "||",    binary)
+    entry(Bitwise_And,         "&",     binary)
+    entry(Bitwise_Or,          "|",     binary)
+    entry(Bitwise_Xor,         "^",     binary)
+    entry(Bitwise_Lshift,      "<<",    binary)
+    entry(Bitwise_Rshift,      ">>",    binary)
+    entry(Unary_PreIncrement,  "++",    unary)
+    entry(Unary_PostIncrement, "++",    post_unary)
+    entry(Unary_PreDecrement,  "--",    unary)
+    entry(Unary_PostDecrement, "--",    post_unary)
+    entry(Unary_Not,           "!",     unary)
+    entry(Unary_BitwiseNot,    "~",     unary)
+    entry(Unary_AddressOf,     "&",     unary)
+    entry(Unary_ValueOf,       "*",     unary)
+    entry(Unary_Negate,        "-",     unary)
     #undef entry
-    #undef foreach_c_operator
 
     binary:
         tr_write("(");

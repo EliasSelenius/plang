@@ -230,7 +230,7 @@ static Value interpret_expression(NodeRef e, ReplScope* context) {
         case Node_Unary_ValueOf: break;
         case Node_Unary_Negate: {
             Value v = interpret_expression(e.Unary->inner_expr, context);
-            v.uint64 = -v.uint64;
+            v.uint64 = -v.uint64; // TODO: this is wrong for ints other than 64bits
             return v;
         }
 

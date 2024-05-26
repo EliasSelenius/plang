@@ -262,6 +262,55 @@ static void init_typenode_for_proc(Procedure* proc) {
 }
 
 
+static bool isBasicType(Parser* parser);
+static bool _isBasicType_validModifier(Parser* parser) {
+
+    u32 ti = parser->token_index;
+
+    if (tok(parser, Tok_Mul)) return true;
+
+    if (tok(parser, Tok_OpenParen)) {
+        if (tok(parser, Tok_CloseParen)) return true;
+
+        do {
+            if (!isBasicType(parser)) goto nope;
+        } while (tok(parser, Tok_Comma));
+
+        if (tok(parser, Tok_CloseParen)) return true;
+        else goto nope;
+    }
+
+    if (tok(parser, Tok_OpenSquare)) {
+        if (tok(parser, Tok_CloseSquare)) return true;
+        if (tok(parser, Tok_Dotdot) && tok(parser, Tok_CloseSquare)) return true;
+        if (tok(parser, Tok_Integer) && tok(parser, Tok_CloseSquare)) return true;
+    }
+
+    nope:
+    parser->token_index = ti;
+    return false;
+}
+
+static bool isBasicType(Parser* parser) {
+    if (tok(parser, Tok_Word)) {
+        if (tok(parser, Tok_Period)) if (!tok(parser, Tok_Word)) return false;
+        while (_isBasicType_validModifier(parser));
+        return true;
+    }
+    return false;
+}
+
+static u32 peekType(Parser* parser) {
+
+    if (peek(parser).type == Tok_Keyword_Let) return parser->token_index + 1;
+
+    u32 ti = parser->token_index;
+    u32 res = 0;
+    if (isBasicType(parser)) res = parser->token_index;
+    parser->token_index = ti;
+    return res;
+}
+
 static NodeRef expectEnum(Parser* parser) {
     Enum* en = alloc_node(parser, Node_Enum).Enum;
     en->entries = list_create(EnumEntry);
@@ -347,7 +396,7 @@ static Argument* expectArgument(Parser* parser) {
     do {
         tok(parser, Tok_Keyword_With);
         arg.loc = get_code_location_here(parser);
-        arg.type = expectType(parser);
+        if (parser->tokens[peekType(parser)].type == Tok_Word) arg.type = expectType(parser);
         arg.name = identifier(parser);
         list_add(res, arg);
     } while (tok(parser, Tok_Comma));

@@ -32,4 +32,41 @@ void main() {
     //     for (let node = list, node, node = node.next) print(node.num, " "); print("\n");
     // }
 
+/*
+
+    for (init, condition, update) block
+
+    for (start, begin, end) do
+        start
+        if begin {
+            do
+            end
+        }
+        if begin {
+            do
+            end
+        }
+        if begin {
+            do
+            end
+        }
+
+
+    for (let i = 0, i < 10, if (i % 2) i++ else i += 2) block
+
+    let i = 0;
+    while i < 10 {
+        block
+        if (i % 2) i++ else i += 2
+    }
+
+*/
+
 }
+
+
+
+
+
+
+
