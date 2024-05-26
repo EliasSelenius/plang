@@ -45,7 +45,7 @@ FileInfo* get_all_files(char* path, bool recursive) {
         FileInfo** list = user_data as FileInfo**;
         let full_path = alloc_string_copy(info.path);
         info.path = full_path.chars;
-        info.name = trim(substr_to_end(full_path, '/'), 1).chars;
+        info.name = trim_start(substr_to_end(full_path, '/'), 1).chars;
 
         list_add(list, *info);
     }

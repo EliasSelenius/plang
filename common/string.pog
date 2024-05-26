@@ -5,6 +5,16 @@ struct string {
     uint32 length;
 }
 
+
+/*
+    it should be easy to implement this, just check if the pointer lies within the static memory region
+    bool is_static_string(string str)
+    bool is_static_string(char* str)
+    this is a very cool function because we can check the ownership of a pice of memory at runtime
+
+*/
+
+
 string make_string(char* c_str) {
     string str = { c_str, strlen(c_str) };
     return str;
@@ -116,6 +126,19 @@ string substr_until(char* str, char delim) {
     return res;
 }
 
+string substr_until(string str, char delim) {
+    string res = str;
+
+    for 0 .. str.length {
+        if str.chars[it] == delim {
+            res.length = it + 1;
+            break;
+        }
+    }
+
+    return res;
+}
+
 string substr_to_end(string str, char start) {
     int64 i = str.length - 1;
     while (i >= 0 and str.chars[i] != start) i--;
@@ -127,10 +150,9 @@ char* trim_starting_whitespace(char* c_str) {
     return c_str;
 }
 
-string trim(string str, uint32 len) {
-    return { str.chars + len, str.length - len };
-}
-
+string trim_start(string str, uint32 len) { return { str.chars + len, str.length - len }; }
+string trim_end(string str, uint32 len) { return { str.chars, str.length - len }; }
+string trim(string str, uint32 len) { return { str.chars + len, str.length - len*2 }; }
 
 bool is_whitespace(char c) { return c == ' ' or c == '\n' or c == '\t'; }
 bool is_whitespace_or_null(char c) { return is_whitespace(c) or c == 0; }
@@ -203,11 +225,46 @@ struct StringBuilder {
 }
 
 string to_string(StringBuilder sb) {
-    return {sb.content, sb.length} as string;
+    return {sb.content, sb.length};
 }
 
+StringBuilder* alloc_temp_builders(uint32 count) {
+    StringBuilder* temps = malloc(count * sizeof StringBuilder);
+    for 0 .. count {
+        temps[it] = sb_create();
+    }
+    return temps;
+}
+
+StringBuilder* temp_builder() {
+    const builder_count = 8;
+    static StringBuilder* temps = alloc_temp_builders(builder_count);
+    static uint32 rotation = 0;
+    let sb = *temps[rotation++ % builder_count];
+    sb_clear(sb);
+    return sb;
+}
+
+
+/* TODO: all these overloads are stupid. something like this would be better:
+    char* concat(any[] params...) {
+        let sb = temp_builder();
+        for 0 .. params.length   sb_append(sb, params[it]);
+        return sb.content;
+    }
+*/
+
+char* concat(char* a, b)        { let sb = temp_builder(); sb_append(sb, a); sb_append(sb, b); return sb.content; }
+char* concat(char* a, string b) { let sb = temp_builder(); sb_append(sb, a); sb_append(sb, b); return sb.content; }
+char* concat(string a, char* b) { let sb = temp_builder(); sb_append(sb, a); sb_append(sb, b); return sb.content; }
+char* concat(string a, b)       { let sb = temp_builder(); sb_append(sb, a); sb_append(sb, b); return sb.content; }
+
+char* concat(char* a, b, c) { let sb = temp_builder(); sb_append(sb, a); sb_append(sb, b); sb_append(sb, c); return sb.content; }
+char* concat(string a, b, c) { let sb = temp_builder(); sb_append(sb, a); sb_append(sb, b); sb_append(sb, c); return sb.content; }
+char* concat(char* a, string b, char* c) { let sb = temp_builder(); sb_append(sb, a); sb_append(sb, b); sb_append(sb, c); return sb.content; }
+
 StringBuilder sb_create() {
-    StringBuilder sb;
+    StringBuilder sb = {};
     sb.length = 0;
     sb.capacity = 16;
 

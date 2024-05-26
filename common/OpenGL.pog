@@ -2947,4 +2947,3 @@ void load_opengl(void()(char*) getProcAddress) {
     glWaitSync                                    = getProcAddress("glWaitSync")                                    as proc_glWaitSync;
 }
 
-

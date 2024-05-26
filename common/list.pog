@@ -41,7 +41,6 @@ void list_grow(void** list, uint32 new_capacity) {
 }
 
 void* list_add(void** list, void* data) {
-
     let len = list_length(@list);
     let cap = list_capacity(@list);
     let stride = list_stride(@list);
@@ -49,11 +48,13 @@ void* list_add(void** list, void* data) {
     if cap == len  list_grow(list, cap * 2);
 
     void* dst = (@list as byte*) + len * stride;
-    memcpy(dst, data, stride);
+    if data  memcpy(dst, data, stride);
 
     list_set_length(@list, len + 1);
     return dst;
 }
+
+void* list_append(void** list) { return list_add(list, null); }
 
 void* list_get(void* list, uint32 index) {
     return (list as byte*) + list_stride(list) * index;

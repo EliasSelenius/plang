@@ -60,3 +60,12 @@ void filewrite(char* filename, char* content) {
     fclose(file);
 }
 
+
+void filewrite(string filename, char* content) {
+    // TODO: isnt this beautiful!
+    char* tmp = malloc(filename.length + 1);
+    memcpy(tmp, filename.chars, filename.length);
+    tmp[filename.length] = 0;
+    filewrite(tmp, content);
+    free(tmp);
+}
