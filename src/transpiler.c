@@ -44,6 +44,7 @@ static char* getTypeCname(Datatype type) {
         case Typekind_float64: return "float64";
         case Typekind_void: return "void";
         case Typekind_char: return "char";
+        case Typekind_string: return "string";
 
         case Typekind_Struct: return get_string(type.stru->name);
         case Typekind_Enum: return get_string(type._enum->name);
@@ -223,6 +224,7 @@ static void transpilePrintFormat(C_Transpiler* tr, Datatype type) {
         case Typekind_float32: tr_write("%f"); return;
         case Typekind_float64: tr_write("%Lf"); return;
         case Typekind_char: tr_write("%c"); return;
+        case Typekind_string: tr_write("%.*s"); return;
 
         default: break;
     }
@@ -252,24 +254,38 @@ static void transpile_print_call(C_Transpiler* tr, ProcCallExpression* call) {
     tr_write("\"");
 
 
-    foreach (item, call->args) {
-        Expression* arg = item->expr;
+    foreach (arg, call->args) {
+        Datatype type = arg->expr->datatype;
+        Nodekind node_kind = arg->node->kind;
         tr_write(", ");
-        if (arg->datatype.kind == Typekind_Struct && arg->datatype.numPointers == 0) {
-            foreach (field, arg->datatype.stru->fields) {
 
-                if (field->type->solvedstate.kind == Typekind_Struct && field->type->solvedstate.numPointers == 0) {
-                    // TODO: print struct inside struct
-                }
+        if (type.numPointers == 0) {
+            switch (type.kind) {
+                case Typekind_Struct: {
+                    foreach (field, type.stru->fields) {
+                        if (field->type->solvedstate.kind == Typekind_Struct && field->type->solvedstate.numPointers == 0) {
+                            // TODO: print struct inside struct
+                        }
 
-                transpile_node(tr, *item);
-                tr_writef(".%s, ", get_string(field->name));
+                        transpile_node(tr, *arg);
+                        tr_writef(".%s, ", get_string(field->name));
+                    }
+                    tr->sb.length -= 2;
+                } continue;
+
+                case Typekind_string: {
+                    transpile_node(tr, *arg); // TODO: if node is a large expression with side effects then transpiling it twice is obviously wrong
+                    tr_write(".length, ");
+                    transpile_node(tr, *arg);
+                    tr_write(".chars");
+                } continue;
+
+                default: break;
             }
-            tr->sb.length -= 2;
-        } else {
-            if (arg->kind == Node_Sizeof) tr_write("(uint32)");
-            transpile_node(tr, *item);
         }
+
+        if (node_kind == Node_Sizeof) tr_write("(uint32)");
+        transpile_node(tr, *arg);
     }
 
     tr_write(")");
@@ -404,7 +420,7 @@ static void transpile_proc_signature(C_Transpiler* tr, Procedure* proc) {
 }
 
 static void transpile_local_procedures(C_Transpiler* tr, NodeRef ref) {
-    if (ref.node == null) return;
+    if (node_is_null(ref)) return;
     if (ref.node->kind != Node_Scope) return;
 
     foreach (s, ref.Scope->statements) {

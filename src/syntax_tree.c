@@ -86,7 +86,7 @@ typedef union NodeRef {
 #undef AstNodePointer_field
 
 #define null_node ((NodeRef){null})
-
+#define node_is_null(node) ((node).void_ptr == null)
 
 // ----Types---------------------------------------------
 
@@ -111,6 +111,7 @@ typedef enum Typekind {
 
     Typekind_void,
     Typekind_char,
+    Typekind_string,
 
     Typekind_Struct,
     Typekind_Enum,
@@ -206,6 +207,7 @@ struct Type {
 #define type_float64 (Datatype) { .kind = Typekind_float64 }
 #define type_char    (Datatype) { .kind = Typekind_char }
 #define type_void    (Datatype) { .kind = Typekind_void }
+#define type_string  (Datatype) { .kind = Typekind_string }
 #define type_bool    type_uint8
 
 static inline bool typeEquals(Datatype a, Datatype b) {

@@ -167,18 +167,19 @@ static void resolve_typenode(Parser* parser, Type* type, Codebase* codebase) {
                 break;
             }
 
-            if (type->name == type_name_int8)    { datatype = type_int8; break; }
-            if (type->name == type_name_uint8)   { datatype = type_uint8; break; }
-            if (type->name == type_name_int16)   { datatype = type_int16; break; }
-            if (type->name == type_name_uint16)  { datatype = type_uint16; break; }
-            if (type->name == type_name_int32)   { datatype = type_int32; break; }
-            if (type->name == type_name_uint32)  { datatype = type_uint32; break; }
-            if (type->name == type_name_int64)   { datatype = type_int64; break; }
-            if (type->name == type_name_uint64)  { datatype = type_uint64; break; }
-            if (type->name == type_name_float32) { datatype = type_float32; break; }
-            if (type->name == type_name_float64) { datatype = type_float64; break; }
-            if (type->name == type_name_char)    { datatype = type_char; break; }
-            if (type->name == type_name_void)    { datatype = type_void; break; }
+            if (type->name == builtin_string_int8)    { datatype = type_int8; break; }
+            if (type->name == builtin_string_uint8)   { datatype = type_uint8; break; }
+            if (type->name == builtin_string_int16)   { datatype = type_int16; break; }
+            if (type->name == builtin_string_uint16)  { datatype = type_uint16; break; }
+            if (type->name == builtin_string_int32)   { datatype = type_int32; break; }
+            if (type->name == builtin_string_uint32)  { datatype = type_uint32; break; }
+            if (type->name == builtin_string_int64)   { datatype = type_int64; break; }
+            if (type->name == builtin_string_uint64)  { datatype = type_uint64; break; }
+            if (type->name == builtin_string_float32) { datatype = type_float32; break; }
+            if (type->name == builtin_string_float64) { datatype = type_float64; break; }
+            if (type->name == builtin_string_char)    { datatype = type_char; break; }
+            if (type->name == builtin_string_void)    { datatype = type_void; break; }
+            if (type->name == builtin_string_string)  { datatype = type_string; break; }
 
             datatype = get_local_type(parser, type->name);
         } break;
@@ -579,7 +580,7 @@ void bind_units(Parser* parser, Codebase* cb) {
 
         foreach (item, u->external_symbols) {
             VariableExpression* var = *item;
-            if (var->ref.node == null) error_node(parser, (NodeRef)var, "Undeclared symbol \"%s\".", get_string(var->name));
+            if (node_is_null(var->ref)) error_node(parser, (NodeRef)var, "Undeclared symbol \"%s\".", get_string(var->name));
         }
     }
 

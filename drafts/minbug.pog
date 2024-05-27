@@ -1,9 +1,9 @@
 
+include "../../grax/src/math.pog";
+include "../common/basic.pog";
+include "../common/string.pog";
 
 void main() {
-    uint32[] numbers = { 69, 420, 12, 42 };
-
-    for 0 .. numbers.length {
-        print("[", it, "] = ", numbers[it], "\n");
-    }
+    string str = make_string("Hello, World!\n");
+    print(str);
 }

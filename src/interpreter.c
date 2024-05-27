@@ -244,7 +244,7 @@ static Value interpret_expression(NodeRef e, ReplScope* context) {
         case Node_Literal_Null:    return (Value) { .type = type_voidPointer, .pointer = null };
 
         case Node_Variable: {
-            if (e.Variable->ref.node == null) {
+            if (node_is_null(e.Variable->ref)) {
                 ReplVariable* var = scope_context_get(context, e.Variable->name);
                 if (var) return var->value;
 

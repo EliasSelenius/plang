@@ -5,8 +5,7 @@ struct {
     u32* byteoffsets; // list
     DynamicBuffer* data;
 
-    // Identifier* identifiers; // list
-    // Arena arena;
+    // TODO: remove dynamic array completely in favor of an arena
 
 } string_table;
 
@@ -31,62 +30,44 @@ static Identifier register_string(StrSpan word) {
     return byteOffset;
 }
 
-static Identifier type_name_int8 = 0;
-static Identifier type_name_uint8 = 0;
-static Identifier type_name_int16 = 0;
-static Identifier type_name_uint16 = 0;
-static Identifier type_name_int32 = 0;
-static Identifier type_name_uint32 = 0;
-static Identifier type_name_int64 = 0;
-static Identifier type_name_uint64 = 0;
-static Identifier type_name_float32 = 0;
-static Identifier type_name_float64 = 0;
-static Identifier type_name_char = 0;
-static Identifier type_name_void = 0;
+#define builtin_strings(X) \
+    X(int8) \
+    X(uint8) \
+    X(int16) \
+    X(uint16) \
+    X(int32) \
+    X(uint32) \
+    X(int64) \
+    X(uint64) \
+    X(float32) \
+    X(float64) \
+    X(char) \
+    X(void) \
+    X(string) \
+    X(print) \
+    X(main) \
+    X(it) \
+    X(it_index) \
+    X(length) \
+    X(capacity) \
+    X(elements) \
+    X(add) \
+    X(static_init) \
+    X(chars) \
 
-static Identifier builtin_string_print = 0;
-static Identifier builtin_string_main = 0;
-static Identifier builtin_string_it = 0;
-static Identifier builtin_string_it_index = 0;
-static Identifier builtin_string_length = 0;
-static Identifier builtin_string_capacity = 0;
-static Identifier builtin_string_elements = 0;
-static Identifier builtin_string_add = 0;
-static Identifier builtin_string_static_init = 0;
 
+#define decl_strings(str) static Identifier builtin_string_##str = 0;
+builtin_strings(decl_strings)
+#undef decl_strings
 
 static void init_string_table() {
-
-    // string_table.identifiers = list_create(Identifier);
-    // string_table.arena = arena_create();
-
     string_table.byteoffsets = list_create(u32);
     string_table.data = dyCreate();
     register_string(spFrom("")); // empty string
 
-    type_name_int8    = register_string(spFrom("int8"));
-    type_name_uint8   = register_string(spFrom("uint8"));
-    type_name_int16   = register_string(spFrom("int16"));
-    type_name_uint16  = register_string(spFrom("uint16"));
-    type_name_int32   = register_string(spFrom("int32"));
-    type_name_uint32  = register_string(spFrom("uint32"));
-    type_name_int64   = register_string(spFrom("int64"));
-    type_name_uint64  = register_string(spFrom("uint64"));
-    type_name_float32 = register_string(spFrom("float32"));
-    type_name_float64 = register_string(spFrom("float64"));
-    type_name_char    = register_string(spFrom("char"));
-    type_name_void    = register_string(spFrom("void"));
-
-    builtin_string_print = register_string(spFrom("print"));
-    builtin_string_main = register_string(spFrom("main"));
-    builtin_string_it = register_string(spFrom("it"));
-    builtin_string_it_index = register_string(spFrom("it_index"));
-    builtin_string_length = register_string(spFrom("length"));
-    builtin_string_capacity = register_string(spFrom("capacity"));
-    builtin_string_elements = register_string(spFrom("elements"));
-    builtin_string_add = register_string(spFrom("add"));
-
-    builtin_string_static_init = register_string(spFrom("__static_init"));
+    #define init_strings(str) builtin_string_##str = register_string(spFrom(#str));
+    builtin_strings(init_strings)
+    #undef init_strings
 }
 
 
@@ -271,9 +252,9 @@ static NodeRef get_global_symbol(Identifier name, Unit* unit) {
 }
 
 
-
+// TODO: could this be consolidated with typeofStatement()
 static Datatype get_datatype_from_statement(NodeRef ref) {
-    if (ref.node == null) return type_invalid;
+    if (node_is_null(ref)) return type_invalid;
     switch (ref.node->kind) {
         case Node_Struct:  return (Datatype) { .kind = Typekind_Struct, .data_ptr = ref.void_ptr };
         case Node_Enum:    return (Datatype) { .kind = Typekind_Enum, .data_ptr = ref.void_ptr };

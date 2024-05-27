@@ -97,12 +97,16 @@ static char* get_basic_type_string(Datatype type) {
         case Typekind_float64:          return "float64";
         case Typekind_void:             return "void";
         case Typekind_char:             return "char";
+        case Typekind_string:           return "string";
 
         case Typekind_Struct:           return get_string(type.stru->name);
         case Typekind_Enum:             return get_string(type._enum->name);
         case Typekind_Typedef:          return get_string(type.type_def->name);
 
-        default: return null;
+        case Typekind_Procedure:        return null;
+        case Typekind_Array:            return null;
+        case Typekind_Fixed_Array:      return null;
+        case Typekind_Dynamic_Array:    return null;
     }
 }
 
@@ -147,13 +151,15 @@ static char* construct_type_string(Datatype type, StringBuilder* sb) {
     return sb->content;
 }
 
+static char* get_temp_type_name(Datatype type) {
+    return construct_type_string(type, temp_builder());
+}
 
-static void assertAssignability(Parser* parser, Datatype toType, Datatype fromType, NodeRef ref) {
-    if (typeAssignable(toType, fromType)) return;
 
-    char* to_str = construct_type_string(toType, temp_builder());
-    char* from_str = construct_type_string(fromType, temp_builder());
-    error_node(parser, ref, "Type missmatch. \"%s\" is not assignable to \"%s\".", from_str, to_str);
+static void assertAssignability(Parser* parser, Datatype dst_type, Datatype src_type, NodeRef ref) {
+    if (typeAssignable(dst_type, src_type)) return;
+
+    error_node(parser, ref, "Type missmatch. \"%s\" is not assignable to \"%s\".", get_temp_type_name(src_type), get_temp_type_name(dst_type));
 }
 
 static Datatype typeofStatement(Statement* sta) {
@@ -325,38 +331,56 @@ static void validate_procedure(Parser* parser, Procedure* proc) {
 }
 
 static Datatype validate_deref_expr(Parser* parser, DerefExpression* deref, Datatype expected_type) {
-    if (deref->expr.node == null) { // implicit derefing:
+    NodeRef inner_expr = deref->expr;
+    Identifier member_name = deref->name;
+
+    // implicit derefing:
+    if (node_is_null(inner_expr)) {
         if (expected_type.kind == Typekind_Enum && expected_type.numPointers == 0) return expected_type;
 
-        error_node(parser, (NodeRef)deref, "Cannot infer implicit dereferencing \".%s\".", get_string(deref->name));
+        error_node(parser, (NodeRef)deref, "Cannot infer implicit dereferencing \".%s\".", get_string(member_name));
         return type_invalid;
     }
 
-    Datatype inner_expr_type = validate_expr(parser, deref->expr);
+    Datatype inner_expr_type = validate_expr(parser, inner_expr);
 
-    // when we deref a variable expression
-    if (deref->expr.node->kind == Node_Variable) {
-        if (deref->expr.Variable->ref.node->kind == Node_Enum) return (Datatype) { Typekind_Enum, ._enum = deref->expr.Variable->ref.Enum };
+    // TODO: we could remove this if we consolidated get_datatype_from_statement() with typeofStatement()
+    // then validate_expr() would handle this case for us,
+    // and out switch statement down there could do the checks to see if member_name
+    // actually is a member of the enum type.
+    if (inner_expr.node->kind == Node_Variable) {
+        if (inner_expr.Variable->ref.node->kind == Node_Enum) return (Datatype) { Typekind_Enum, ._enum = inner_expr.Variable->ref.Enum };
     }
 
-    if (inner_expr_type.kind == Typekind_Struct) {
-        if (inner_expr_type.numPointers > 1) {
-            error_node(parser, (NodeRef)deref, "Attempted to dereference a %dth-degree pointer.", inner_expr_type.numPointers);
+    if (inner_expr_type.numPointers > 1) {
+        error_node(parser, (NodeRef)deref, "Attempted to dereference a %dth-degree pointer.", inner_expr_type.numPointers);
+        return type_invalid;
+    }
+
+    switch (inner_expr_type.kind) {
+        case Typekind_Struct: {
+            Statement* member = getMember(inner_expr_type.stru, member_name);
+            if (member) return typeofStatement(member);
+
+            error_node(parser, (NodeRef)deref, "Member \"%s\" does not exist in struct \"%s\".", get_string(member_name), get_string(inner_expr_type.stru->name));
             return type_invalid;
         }
 
-        Statement* member = getMember(inner_expr_type.stru, deref->name);
-        if (member) return typeofStatement(member);
+        case Typekind_string: {
+            if (member_name == builtin_string_length) return type_uint32;
+            if (member_name == builtin_string_chars) return type_charPointer;
+        } break;
 
-        error_node(parser, (NodeRef)deref, "Member \"%s\" does not exist in struct \"%s\".", get_string(deref->name), get_string(inner_expr_type.stru->name));
-        return type_invalid;
+        case Typekind_Dynamic_Array:
+            if (member_name == builtin_string_capacity) return type_uint32; // TODO: hardcoded type of capacity field
+        case Typekind_Array:
+        case Typekind_Fixed_Array: {
+            if (member_name == builtin_string_length) return type_uint32; // TODO: hardcoded type of length field
+        } break;
+        default: break;
     }
 
-    if (inner_expr_type.kind == Typekind_Array) {
-        if (deref->name == builtin_string_length) return type_uint32; // TODO: hardcoded type of length field
-    }
-
-    error_node(parser, (NodeRef)deref, "Invalid dereferencing.");
+    error_node(parser, (NodeRef)deref, "Invalid dereferencing. \"%s\" is not a member of %s", get_string(member_name), get_temp_type_name(inner_expr_type));
     return type_invalid;
 }
 
@@ -406,7 +430,7 @@ switch (p.node->kind) {
         if (typeAssignable(type_l, type_r)) return type_l;
         if (typeAssignable(type_r, type_l)) return type_r;
 
-        error_node(parser, p, "Invalid binary expression. operator %s (%s, %s)", "", construct_type_string(type_l, temp_builder()), construct_type_string(type_r, temp_builder()));
+        error_node(parser, p, "Invalid binary expression. operator %s (%s, %s)", "", get_temp_type_name(type_l), get_temp_type_name(type_r));
         return type_invalid;
     }
 
@@ -434,7 +458,7 @@ switch (p.node->kind) {
     case Node_Literal_Integer: return type_ambiguousInteger;
     case Node_Literal_Decimal: return type_ambiguousDecimal;
     case Node_Literal_Char:    return type_char;
-    case Node_Literal_String:  return type_charPointer;
+    case Node_Literal_String:  return type_charPointer; // TODO: string literals should be Typekind_string
     case Node_Literal_True:    return type_bool;
     case Node_Literal_False:   return type_bool;
     case Node_Literal_Null:    return type_voidPointer;

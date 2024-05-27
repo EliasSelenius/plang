@@ -120,7 +120,7 @@ static NodeRef expect_unary(Parser* parser) {
     }
 
     NodeRef inner = expect_leaf(parser);
-    if (p.node) {
+    if (!node_is_null(p)) {
         p.Unary->inner_expr = inner;
         inner = p;
     }
@@ -202,7 +202,7 @@ static Nodekind token_is_binary(TokenType type) {
         case Tok_LeftShift: return Node_Bitwise_Lshift;
         case Tok_RightShift: return Node_Bitwise_Rshift;
 
-        default: return 0; // not an operator
+        default: return Node_Invalid; // not an operator
     }
 }
 
@@ -241,14 +241,14 @@ static NodeRef merge_binary_exprs(NodeRef a, NodeRef b) {
 static NodeRef expect_binary(Parser* parser) {
     NodeRef a = expect_unary(parser);
     Nodekind node_kind = token_is_binary(peek(parser).type);
-    if (node_kind == 0) return a;
+    if (node_kind == Node_Invalid) return a;
 
     NodeRef root = alloc_node(parser, node_kind);
     advance(parser);
     root.Binary->left = a;
     root.Binary->right = expect_unary(parser);
 
-    while ((node_kind = token_is_binary(peek(parser).type))) {
+    while ((node_kind = token_is_binary(peek(parser).type)) != Node_Invalid) {
         NodeRef op = alloc_node(parser, node_kind);
         advance(parser);
         op.Binary->right = expect_unary(parser);
