@@ -20,6 +20,7 @@ string make_string(char* c_str) {
     return str;
 }
 
+// TODO: shouldnt this be a pow overload in math.pog
 uint64 pow_uint64(uint64 x, uint64 y) {
     uint64 res = 1;
     for 0 .. y  res *= x;

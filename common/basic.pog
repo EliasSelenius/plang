@@ -18,8 +18,10 @@ void* calloc(uint64 count, uint64 size);
 void* malloc(uint64 size);
 void free(void* block);
 void* realloc(void* buffer, uint64 size);
+
 void* memcpy(void* dst, void* src, uint64 size);
 void* memset(void* dst, int32 val, uint64 size);
+void* memmove(void* dst, void* src, uint64 size);
 
 uint64 strlen(char* str);
 

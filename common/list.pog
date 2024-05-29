@@ -23,14 +23,8 @@ uint32 list_capacity(void* list) { return list_head(list).capacity; }
 uint32 list_stride(void* list) { return list_head(list).stride; }
 
 void list_set_length(void* list, uint32 new_len) { list_head(list).length = new_len; }
-
-void list_delete(void* list) {
-    free(list_head(list));
-}
-
-void list_clear(void* list) {
-    list_head(list).length = 0;
-}
+void list_delete(void* list) { free(list_head(list)); }
+void list_clear(void* list) { list_head(list).length = 0; }
 
 void list_grow(void** list, uint32 new_capacity) {
     List* head = list_head(@list);
@@ -56,18 +50,32 @@ void* list_add(void** list, void* data) {
 
 void* list_append(void** list) { return list_add(list, null); }
 
-void* list_get(void* list, uint32 index) {
-    return (list as byte*) + list_stride(list) * index;
-}
-
-void* list_last_item(void* list) {
-    return list_get(list, list_length(list) - 1);
-}
+void* list_get(void* list, uint32 index) { return (list as byte*) + list_stride(list) * index; }
+void* list_last_item(void* list) { return list_get(list, list_length(list) - 1); }
 
 void list_unordered_remove(void* list, uint32 index) {
     let len = list_length(list);
     memcpy(list_get(list, index), list_get(list, len - 1), list_stride(list));
     list_set_length(list, len - 1);
+}
+
+void list_ordered_remove(void* list, uint32 index) {
+    let new_len = list_length(list) - 1;
+    memmove(list_get(list, index), list_get(list, index + 1), (new_len - index) * list_stride(list));
+    list_set_length(list, new_len);
+}
+
+void* list_insert(void** list, uint32 index) { return list_insert(list, index, null); }
+void* list_insert(void** list, uint32 index, void* data) {
+    let stride = list_stride(@list);
+    let count = list_length(@list) - index;
+
+    list_append(list);
+    void* item = list_get(@list, index);
+    memmove(list_get(@list, index + 1), item, count * stride);
+    if data memcpy(item, data, stride);
+
+    return item;
 }
 
 void* list_pop(void* list) {

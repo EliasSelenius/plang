@@ -2,8 +2,53 @@
 include "../../grax/src/math.pog";
 include "../common/basic.pog";
 include "../common/string.pog";
+include "../common/list.pog";
 
 void main() {
     string str = make_string("Hello, World!\n");
     print(str);
+
+    void add_int(void** list, uint32 num) {
+        list_add(list, *num);
+    }
+
+    uint32* list = list_create(sizeof uint32);
+    add_int(*list, 12);
+    add_int(*list, 69);
+    add_int(*list, 420);
+
+    for 0 .. list_length(list)  print(it, ". ", list[it], "\n");
+    print("\n\n");
+
+    void insert(void** list, uint32 index, value) {
+        // @(list_insert(list, index) as uint32*) = value;
+        list_insert(list, index, *value);
+        for 0 .. list_length(@list)  print(it, ". ", (@list as uint32*)[it], "\n");
+        print("\n\n");
+    }
+
+    insert(*list, 0, 3);
+    insert(*list, 3, 70);
+    insert(*list, 5, 99);
+
+    list_ordered_remove(list, 3);
+    for 0 .. list_length(list)  print(it, ". ", list[it], "\n");
+    print("\n\n");
+
+    list_ordered_remove(list, 0);
+    for 0 .. list_length(list)  print(it, ". ", list[it], "\n");
+    print("\n\n");
+
+    list_ordered_remove(list, 3);
+    for 0 .. list_length(list)  print(it, ". ", list[it], "\n");
+    print("\n\n");
+
+    print("Done!\n");
 }
+
+// void todo1() {
+//     void foo(float32 a) {}
+//     void foo(uint32 a) {}
+
+//     foo(12); // this should be an ambigous reference
+// }
