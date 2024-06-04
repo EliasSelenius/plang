@@ -9,6 +9,9 @@ typedef struct C_Transpiler {
 #define tr_write(c_str) sbAppend(&tr->sb, c_str)
 #define tr_writef(format, ...) sb_append_format(&tr->sb, format, __VA_ARGS__)
 
+static void tr_write_asterixs(C_Transpiler* tr, u32 count) {
+    while (count-- > 0) tr_write("*");
+}
 
 static inline void newline(C_Transpiler* tr) {
     tr_write("\n");
@@ -71,8 +74,7 @@ static void transpileProcSigStart(C_Transpiler* tr, Type* proc_type) {
     }
 
     tr_write("(");
-    u32 np = proc_type->solvedstate.numPointers;
-    while (np-- > 0) tr_write("*");
+    tr_write_asterixs(tr, proc_type->solvedstate.numPointers);
 }
 
 static void transpileProcArguments(C_Transpiler* tr, Type* proc_type) {
@@ -101,9 +103,7 @@ static void transpileTypeStart(C_Transpiler* tr, Datatype type) {
 
     if (type.kind == Typekind_Array) {
         tr_write("Array");
-
-        u32 np = type.numPointers;
-        while (np-- > 0) tr_write("*");
+        tr_write_asterixs(tr, type.numPointers);
         return;
     }
 
@@ -120,8 +120,7 @@ static void transpileTypeStart(C_Transpiler* tr, Datatype type) {
         transpileProcSigStart(tr, type.proc_ptr_typenode);
     } else {
         tr_write(getTypeCname(type));
-        u32 np = type.numPointers;
-        while (np-- > 0) tr_write("*");
+        tr_write_asterixs(tr, type.numPointers);
         //tr_write(" ");
     }
 }
@@ -291,6 +290,19 @@ static void transpile_print_call(C_Transpiler* tr, ProcCallExpression* call) {
     tr_write(")");
 }
 
+static void transpile_proc_argument(C_Transpiler* tr, ProcCallExpression* call, u32 index) {
+    Datatype type = call->proc ? call->proc->arguments[index].type->solvedstate : type_invalid;
+    if (type.kind == Typekind_void && type.numPointers > 1) {
+        tr_write("(void");
+        tr_write_asterixs(tr, type.numPointers);
+        tr_write(")(");
+        transpile_node(tr, call->args[index]);
+        tr_write(")");
+    } else {
+        transpile_node(tr, call->args[index]);
+    }
+}
+
 static void transpile_proccall(C_Transpiler* tr, ProcCallExpression* call) {
 
     // special cases:
@@ -301,18 +313,17 @@ static void transpile_proccall(C_Transpiler* tr, ProcCallExpression* call) {
         }
     }
 
-
     transpile_node(tr, call->proc_expr);
     if (call->proc && call->proc->overload) tr_writef("%d", call->proc->overload);
 
     tr_write("(");
     if (call->args) {
-        transpile_node(tr, call->args[0]);
+        transpile_proc_argument(tr, call, 0);
 
         u32 len = list_length(call->args);
         for (u32 i = 1; i < len; i++) {
             tr_write(", ");
-            transpile_node(tr, call->args[i]);
+            transpile_proc_argument(tr, call, i);
         }
     }
     tr_write(")");
@@ -399,7 +410,7 @@ static void transpile_scope(C_Transpiler* tr, Scope* scope) {
 
 static void transpile_proc_signature(C_Transpiler* tr, Procedure* proc) {
 
-    if (proc->name != builtin_string_main && proc->scope) tr_write("static ");
+    if (proc->name != builtin_string_main && !node_is_null(proc->sub_node)) tr_write("static ");
     transpileType(tr, proc->return_type);
     tr_write(" ");
 
@@ -437,10 +448,23 @@ static void transpile_local_procedures(C_Transpiler* tr, NodeRef ref) {
 }
 
 static void transpile_procedure(C_Transpiler* tr, Procedure* proc) {
-    transpile_local_procedures(tr, (NodeRef)proc->scope);
+    transpile_local_procedures(tr, proc->sub_node);
     transpile_proc_signature(tr, proc);
     tr_write(" ");
-    transpile_scope(tr, proc->scope);
+
+    if (proc->sub_node.node->kind != Node_Scope) {
+        tr_write("{");
+        tr->tabing++; newline(tr);
+
+        transpile_node(tr, proc->sub_node);
+        transpile_semicolon_after_node(tr, proc->sub_node);
+
+        tr->tabing--; newline(tr);
+        tr_write("}");
+    } else {
+        transpile_node(tr, proc->sub_node);
+    }
+
     newline(tr);
 }
 
@@ -544,9 +568,9 @@ switch (p.node->kind) {
         }
         tr_write(get_string(p.Variable->name));
     } return;
-    case Node_Alloc:          tr_write("malloc(sizeof("); transpileType(tr, p.Alloc->type); tr_write(")"); if (p.Alloc->size_expr.node) { tr_write(" * "); transpile_node(tr, p.Alloc->size_expr); } tr_write(")"); return;
-    case Node_Ternary:        transpile_node(tr, p.Ternary->condition); tr_write(" ? "); transpile_node(tr, p.Ternary->then_expr); tr_write(" : "); transpile_node(tr, p.Ternary->else_expr); return;
-    case Node_ProcCall:       transpile_proccall(tr, p.ProcCall); return;
+    case Node_Alloc:    tr_write("malloc(sizeof("); transpileType(tr, p.Alloc->type); tr_write(")"); if (p.Alloc->size_expr.node) { tr_write(" * "); transpile_node(tr, p.Alloc->size_expr); } tr_write(")"); return;
+    case Node_Ternary:  transpile_node(tr, p.Ternary->condition); tr_write(" ? "); transpile_node(tr, p.Ternary->then_expr); tr_write(" : "); transpile_node(tr, p.Ternary->else_expr); return;
+    case Node_ProcCall: transpile_proccall(tr, p.ProcCall); return;
     case Node_Deref: {
 
         if (p.Deref->datatype.kind == Typekind_Enum) {
@@ -778,7 +802,7 @@ void transpile(Codebase* codebase) {
         tr_write("\n// Implementations\n");
         for (u32 i = 0; i < procs_count; i++) {
             Procedure* proc = codebase->procedures[i];
-            if (proc->scope == null) continue;
+            if (node_is_null(proc->sub_node)) continue;
             transpile_procedure(tr, proc);
         }
 

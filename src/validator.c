@@ -320,10 +320,10 @@ static void validate_scope(Parser* parser, Scope* scope) {
 }
 
 static void validate_procedure(Parser* parser, Procedure* proc) {
-    if (proc->scope) {
-        Procedure* otherproc = parser->procedure;
+    if (!node_is_null(proc->sub_node)) {
+        Procedure* otherproc = parser->procedure; // in case this is a local procedure
         parser->procedure = proc;
-        validate_scope(parser, proc->scope);
+        validate_node(parser, proc->sub_node);
         parser->procedure = otherproc;
     }
 
@@ -336,7 +336,12 @@ static Datatype validate_deref_expr(Parser* parser, DerefExpression* deref, Data
 
     // implicit derefing:
     if (node_is_null(inner_expr)) {
-        if (expected_type.kind == Typekind_Enum && expected_type.numPointers == 0) return expected_type;
+        if (expected_type.kind == Typekind_Enum && expected_type.numPointers == 0) {
+            Enum* en = expected_type._enum;
+            if (getEnumEntry(en, member_name)) return expected_type;
+            error_node(parser, (NodeRef)deref, "Invalid enum member in implicit dereferencing \".%s\".", get_string(member_name));
+            return type_invalid;
+        }
 
         error_node(parser, (NodeRef)deref, "Cannot infer implicit dereferencing \".%s\".", get_string(member_name));
         return type_invalid;

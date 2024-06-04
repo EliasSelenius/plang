@@ -422,20 +422,16 @@ static NodeRef proc_or_var(Parser* parser, bool declare_localy) {
 
         if (declare_localy) declare_symbol(parser, (NodeRef)proc);
 
-        if (tok(parser, Tok_Semicolon)) {
-            proc->scope = null;
-        } else {
-
-            u32 num_args = 0;
+        if (!tok(parser, Tok_Semicolon)) {
+            u32 stack_ptr = get_symbol_stack_length(parser);
             if (proc->arguments) {
                 foreach (arg, proc->arguments) {
                     declare_symbol(parser, (NodeRef)arg);
                 }
-                num_args = arg_count;
             }
 
-            proc->scope = expectScope(parser);
-            stack_pop(parser, num_args);
+            proc->sub_node = expect_node(parser);
+            set_symbol_stack_length(parser, stack_ptr);
         }
 
         return (NodeRef)proc;

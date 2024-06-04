@@ -416,7 +416,7 @@ DefineStatementNode(Procedure, {
     u32 overload;
     Procedure* next_overload;
 
-    Scope* scope; // scope can be null
+    NodeRef sub_node;
 
     Type* type_node;
 })

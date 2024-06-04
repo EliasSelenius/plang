@@ -308,3 +308,6 @@ static void declare_symbol(Parser* parser, NodeRef ref) {
 static void stack_pop(Parser* parser, u32 num) {
     list_head(parser->local_symbols)->length -= num;
 }
+
+static u32 get_symbol_stack_length(Parser* parser) { return list_head(parser->local_symbols)->length; }
+static void set_symbol_stack_length(Parser* parser, u32 value) { list_head(parser->local_symbols)->length = value; }

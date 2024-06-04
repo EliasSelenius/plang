@@ -82,6 +82,8 @@ float64 parse_float(char* c_str, uint32* length) {
 }
 
 
+// TODO: make signed overloads
+string to_string(uint32 num) { return to_string(num as uint64); }
 string to_string(uint64 num) {
 
     // TODO: make this a fixed array, so we dont have to malloc
@@ -130,7 +132,7 @@ string substr_until(char* str, char delim) {
 string substr_until(string str, char delim) {
     string res = str;
 
-    for 0 .. str.length {
+    for uint32 it : 0 .. str.length {
         if str.chars[it] == delim {
             res.length = it + 1;
             break;
@@ -314,10 +316,10 @@ void sb_append(StringBuilder* sb, char c) {
     sb.content[sb.length] = 0 as char;
 }
 
-void sb_insert(StringBuilder* sb, int32 loc, string str) {
+void sb_insert(StringBuilder* sb, uint32 loc, string str) {
     sb_grow(sb, str.length);
 
-    int32 i = sb.length as int32;
+    int64 i = sb.length;
     while i >= loc {
         sb.content[i + str.length] = sb.content[i];
         i--;
