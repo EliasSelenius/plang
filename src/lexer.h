@@ -82,6 +82,7 @@ X(BitXorAssign)
 
 #define TokenEnumEntry(token) Tok_##token,
 typedef enum TokenType {
+    TokenType_Invalid = 0,
     DefineTokenList(TokenEnumEntry)
     TokenType_Count
 } TokenType;
@@ -91,7 +92,7 @@ typedef enum TokenType {
 static char* TokenType_Names[] = {
     DefineTokenList(TokenString)
 };
-#undef TokenEnumEntry
+#undef TokenString
 
 // signifies a string thats stored in the string-table
 typedef u32 Identifier;

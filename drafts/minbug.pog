@@ -4,7 +4,28 @@ include "../common/basic.pog";
 include "../common/string.pog";
 include "../common/list.pog";
 
+struct Vector2 {
+    float32 x, y;
+}
+
+Vector2 add(Vector2 a, b) as +
+    return { a.x + b.x, a.y + b.y };
+
+Vector2 mul(Vector2 a, float32 s) as *
+    return { a.x * s, a.y * s };
+
+
+void vector_test() {
+    Vector2 a = {1, 2};
+    Vector2 b = {3, 5};
+    let r = a*2 + b;
+    print(r, "\n");
+}
+
 void main() {
+
+    vector_test();
+
     string str = make_string("Hello, World!\n");
     print(str);
 

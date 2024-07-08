@@ -420,6 +420,8 @@ static NodeRef proc_or_var(Parser* parser, bool declare_localy) {
         proc->name = name;
         proc->arguments = expectArgument(parser);
 
+        proc->operator = tok(parser, Tok_Keyword_As) ? get_binary_node_from_token(advance(parser).type) : Node_Invalid;
+
         if (declare_localy) declare_symbol(parser, (NodeRef)proc);
 
         if (!tok(parser, Tok_Semicolon)) {
@@ -516,10 +518,12 @@ void parser_parse_file(Parser* parser, char* file_name) {
 
 // must be possible to rebind codebase several times, because units may change
 void bind_units(Parser* parser, Codebase* cb) {
+    parser->codebase = cb;
 
     // construct Codebase that contains lists of all procs/types/globals
     #define ensure_list(list) if (list) list_clear(list); else list = list_create(typeof(*list))
     ensure_list(cb->procedures);
+    ensure_list(cb->operators);
     ensure_list(cb->global_vars);
     ensure_list(cb->global_consts);
     ensure_list(cb->structs);
@@ -532,7 +536,10 @@ void bind_units(Parser* parser, Codebase* cb) {
             NodeRef ref = (NodeRef)(*top_lvl_sta);
 
             switch (ref.node->kind) {
-                case Node_Procedure:   list_add(cb->procedures,    ref); break;
+                case Node_Procedure: {
+                    list_add(cb->procedures, ref);
+                    if (ref.Procedure->operator) list_add(cb->operators, ref);
+                } break;
                 case Node_Constant:    list_add(cb->global_consts, ref); break;
                 case Node_Declaration: list_add(cb->global_vars,   ref); break;
                 case Node_Struct:      list_add(cb->structs,       ref); break;

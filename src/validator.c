@@ -430,12 +430,24 @@ switch (p.node->kind) {
         Datatype type_l = validate_expr_expect_type(parser, p.Binary->left,  expected_type);
         Datatype type_r = validate_expr_expect_type(parser, p.Binary->right, expected_type);
 
+        if (type_l.kind == Typekind_Invalid || type_r.kind == Typekind_Invalid) return type_invalid;
+
+        foreach (item, parser->codebase->operators) {
+            Procedure* op = *item;
+            if (p.node->kind == op->operator)
+            if (typeAssignable(op->arguments[0].type->solvedstate, type_l)
+             && typeAssignable(op->arguments[1].type->solvedstate, type_r)) {
+                p.Binary->operator_overload = op;
+                return op->return_type->solvedstate;
+            }
+        }
+
         if (type_l.numPointers) return type_l; // to enable pointer arithmetic
 
         if (typeAssignable(type_l, type_r)) return type_l;
         if (typeAssignable(type_r, type_l)) return type_r;
 
-        error_node(parser, p, "Invalid binary expression. operator %s (%s, %s)", "", get_temp_type_name(type_l), get_temp_type_name(type_r));
+        error_node(parser, p, "Invalid binary expression. operator %s (%s, %s)", get_node_symbol(p.node->kind).symbol, get_temp_type_name(type_l), get_temp_type_name(type_r));
         return type_invalid;
     }
 

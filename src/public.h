@@ -3,6 +3,7 @@
 typedef struct Codebase {
 
     struct Procedure** procedures; // list
+    struct Procedure** operators; // list
     struct Declaration** global_vars; // list
     struct Constant** global_consts; // list
     struct Struct** structs; // list

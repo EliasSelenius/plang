@@ -10,6 +10,7 @@ type Typedef;
 
 struct Codebase {
     Procedure** procedures; // list
+    Procedure** operators; // list
     Declaration** global_vars; // list
     Declaration** global_consts; // list
     Struct** structs; // list

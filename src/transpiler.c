@@ -23,7 +23,7 @@ static void transpile_procedure(C_Transpiler* tr, Procedure* proc);
 static void transpile_node(C_Transpiler* tr, NodeRef p);
 
 
-static char* getTypeCname(Datatype type) {
+static char* get_type_symbol_c(Datatype type) {
     switch (type.kind) {
 
         // These should not exist at this point
@@ -61,15 +61,15 @@ static char* getTypeCname(Datatype type) {
     return null;
 }
 
-static void _transpileDatatype(C_Transpiler* tr, Datatype type, Identifier name);
-static void transpileDatatype(C_Transpiler* tr, Datatype type);
-static void transpileType(C_Transpiler* tr, Type* type) { transpileDatatype(tr, type->solvedstate); }
 
-static void transpileProcSigStart(C_Transpiler* tr, Type* proc_type) {
-    if (proc_type->procedure.return_type->solvedstate.kind == Typekind_Procedure) {
-        transpileProcSigStart(tr, proc_type->procedure.return_type);
+static void transpile_datatype(C_Transpiler* tr, Datatype type);
+
+static void transpile_begin_procptr(C_Transpiler* tr, Type* proc_type) {
+    Type* ret_type = proc_type->procedure.return_type;
+    if (ret_type->solvedstate.kind == Typekind_Procedure) {
+        transpile_begin_procptr(tr, ret_type);
     } else {
-        transpileDatatype(tr, proc_type->procedure.return_type->solvedstate);
+        transpile_datatype(tr, ret_type->solvedstate);
         tr_write(" ");
     }
 
@@ -77,123 +77,57 @@ static void transpileProcSigStart(C_Transpiler* tr, Type* proc_type) {
     tr_write_asterixs(tr, proc_type->solvedstate.numPointers);
 }
 
-static void transpileProcArguments(C_Transpiler* tr, Type* proc_type) {
+static void transpile_begin_type(C_Transpiler* tr, Datatype type) {
+    switch (type.kind) {
+        case Typekind_Array: tr_write("Array"); tr_write_asterixs(tr, type.numPointers); break;
+
+        case Typekind_Fixed_Array:
+        case Typekind_Dynamic_Array:
+            transpile_begin_type(tr, type.array_typenode->array.element_type->solvedstate); tr_write("*"); break;
+
+        case Typekind_Procedure: transpile_begin_procptr(tr, type.proc_ptr_typenode); break;
+
+        default:
+            tr_write(get_type_symbol_c(type));
+            tr_write_asterixs(tr, type.numPointers);
+            //tr_write(" ");
+            break;
+    }
+}
+
+static void transpile_procptr_args(C_Transpiler* tr, Type* proc_type) {
     tr_write("(");
     Type* arg = proc_type->procedure.first_argument;
     while (arg) {
-        transpileDatatype(tr, arg->solvedstate);
+        transpile_datatype(tr, arg->solvedstate);
         if (arg->next) tr_write(", ");
         arg = arg->next;
     }
     tr_write(")");
 }
 
-static void transpileProcSigEnd(C_Transpiler* tr, Type* proc_type) {
-    tr_write(")");
-    transpileProcArguments(tr, proc_type);
+static void transpile_declarator(C_Transpiler* tr, Datatype type, Identifier name) {
+    transpile_begin_type(tr, type);
 
-    while (proc_type->procedure.return_type->solvedstate.kind == Typekind_Procedure) {
-        tr_write(")");
-        proc_type = proc_type->procedure.return_type;
-        transpileProcArguments(tr, proc_type);
-    }
-}
-
-static void transpileTypeStart(C_Transpiler* tr, Datatype type) {
-
-    if (type.kind == Typekind_Array) {
-        tr_write("Array");
-        tr_write_asterixs(tr, type.numPointers);
-        return;
-    }
-
-    if ((type.kind == Typekind_Fixed_Array) ||
-        (type.kind == Typekind_Dynamic_Array)) {
-
-        transpileTypeStart(tr, type.array_typenode->array.element_type->solvedstate);
-        tr_write("*");
-        return;
-    }
-
-
-    if (type.kind == Typekind_Procedure) {
-        transpileProcSigStart(tr, type.proc_ptr_typenode);
-    } else {
-        tr_write(getTypeCname(type));
-        tr_write_asterixs(tr, type.numPointers);
-        //tr_write(" ");
-    }
-}
-
-static void transpileTypeEnd(C_Transpiler* tr, Datatype type) {
-    if (type.kind == Typekind_Procedure) transpileProcSigEnd(tr, type.proc_ptr_typenode);
-}
-
-
-/*
-    void *name
-        name is pointer
-    void (*name)()
-        name is pointer to function() returning void
-    void (*name)(int)
-        name is pointer to function(int) returning void
-    void (*(*name)(int))(int)
-        name is pointer to function(int) returning pointer to function(int) returning void
-*/
-
-static void transpileDatatype(C_Transpiler* tr, Datatype type) {
-    transpileTypeStart(tr, type);
-    transpileTypeEnd(tr, type);
-}
-
-static void _transpileDatatype(C_Transpiler* tr, Datatype type, Identifier name) {
-    transpileTypeStart(tr, type);
     if (name && type.kind != Typekind_Procedure) tr_write(" ");
     tr_write(get_string(name));
-    transpileTypeEnd(tr, type);
+
+    if (type.kind == Typekind_Procedure) {
+        Type* proc_type = type.proc_ptr_typenode;
+        tr_write(")");
+        transpile_procptr_args(tr, proc_type);
+
+        while (proc_type->procedure.return_type->solvedstate.kind == Typekind_Procedure) {
+            tr_write(")");
+            proc_type = proc_type->procedure.return_type;
+            transpile_procptr_args(tr, proc_type);
+        }
+    }
 }
 
+static void transpile_datatype(C_Transpiler* tr, Datatype type) { transpile_declarator(tr, type, 0); }
+static void transpile_type(C_Transpiler* tr, Type* type) { transpile_datatype(tr, type->solvedstate); }
 
-
-// static void transpile_declarator(Datatype datatype, Identifier name) {
-//     if (datatype.kind == Typekind_Procedure) {
-
-//         tr_write("(");
-//         transpile_declarator(datatype.proc_ptr_typenode->procedure.return_type, name);
-//         tr_write(")");
-
-//         tr_write("(");
-//         // args
-//         tr_write(")");
-//     } else {
-//         u32 np = datatype.numPointers;
-//         while (np-- > 0) tr_write("*");
-//         tr_write(get_string(name));
-//     }
-// }
-
-// static void transpile_procptr(Type* proc_type) {
-//     if (proc_type->procedure.return_type->node_type == TypeNode_Procedure) {
-//         transpile_procptr(proc_type->procedure.return_type);
-//     }
-
-//     tr_write("(*");
-// }
-
-// static void transpile_cdecl(Datatype datatype, Identifier name_or_null) {
-
-//     Datatype type_specifier = datatype;
-//     while (true) {
-//         if (type_specifier.kind == Typekind_Procedure) {
-//             type_specifier = type_specifier.proc_ptr_typenode->procedure.return_type->solvedstate;
-//         } else {
-//             tr_write(getTypeCname(type_specifier));
-//             u32 np = type_specifier.numPointers;
-//             while (np-- > 0) tr_write("*");
-//             break;
-//         }
-//     }
-// }
 
 
 static void transpilePrintFormat(C_Transpiler* tr, Datatype type) {
@@ -341,7 +275,7 @@ static void transpile_struct(C_Transpiler* tr, Struct* stru) {
 
     foreach (field, stru->fields) {
         newline(tr);
-        _transpileDatatype(tr, field->type->solvedstate, field->name);
+        transpile_declarator(tr, field->type->solvedstate, field->name);
         tr_write(";");
     }
 
@@ -352,7 +286,7 @@ static void transpile_struct(C_Transpiler* tr, Struct* stru) {
 static void transpile_typedef(C_Transpiler* tr, Typedef* def) {
     tr_write("typedef ");
     if (def->type) {
-        _transpileDatatype(tr, def->type->solvedstate, def->name);
+        transpile_declarator(tr, def->type->solvedstate, def->name);
     } else {
         char* name = get_string(def->name);
         tr_writef("struct %s %s", name, name);
@@ -367,7 +301,7 @@ static void transpile_declaration(C_Transpiler* tr, Declaration* decl) {
         return;
     }
 
-    _transpileDatatype(tr, decl->type->solvedstate, decl->name);
+    transpile_declarator(tr, decl->type->solvedstate, decl->name);
     if (decl->expr.node) {
         tr_write(" = ");
         transpile_node(tr, decl->expr);
@@ -411,7 +345,7 @@ static void transpile_scope(C_Transpiler* tr, Scope* scope) {
 static void transpile_proc_signature(C_Transpiler* tr, Procedure* proc) {
 
     if (proc->name != builtin_string_main && !node_is_null(proc->sub_node)) tr_write("static ");
-    transpileType(tr, proc->return_type);
+    transpile_type(tr, proc->return_type);
     tr_write(" ");
 
     if (proc->name == builtin_string_main) tr_write("__main");
@@ -422,7 +356,7 @@ static void transpile_proc_signature(C_Transpiler* tr, Procedure* proc) {
     tr_write("(");
     if (proc->arguments) {
         foreach (arg, proc->arguments) {
-            _transpileDatatype(tr, arg->type->solvedstate, arg->name);
+            transpile_declarator(tr, arg->type->solvedstate, arg->name);
             tr_write(", ");
         }
         tr->sb.length -= 2;
@@ -470,8 +404,8 @@ static void transpile_procedure(C_Transpiler* tr, Procedure* proc) {
 
 static void transpile_for_loop(C_Transpiler* tr, ForStmt* forsta) {
     tr_write("for (");
-    if (forsta->index_type) transpileType(tr, forsta->index_type);
-    else transpileDatatype(tr, default_for_loop_numeric_type);
+    if (forsta->index_type) transpile_type(tr, forsta->index_type);
+    else transpile_datatype(tr, default_for_loop_numeric_type);
 
     char* name = get_string(forsta->index_name);
     tr_writef(" %s = ", name);
@@ -497,52 +431,60 @@ static void transpile_for_loop(C_Transpiler* tr, ForStmt* forsta) {
 }
 
 static void transpile_node(C_Transpiler* tr, NodeRef p) {
-char* operator = null;
 switch (p.node->kind) {
-    #define entry(op, str, label) case Node_##op: operator = str; goto label;
-    entry(Plus,                "+",     binary)
-    entry(Minus,               "-",     binary)
-    entry(Mul,                 "*",     binary)
-    entry(Div,                 "/",     binary)
-    entry(Mod,                 "%",     binary)
-    entry(Less,                "<",     binary)
-    entry(Greater,             ">",     binary)
-    entry(LessEquals,          "<=",    binary)
-    entry(GreaterEquals,       ">=",    binary)
-    entry(Equals,              "==",    binary)
-    entry(NotEquals,           "!=",    binary)
-    entry(BooleanAnd,          "&&",    binary)
-    entry(BooleanOr,           "||",    binary)
-    entry(Bitwise_And,         "&",     binary)
-    entry(Bitwise_Or,          "|",     binary)
-    entry(Bitwise_Xor,         "^",     binary)
-    entry(Bitwise_Lshift,      "<<",    binary)
-    entry(Bitwise_Rshift,      ">>",    binary)
-    entry(Unary_PreIncrement,  "++",    unary)
-    entry(Unary_PostIncrement, "++",    post_unary)
-    entry(Unary_PreDecrement,  "--",    unary)
-    entry(Unary_PostDecrement, "--",    post_unary)
-    entry(Unary_Not,           "!",     unary)
-    entry(Unary_BitwiseNot,    "~",     unary)
-    entry(Unary_AddressOf,     "&",     unary)
-    entry(Unary_ValueOf,       "*",     unary)
-    entry(Unary_Negate,        "-",     unary)
-    #undef entry
 
-    binary:
-        tr_write("(");
-        transpile_node(tr, p.Binary->left);
-        tr_writef(" %s ", operator);
-        transpile_node(tr, p.Binary->right);
-        tr_write(")");
+    case Node_Plus:
+    case Node_Minus:
+    case Node_Mul:
+    case Node_Div:
+    case Node_Mod:
+    case Node_Less:
+    case Node_Greater:
+    case Node_LessEquals:
+    case Node_GreaterEquals:
+    case Node_Equals:
+    case Node_NotEquals:
+    case Node_BooleanAnd:
+    case Node_BooleanOr:
+    case Node_Bitwise_And:
+    case Node_Bitwise_Or:
+    case Node_Bitwise_Xor:
+    case Node_Bitwise_Lshift:
+    case Node_Bitwise_Rshift:
+
+        if (p.Binary->operator_overload) {
+            Procedure* op = p.Binary->operator_overload;
+            tr_write(get_string(op->name));
+            if (op->overload) tr_writef("%d", op->overload);
+            tr_write("(");
+            transpile_node(tr, p.Binary->left);
+            tr_write(", ");
+            transpile_node(tr, p.Binary->right);
+            tr_write(")");
+        } else {
+            tr_write("(");
+            transpile_node(tr, p.Binary->left);
+            tr_writef(" %s ", get_node_symbol(p.node->kind).c_symbol);
+            transpile_node(tr, p.Binary->right);
+            tr_write(")");
+        }
         return;
-    unary:
-        tr_writef("%s", operator);
+
+    case Node_Unary_PreIncrement:
+    case Node_Unary_PreDecrement:
+    case Node_Unary_Not:
+    case Node_Unary_BitwiseNot:
+    case Node_Unary_AddressOf:
+    case Node_Unary_ValueOf:
+    case Node_Unary_Negate:
+        tr_writef("%s", get_node_symbol(p.node->kind).c_symbol);
         transpile_node(tr, p.Unary->inner_expr);
         return;
-    post_unary:
+
+    case Node_Unary_PostIncrement:
+    case Node_Unary_PostDecrement:
         transpile_node(tr, p.Unary->inner_expr);
-        tr_writef("%s", operator);
+        tr_writef("%s", get_node_symbol(p.node->kind).c_symbol);
         return;
 
     case Node_Literal_Integer: tr_writef("%llu", p.Literal->data.integer); return;
@@ -568,7 +510,7 @@ switch (p.node->kind) {
         }
         tr_write(get_string(p.Variable->name));
     } return;
-    case Node_Alloc:    tr_write("malloc(sizeof("); transpileType(tr, p.Alloc->type); tr_write(")"); if (p.Alloc->size_expr.node) { tr_write(" * "); transpile_node(tr, p.Alloc->size_expr); } tr_write(")"); return;
+    case Node_Alloc:    tr_write("malloc(sizeof("); transpile_type(tr, p.Alloc->type); tr_write(")"); if (p.Alloc->size_expr.node) { tr_write(" * "); transpile_node(tr, p.Alloc->size_expr); } tr_write(")"); return;
     case Node_Ternary:  transpile_node(tr, p.Ternary->condition); tr_write(" ? "); transpile_node(tr, p.Ternary->then_expr); tr_write(" : "); transpile_node(tr, p.Ternary->else_expr); return;
     case Node_ProcCall: transpile_proccall(tr, p.ProcCall); return;
     case Node_Deref: {
@@ -591,7 +533,7 @@ switch (p.node->kind) {
             tr_write("((");
             Datatype elm_type = p.Indexing->indexed.expr->datatype.array_typenode->array.element_type->solvedstate;
             elm_type.numPointers++;
-            transpileDatatype(tr, elm_type);
+            transpile_datatype(tr, elm_type);
             tr_write(")");
             transpile_node(tr, p.Indexing->indexed);
             tr_write(".data)");
@@ -601,16 +543,16 @@ switch (p.node->kind) {
 
         tr_write("["); transpile_node(tr, p.Indexing->index); tr_write("]");
     } return;
-    case Node_Cast:           tr_write("("); transpileType(tr, p.Cast->new_type); tr_write(")"); transpile_node(tr, p.Cast->expr); return;
-    case Node_Sizeof:         tr_write("sizeof("); transpileType(tr, p.Sizeof->type); tr_write(")"); return;
+    case Node_Cast:           tr_write("("); transpile_type(tr, p.Cast->new_type); tr_write(")"); transpile_node(tr, p.Cast->expr); return;
+    case Node_Sizeof:         tr_write("sizeof("); transpile_type(tr, p.Sizeof->type); tr_write(")"); return;
     case Node_Parenthesized:  if (is_binary_expr(p.Parenthesized->inner_expr)) transpile_node(tr, p.Parenthesized->inner_expr);
                               else { tr_write("("); transpile_node(tr, p.Parenthesized->inner_expr); tr_write(")"); } return;
     case Node_Compound: {
         if (p.Compound->datatype.kind != Typekind_Invalid) {
-            tr_write("("); transpileDatatype(tr, p.Compound->datatype); tr_write(") ");
+            tr_write("("); transpile_datatype(tr, p.Compound->datatype); tr_write(") ");
             if (p.Compound->datatype.kind == Typekind_Array) {
                 tr_writef("{ .length = %d, .data = (", p.Compound->elements ? list_length(p.Compound->elements) : 0);
-                transpileDatatype(tr, p.Compound->datatype.array_typenode->array.element_type->solvedstate);
+                transpile_datatype(tr, p.Compound->datatype.array_typenode->array.element_type->solvedstate);
                 tr_write("[])");
             }
         }
@@ -787,7 +729,7 @@ void transpile(Codebase* codebase) {
         }
 
         tr_write("static ");
-        _transpileDatatype(tr, decl->type->solvedstate, decl->name);
+        transpile_declarator(tr, decl->type->solvedstate, decl->name);
         if (decl->expr.node) {
             tr_write(" = ");
             transpile_node(tr, decl->expr);
@@ -812,7 +754,7 @@ void transpile(Codebase* codebase) {
         foreach (static_decl, tr->static_decls) {
             Declaration* decl = *static_decl;
             tr_write("static ");
-            _transpileDatatype(tr, decl->type->solvedstate, decl->name);
+            transpile_declarator(tr, decl->type->solvedstate, decl->name);
             if (decl->expr.node && isCompiletimeExpression(decl->expr)) {
                 tr_write(" = ");
                 transpile_node(tr, decl->expr);

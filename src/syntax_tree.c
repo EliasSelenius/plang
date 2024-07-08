@@ -357,7 +357,7 @@ typedef struct CompoundElement {
 DefineExpressionNode(Compound,      { CompoundElement* elements;                                                     })
 DefineExpressionNode(Literal,       { Tokendata        data;                                                         })
 DefineExpressionNode(Unary,         { NodeRef          inner_expr;                                                   })
-DefineExpressionNode(Binary,        { NodeRef          left;       NodeRef     right;                                })
+DefineExpressionNode(Binary,        { NodeRef          left;       NodeRef     right;       Procedure* operator_overload; })
 DefineExpressionNode(Parenthesized, { NodeRef          inner_expr;                                                   })
 DefineExpressionNode(Indexing,      { NodeRef          indexed;    NodeRef     index;                                })
 DefineExpressionNode(Alloc,         { NodeRef          size_expr;  Type*       type;                                 })
@@ -415,6 +415,8 @@ DefineStatementNode(Procedure, {
     */
     u32 overload;
     Procedure* next_overload;
+
+    Nodekind operator; // if this procedure overloads an operator
 
     NodeRef sub_node;
 
@@ -546,3 +548,100 @@ static bool isCompiletimeExpression(NodeRef e) {
         }
     }
 }
+
+
+static u32 binary_precedence_level(NodeRef a) {
+    switch (a.node->kind) {
+        case Node_BooleanAnd:
+        case Node_BooleanOr:
+            return 1;
+
+        case Node_Less:
+        case Node_Greater:
+        case Node_LessEquals:
+        case Node_GreaterEquals:
+        case Node_Equals:
+        case Node_NotEquals:
+            return 2;
+
+        case Node_Bitwise_Lshift:
+        case Node_Bitwise_Rshift:
+        case Node_Bitwise_And:
+        case Node_Bitwise_Or:
+        case Node_Bitwise_Xor:
+            return 3;
+
+        case Node_Plus:
+        case Node_Minus:
+            return 4;
+        case Node_Mul:
+        case Node_Div:
+        case Node_Mod:
+            return 5;
+
+        default: return 0; // not an operator
+    }
+}
+
+static bool is_binary_expr(NodeRef a) { return binary_precedence_level(a) != 0; }
+
+static Nodekind get_binary_node_from_token(TokenType type) {
+    switch (type) {
+        case Tok_Plus: return Node_Plus;
+        case Tok_Minus: return Node_Minus;
+        case Tok_Mul: return Node_Mul;
+        case Tok_Div: return Node_Div;
+        case Tok_Mod: return Node_Mod;
+
+        case Tok_LessThan: return Node_Less;
+        case Tok_GreaterThan: return Node_Greater;
+        case Tok_LessThanOrEqual: return Node_LessEquals;
+        case Tok_GreaterThanOrEqual: return Node_GreaterEquals;
+        case Tok_Equals: return Node_Equals;
+        case Tok_NotEquals: return Node_NotEquals;
+        case Tok_Keyword_And: return Node_BooleanAnd;
+        case Tok_Keyword_Or: return Node_BooleanOr;
+
+        case Tok_Ampersand: return Node_Bitwise_And;
+        case Tok_Pipe: return Node_Bitwise_Or;
+        case Tok_Caret: return Node_Bitwise_Xor;
+        case Tok_LeftShift: return Node_Bitwise_Lshift;
+        case Tok_RightShift: return Node_Bitwise_Rshift;
+
+        default: return Node_Invalid; // not an operator
+    }
+}
+
+typedef struct NodeSymbol { char *symbol, *c_symbol; } NodeSymbol;
+
+NodeSymbol node_symbols[Nodekind_Count] = {
+    [Node_Plus]                = { "+",    "+"  },
+    [Node_Minus]               = { "-",    "-"  },
+    [Node_Mul]                 = { "*",    "*"  },
+    [Node_Div]                 = { "/",    "/"  },
+    [Node_Mod]                 = { "%",    "%"  },
+    [Node_Less]                = { "<",    "<"  },
+    [Node_Greater]             = { ">",    ">"  },
+    [Node_LessEquals]          = { "<=",   "<=" },
+    [Node_GreaterEquals]       = { ">=",   ">=" },
+    [Node_Equals]              = { "==",   "==" },
+    [Node_NotEquals]           = { "!=",   "!=" },
+    [Node_BooleanAnd]          = { "and",  "&&" },
+    [Node_BooleanOr]           = { "or",   "||" },
+    [Node_Bitwise_And]         = { "&",    "&"  },
+    [Node_Bitwise_Or]          = { "|",    "|"  },
+    [Node_Bitwise_Xor]         = { "^",    "^"  },
+    [Node_Bitwise_Lshift]      = { "<<",   "<<" },
+    [Node_Bitwise_Rshift]      = { ">>",   ">>" },
+    [Node_Unary_PreIncrement]  = { "++",   "++" },
+    [Node_Unary_PostIncrement] = { "++",   "++" },
+    [Node_Unary_PreDecrement]  = { "--",   "--" },
+    [Node_Unary_PostDecrement] = { "--",   "--" },
+    [Node_Unary_Not]           = { "!",    "!"  },
+    [Node_Unary_BitwiseNot]    = { "~",    "~"  },
+    [Node_Unary_AddressOf]     = { "*",    "&"  },
+    [Node_Unary_ValueOf]       = { "@",    "*"  },
+    [Node_Unary_Negate]        = { "-",    "-"  },
+};
+
+static NodeSymbol get_node_symbol(Nodekind kind) { return node_symbols[kind]; }

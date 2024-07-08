@@ -109,6 +109,8 @@ typedef struct Unit {
 } Unit;
 
 typedef struct Parser {
+    Codebase* codebase;
+
     Token* tokens; // list
     u32 token_index;
 

@@ -16,11 +16,9 @@
         - multi-declare e.g: int i, j = 1, k;
         - let output exe be named the name of the directory
         - labeled break and continue e.g (for i in 0..count { if a break i; else continue i; }) use the index/item name as the for label
-        - operator overload
         - capturing locals for localy defined procedures
         - defer statement
         - named arguments e.g foo(arg_name: "daw")
-        - single expression body
         - field initializers
         - redundant cast warning
 
@@ -32,18 +30,15 @@
         - contextual inclusion (the with keyword on struct fields)
 
 upcoming todos:
- - make sure the parser_parse_source() never exits
 
  - improved arenas (look at raddbg)
  - lists in arenas?
 
  - include paths relative to file
 
-
  - NodeRef in Datatype
      - remove init_typenode_for_proc
  - for loop parsing
- - get operator string (for Invalid binary expression error)
 
 
 */

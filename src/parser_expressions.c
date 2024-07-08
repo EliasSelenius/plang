@@ -144,84 +144,6 @@ static NodeRef expect_unary(Parser* parser) {
 
 
 
-static u32 binary_precedence_level(NodeRef a) {
-    switch (a.node->kind) {
-        case Node_BooleanAnd:
-        case Node_BooleanOr:
-            return 1;
-
-        case Node_Less:
-        case Node_Greater:
-        case Node_LessEquals:
-        case Node_GreaterEquals:
-        case Node_Equals:
-        case Node_NotEquals:
-            return 2;
-
-        case Node_Bitwise_Lshift:
-        case Node_Bitwise_Rshift:
-        case Node_Bitwise_And:
-        case Node_Bitwise_Or:
-        case Node_Bitwise_Xor:
-            return 3;
-
-        case Node_Plus:
-        case Node_Minus:
-            return 4;
-        case Node_Mul:
-        case Node_Div:
-        case Node_Mod:
-            return 5;
-
-        default: return 0; // not an operator
-    }
-}
-
-static bool is_binary_expr(NodeRef a) { return binary_precedence_level(a) != 0; }
-
-static Nodekind token_is_binary(TokenType type) {
-    switch (type) {
-        case Tok_Plus: return Node_Plus;
-        case Tok_Minus: return Node_Minus;
-        case Tok_Mul: return Node_Mul;
-        case Tok_Div: return Node_Div;
-        case Tok_Mod: return Node_Mod;
-
-        case Tok_LessThan: return Node_Less;
-        case Tok_GreaterThan: return Node_Greater;
-        case Tok_LessThanOrEqual: return Node_LessEquals;
-        case Tok_GreaterThanOrEqual: return Node_GreaterEquals;
-        case Tok_Equals: return Node_Equals;
-        case Tok_NotEquals: return Node_NotEquals;
-        case Tok_Keyword_And: return Node_BooleanAnd;
-        case Tok_Keyword_Or: return Node_BooleanOr;
-
-        case Tok_Ampersand: return Node_Bitwise_And;
-        case Tok_Pipe: return Node_Bitwise_Or;
-        case Tok_Caret: return Node_Bitwise_Xor;
-        case Tok_LeftShift: return Node_Bitwise_Lshift;
-        case Tok_RightShift: return Node_Bitwise_Rshift;
-
-        default: return Node_Invalid; // not an operator
-    }
-}
-
-/*
-1 + 2 * 3
-
-    +
-   1 *
-    2 3
-
-a = (1 + 2)
-b = ( * 3)
-
-merge(a, b)
-    2 => merge(2, b)
-    
-*/
-
-
 static NodeRef merge_binary_exprs(NodeRef a, NodeRef b) {
     if (binary_precedence_level(a) >= binary_precedence_level(b)) {
         b.Binary->left = a;
@@ -240,7 +162,7 @@ static NodeRef merge_binary_exprs(NodeRef a, NodeRef b) {
 
 static NodeRef expect_binary(Parser* parser) {
     NodeRef a = expect_unary(parser);
-    Nodekind node_kind = token_is_binary(peek(parser).type);
+    Nodekind node_kind = get_binary_node_from_token(peek(parser).type);
     if (node_kind == Node_Invalid) return a;
 
     NodeRef root = alloc_node(parser, node_kind);
@@ -248,7 +170,7 @@ static NodeRef expect_binary(Parser* parser) {
     root.Binary->left = a;
     root.Binary->right = expect_unary(parser);
 
-    while ((node_kind = token_is_binary(peek(parser).type)) != Node_Invalid) {
+    while ((node_kind = get_binary_node_from_token(peek(parser).type)) != Node_Invalid) {
         NodeRef op = alloc_node(parser, node_kind);
         advance(parser);
         op.Binary->right = expect_unary(parser);

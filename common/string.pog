@@ -332,14 +332,19 @@ void sb_insert(StringBuilder* sb, uint32 loc, string str) {
     }
 }
 
-void sb_remove(StringBuilder* sb, int32 loc, uint32 num_chars) {
-    int32 i = loc;
+void sb_remove(StringBuilder* sb, uint32 loc, uint32 num_chars) {
+    uint32 i = loc;
     while i <= sb.length {
         sb.content[i] = sb.content[i + num_chars];
         i++;
     }
 
     sb.length -= num_chars;
+}
+
+void sb_truncate_length(StringBuilder* sb, uint32 new_len) {
+    sb.length = new_len;
+    sb.content[new_len] = 0 as char;
 }
 
 void sb_clear(StringBuilder* sb) {

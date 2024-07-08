@@ -1,6 +1,6 @@
 
-set flags=-Wall -Wno-unused-variable -Wno-unused-function -g
-@REM set flags=-Wall -Wno-unused-variable -Wno-unused-function -g -O0 -fsanitize=address -fno-omit-frame-pointer
+@REM set flags=-Wall -Wno-unused-variable -Wno-unused-function -g
+set flags=-Wall -Wno-unused-variable -Wno-unused-function -g -O0 -fsanitize=address -fno-omit-frame-pointer
 
 pushd bin
 clang %flags% -c ../src/stub.c ../platform/win32.c
