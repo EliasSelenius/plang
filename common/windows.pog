@@ -1,0 +1,78 @@
+
+
+
+type HANDLE = void*;
+const INVALID_HANDLE_VALUE = -1 as HANDLE;
+
+
+struct FILETIME {
+    uint32 dwLowDateTime;
+    uint32 dwHighDateTime;
+}
+
+struct WIN32_FIND_DATAW {
+    uint32 dwFileAttributes;
+    FILETIME ftCreationTime;
+    FILETIME ftLastAccessTime;
+    FILETIME ftLastWriteTime;
+    uint32 nFileSizeHigh;
+    uint32 nFileSizeLow;
+    uint32 dwReserved0;
+    uint32 dwReserved1;
+    uint16[260] cFileName;
+    uint16[14] cAlternateFileName;
+}
+
+struct WIN32_FIND_DATAA {
+    uint32 dwFileAttributes;
+    FILETIME ftCreationTime;
+    FILETIME ftLastAccessTime;
+    FILETIME ftLastWriteTime;
+    uint32 nFileSizeHigh;
+    uint32 nFileSizeLow;
+    uint32 dwReserved0;
+    uint32 dwReserved1;
+    char[260] cFileName;
+    char[14] cAlternateFileName;
+}
+
+
+const FILE_ATTRIBUTE_DIRECTORY = 0x00000010;
+
+
+int32 FindClose(HANDLE hFindFile);
+
+// HANDLE FindFirstFileW(uint16* lpFileName, WIN32_FIND_DATA_W* lpFindFileData);
+// int32 FindNextFileW(HANDLE hFindFile, WIN32_FIND_DATA_W* lpFindFileData);
+
+HANDLE FindFirstFileA(char* lpFileName, WIN32_FIND_DATAA* lpFindFileData);
+int32 FindNextFileA(HANDLE hFindFile, WIN32_FIND_DATAA* lpFindFileData);
+
+
+
+
+
+
+void* VirtualAlloc(void* lpAddress, uint64 dwSize, uint32 flAllocationType, uint32 flProtect);
+int32 VirtualFree(void* lpAddress, uint64 dwSize, uint32 dwFreeType);
+
+const MEM_COMMIT   = 0x00001000;
+const MEM_RESERVE  = 0x00002000;
+const MEM_DECOMMIT = 0x00004000;
+const MEM_RELEASE  = 0x00008000;
+
+const PAGE_NOACCESS          = 0x01;
+const PAGE_READWRITE         = 0x04;
+const PAGE_EXECUTE_READWRITE = 0x40;
+
+
+
+
+
+
+// Implementation of platform agnostic API:
+
+void* vmem_reserve(uint64 size)                { return VirtualAlloc(null,    size, MEM_RESERVE, PAGE_NOACCESS);  }
+void vmem_release(void* address)               {        VirtualFree (address, 0,    MEM_RELEASE);                 }
+void vmem_commit(void* address, uint64 size)   {        VirtualAlloc(address, size, MEM_COMMIT,  PAGE_READWRITE); }
+void vmem_decommit(void* address, uint64 size) {        VirtualFree (address, size, MEM_DECOMMIT);                }
