@@ -1,19 +1,27 @@
 
-namespace builtin;
 
-struct Field {
+struct TypeInfo {
     string name;
 }
 
 struct Struct {
     string name;
-    Field* fields;
-    uint32 fields_count;
+    StructField[] fields;
+}
+
+struct StructField {
+    TypeInfo type;
+    string name;
 }
 
 struct Procedure {
     string name;
     void* code;
+
+    TypeInfo return_type;
+    TypeInfo[] argument_types;
+    string[]   argument_names;
+
 }
 
 /*

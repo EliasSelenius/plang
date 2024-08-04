@@ -24,9 +24,6 @@
 
     InProgress:
         - print structs
-        *- file name in errors
-        *- array literal
-        *- struct literal
         - contextual inclusion (the with keyword on struct fields)
 
 upcoming todos:
