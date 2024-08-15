@@ -161,8 +161,9 @@ typedef struct Datatype {
         Struct* stru;
         Enum* _enum;
         Typedef* type_def;
-        Type* proc_ptr_typenode;
-        Type* array_typenode;
+        Type* node;
+            Type* proc_ptr_typenode;
+            Type* array_typenode;
     };
 } Datatype;
 

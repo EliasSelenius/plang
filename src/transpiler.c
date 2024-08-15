@@ -81,9 +81,8 @@ static void transpile_begin_type(C_Transpiler* tr, Datatype type) {
     switch (type.kind) {
         case Typekind_Array: tr_write("Array"); tr_write_asterixs(tr, type.numPointers); break;
 
-        case Typekind_Fixed_Array:
-        case Typekind_Dynamic_Array:
-            transpile_begin_type(tr, type.array_typenode->array.element_type->solvedstate); tr_write("*"); break;
+        case Typekind_Fixed_Array:   transpile_begin_type(tr, type.array_typenode->array.element_type->solvedstate); break;
+        case Typekind_Dynamic_Array: transpile_begin_type(tr, type.array_typenode->array.element_type->solvedstate); tr_write("*"); break;
 
         case Typekind_Procedure: transpile_begin_procptr(tr, type.proc_ptr_typenode); break;
 
@@ -112,16 +111,23 @@ static void transpile_declarator(C_Transpiler* tr, Datatype type, Identifier nam
     if (name && type.kind != Typekind_Procedure) tr_write(" ");
     tr_write(get_string(name));
 
-    if (type.kind == Typekind_Procedure) {
-        Type* proc_type = type.proc_ptr_typenode;
-        tr_write(")");
-        transpile_procptr_args(tr, proc_type);
+    Type* type_node = type.node;
 
-        while (proc_type->procedure.return_type->solvedstate.kind == Typekind_Procedure) {
+    switch (type.kind) {
+        case Typekind_Procedure: {
             tr_write(")");
-            proc_type = proc_type->procedure.return_type;
-            transpile_procptr_args(tr, proc_type);
-        }
+            transpile_procptr_args(tr, type_node);
+
+            while (type_node->procedure.return_type->solvedstate.kind == Typekind_Procedure) {
+                tr_write(")");
+                type_node = type_node->procedure.return_type;
+                transpile_procptr_args(tr, type_node);
+            }
+        } break;
+
+        case Typekind_Fixed_Array: tr_writef("[%d]", type_node->array.size_expr.Literal->data.integer); break;
+
+        default: break;
     }
 }
 
@@ -142,41 +148,43 @@ static void transpilePrintFormat(C_Transpiler* tr, Datatype type) {
         return;
     }
 
-
     switch (type.kind) {
         case Typekind_AmbiguousDecimal: tr_write("%f"); return;
         case Typekind_AmbiguousInteger: tr_write("%d"); return;
 
-        case Typekind_uint16: tr_write("%hu"); return;
-        case Typekind_uint32: tr_write("%u"); return;
+        case Typekind_uint16: tr_write("%hu");  return;
+        case Typekind_uint32: tr_write("%u");   return;
         case Typekind_uint64: tr_write("%llu"); return;
-        case Typekind_int16: tr_write("%hd"); return;
-        case Typekind_int32: tr_write("%d"); return;
-        case Typekind_int64: tr_write("%lld"); return;
+        case Typekind_int16:  tr_write("%hd");  return;
+        case Typekind_int32:  tr_write("%d");   return;
+        case Typekind_int64:  tr_write("%lld"); return;
 
-        case Typekind_float32: tr_write("%f"); return;
-        case Typekind_float64: tr_write("%Lf"); return;
-        case Typekind_char: tr_write("%c"); return;
-        case Typekind_string: tr_write("%.*s"); return;
+        case Typekind_float32: tr_write("%f");   return;
+        case Typekind_float64: tr_write("%Lf");  return;
+        case Typekind_char:    tr_write("%c");   return;
+        case Typekind_string:  tr_write("%.*s"); return;
 
-        default: break;
+        case Typekind_Struct: {
+            tr_write("{");
+            foreach (field, type.stru->fields) {
+                tr_write(get_string(field->name));
+                tr_write(" = ");
+                bool use_qutation_marks = field->type->solvedstate.kind == Typekind_string;
+                if (use_qutation_marks) tr_write("\\\"");
+                transpilePrintFormat(tr, field->type->solvedstate);
+                if (use_qutation_marks) tr_write("\\\"");
+                tr_write(", ");
+            }
+            tr->sb.length -= 2;
+            tr_write("}");
+        } return;
+
+        case Typekind_Enum: {
+            tr_write("%d");
+        } return;
+
+        default: tr_write("<print_error>"); return;
     }
-
-    if (type.kind == Typekind_Struct) {
-        Struct* stru = type.stru;
-        tr_write("{");
-        foreach (field, stru->fields) {
-            tr_write(get_string(field->name));
-            tr_write(" = ");
-            transpilePrintFormat(tr, field->type->solvedstate);
-            tr_write(", ");
-        }
-        tr->sb.length -= 2;
-        tr_write("}");
-        return;
-    }
-
-    tr_write("<print_error>");
 }
 
 static void transpile_print_call(C_Transpiler* tr, ProcCallExpression* call) {
@@ -200,8 +208,18 @@ static void transpile_print_call(C_Transpiler* tr, ProcCallExpression* call) {
                             // TODO: print struct inside struct
                         }
 
-                        transpile_node(tr, *arg);
-                        tr_writef(".%s, ", get_string(field->name));
+                        if (field->type->solvedstate.kind == Typekind_string) {
+                            transpile_node(tr, *arg);
+                            tr_writef(".%s", get_string(field->name));
+                            tr_write(".length, ");
+
+                            transpile_node(tr, *arg);
+                            tr_writef(".%s", get_string(field->name));
+                            tr_write(".chars, ");
+                        } else {
+                            transpile_node(tr, *arg);
+                            tr_writef(".%s, ", get_string(field->name));
+                        }
                     }
                     tr->sb.length -= 2;
                 } continue;

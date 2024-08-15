@@ -48,8 +48,11 @@ int32 FindClose(HANDLE hFindFile);
 HANDLE FindFirstFileA(char* lpFileName, WIN32_FIND_DATAA* lpFindFileData);
 int32 FindNextFileA(HANDLE hFindFile, WIN32_FIND_DATAA* lpFindFileData);
 
+uint32 GetLastError();
 
-
+const ERROR_SUCCESS = 0;
+const ERROR_FILE_NOT_FOUND = 2;
+const ERROR_PATH_NOT_FOUND = 3;
 
 
 
