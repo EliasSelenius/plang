@@ -125,7 +125,11 @@ static void transpile_declarator(C_Transpiler* tr, Datatype type, Identifier nam
             }
         } break;
 
-        case Typekind_Fixed_Array: tr_writef("[%d]", type_node->array.size_expr.Literal->data.integer); break;
+        case Typekind_Fixed_Array: {
+            tr_writef("[");
+            transpile_node(tr, type_node->array.size_expr);
+            tr_writef("]");
+        } break;
 
         default: break;
     }
@@ -266,7 +270,7 @@ static void transpile_proccall(C_Transpiler* tr, ProcCallExpression* call) {
     }
 
     transpile_node(tr, call->proc_expr);
-    if (call->proc && call->proc->overload) tr_writef("%d", call->proc->overload);
+    if (call->proc && call->proc->overload) tr_writef("_overload%d", call->proc->overload);
 
     tr_write("(");
     if (call->args) {
@@ -369,7 +373,7 @@ static void transpile_proc_signature(C_Transpiler* tr, Procedure* proc) {
     if (proc->name == builtin_string_main) tr_write("__main");
     else tr_write(get_string(proc->name));
 
-    if (proc->overload) tr_writef("%u", proc->overload);
+    if (proc->overload) tr_writef("_overload%u", proc->overload);
 
     tr_write("(");
     if (proc->arguments) {
@@ -473,7 +477,7 @@ switch (p.node->kind) {
         if (p.Binary->operator_overload) {
             Procedure* op = p.Binary->operator_overload;
             tr_write(get_string(op->name));
-            if (op->overload) tr_writef("%d", op->overload);
+            if (op->overload) tr_writef("_overload%d", op->overload);
             tr_write("(");
             transpile_node(tr, p.Binary->left);
             tr_write(", ");

@@ -1,8 +1,0 @@
-<project>
-    <output>
-        <name>plang</name>
-        <type>exe</type>
-        <linkargs>-g -fsanitize=address</linkargs>
-        <compileargs>-O0 -g -fsanitize=address -fno-omit-frame-pointer</compileargs>
-    </output>
-</project>
