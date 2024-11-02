@@ -285,6 +285,7 @@ static bool _isBasicType_validModifier(Parser* parser) {
         if (tok(parser, Tok_CloseSquare)) return true;
         if (tok(parser, Tok_Dotdot) && tok(parser, Tok_CloseSquare)) return true;
         if (tok(parser, Tok_Integer) && tok(parser, Tok_CloseSquare)) return true;
+        if (tok(parser, Tok_Word) && tok(parser, Tok_CloseSquare)) return true;
     }
 
     nope:

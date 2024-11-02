@@ -21,6 +21,7 @@
         - named arguments e.g foo(arg_name: "daw")
         - field initializers
         - redundant cast warning
+        - static variable crash compiler if not assigned to
 
     InProgress:
         - print structs
