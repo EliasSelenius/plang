@@ -9,10 +9,11 @@ struct List {
     uint32 length;
 }
 
-void* list_create(uint32 stride) {
-    List* head = malloc(sizeof List + stride * ListStartingCapacity);
+void* list_create(uint32 stride) return list_create(stride, ListStartingCapacity);
+void* list_create(uint32 stride, starting_capacity) {
+    List* head = malloc(sizeof List + stride * starting_capacity);
     head.stride = stride;
-    head.capacity = ListStartingCapacity;
+    head.capacity = starting_capacity;
     head.length = 0;
     return *head[1];
 }
