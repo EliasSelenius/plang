@@ -87,7 +87,8 @@ string to_string(uint32 num) { return to_string(num as uint64); }
 string to_string(uint64 num) {
 
     // TODO: make this a fixed array, so we dont have to malloc
-    static char* num_str = malloc(20); // 20 is max char size for 64 bit integer
+    // static char* num_str = malloc(21); // 20 is max char size for 64 bit integer
+    static char[21] num_str = {};
 
     if num == 0 return {"0", 1} as string;
     uint32 i = 20;
@@ -147,6 +148,18 @@ string substr_to_end(string str, char start) {
     while (i >= 0 and str.chars[i] != start) i--;
     return { *str.chars[i], str.length - i };
 }
+
+// string[2] split_once(string str, char delim) {
+//     string[2] res = {};
+//     res[0] = str;
+//     for 0 .. str.length {
+//         if str.chars[it] == delim {
+
+//         }
+//     }
+
+//     return res;
+// }
 
 char* trim_starting_whitespace(char* c_str) {
     while is_whitespace(@c_str) c_str++;
