@@ -240,9 +240,9 @@ struct StringBuilder {
     uint32 length;
 }
 
-string to_string(StringBuilder sb) {
-    return {sb.content, sb.length};
-}
+string to_string(StringBuilder sb)  return {sb.content, sb.length};
+string to_string(StringBuilder* sb) return {sb.content, sb.length};
+
 
 StringBuilder* alloc_temp_builders(uint32 count) {
     StringBuilder* temps = malloc(count * sizeof StringBuilder);

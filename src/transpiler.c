@@ -82,7 +82,8 @@ static void transpile_begin_type(C_Transpiler* tr, Datatype type) {
         case Typekind_Array: tr_write("Array"); tr_write_asterixs(tr, type.numPointers); break;
 
         case Typekind_Fixed_Array:   transpile_begin_type(tr, type.array_typenode->array.element_type->solvedstate); break;
-        case Typekind_Dynamic_Array: transpile_begin_type(tr, type.array_typenode->array.element_type->solvedstate); tr_write("*"); break;
+        case Typekind_Dynamic_Array: transpile_begin_type(tr, type.array_typenode->array.element_type->solvedstate);
+                                     tr_write_asterixs(tr, type.numPointers + 1); break;
 
         case Typekind_Procedure: transpile_begin_procptr(tr, type.proc_ptr_typenode); break;
 
