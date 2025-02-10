@@ -106,12 +106,7 @@ static void transpile_procptr_args(C_Transpiler* tr, Type* proc_type) {
     tr_write(")");
 }
 
-static void transpile_declarator(C_Transpiler* tr, Datatype type, Identifier name) {
-    transpile_begin_type(tr, type);
-
-    if (name && type.kind != Typekind_Procedure) tr_write(" ");
-    tr_write(get_string(name));
-
+static void transpile_end_type(C_Transpiler* tr, Datatype type) {
     Type* type_node = type.node;
 
     switch (type.kind) {
@@ -130,10 +125,20 @@ static void transpile_declarator(C_Transpiler* tr, Datatype type, Identifier nam
             tr_writef("[");
             transpile_node(tr, type_node->array.size_expr);
             tr_writef("]");
+            transpile_end_type(tr, type_node->array.element_type->solvedstate);
         } break;
 
         default: break;
     }
+}
+
+static void transpile_declarator(C_Transpiler* tr, Datatype type, Identifier name) {
+    transpile_begin_type(tr, type);
+
+    if (name && type.kind != Typekind_Procedure) tr_write(" ");
+    tr_write(get_string(name));
+
+    transpile_end_type(tr, type);
 }
 
 static void transpile_datatype(C_Transpiler* tr, Datatype type) { transpile_declarator(tr, type, 0); }
@@ -794,6 +799,7 @@ void transpile(Codebase* codebase) {
     foreach (static_decl, tr->static_decls) {
         Declaration* decl = *static_decl;
         if (decl->expr.node && isCompiletimeExpression(decl->expr)) continue;
+        if (decl->expr.node == null) continue;
         newline(tr);
         tr_write(get_string(decl->name));
         tr_write(" = ");

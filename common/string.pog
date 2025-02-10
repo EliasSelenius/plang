@@ -170,6 +170,22 @@ string trim_start(string str, uint32 len) { return { str.chars + len, str.length
 string trim_end(string str, uint32 len) { return { str.chars, str.length - len }; }
 string trim(string str, uint32 len) { return { str.chars + len, str.length - len*2 }; }
 
+string trim_start(string str, char c) {
+    uint32 count = 0;
+    while str.chars[count] == c  count++;
+    return trim_start(str, count);
+}
+
+string trim_end(string str, char c) {
+    uint32 count = 0;
+    while str.chars[str.length-1 - count] == c  count++;
+    return trim_end(str, count);
+}
+
+string trim(string str, char c) {
+    return trim_start(trim_end(str, c), c);
+}
+
 bool is_whitespace(char c) { return c == ' ' or c == '\n' or c == '\t'; }
 bool is_whitespace_or_null(char c) { return is_whitespace(c) or c == 0; }
 bool is_upper_case_letter(char c) { return c >= 'A' and c <= 'Z'; }
@@ -306,20 +322,10 @@ void sb_grow(StringBuilder* sb, uint32 len) {
     }
 }
 
+void sb_append(StringBuilder* sb, char* str) sb_append(sb, make_string(str));
 void sb_append(StringBuilder* sb, string str) {
     sb_grow(sb, str.length);
-
     for i : 0 .. str.length  sb.content[sb.length++] = str.chars[i];
-
-    sb.content[sb.length] = 0 as char;
-}
-
-void sb_append(StringBuilder* sb, char* str) {
-    let len = strlen(str) as uint32;
-    sb_grow(sb, len);
-
-    while @str  sb.content[sb.length++] = @(str++);
-
     sb.content[sb.length] = 0 as char;
 }
 
@@ -327,6 +333,32 @@ void sb_append(StringBuilder* sb, char c) {
     sb_grow(sb, 1);
     sb.content[sb.length++] = c;
     sb.content[sb.length] = 0 as char;
+}
+
+void sb_append(StringBuilder* sb, float32 f) {
+    uint32 bits = @(*f as uint32*);
+    // print("float: ", f, " bits: ", bits, "\n");
+
+    if bits&0x8000_0000  sb_append(sb, "-");
+
+    if bits == 0x7f80_0000 or bits == 0xff80_0000 {
+        sb_append(sb, "Infinity");
+    } else if is_nan(f) {
+        sb_append(sb, "NaN");
+    } else {
+        sb_append(sb, to_string(abs(f) as uint64));
+        sb_append(sb, ".");
+
+        let frac = to_string(round(fract(abs(f)) * 1_000_000) as uint64);
+        for 0 .. 6 - frac.length   sb_append(sb, '0');
+        sb_append(sb, frac);
+    }
+}
+
+void sb_append(StringBuilder* sb, vec2 v) {
+    sb_append(sb, v.x);
+    sb_append(sb, ", ");
+    sb_append(sb, v.y);
 }
 
 void sb_insert(StringBuilder* sb, uint32 loc, string str) {
@@ -351,6 +383,12 @@ void sb_remove(StringBuilder* sb, uint32 loc, uint32 num_chars) {
         sb.content[i] = sb.content[i + num_chars];
         i++;
     }
+
+    // for uint32 i : loc .. sb.length+1 {}
+
+    // for uint32 i = loc, i <= sb.length, i++ {
+    //     sb.content[i] = sb.content[i + num_chars];
+    // }
 
     sb.length -= num_chars;
 }

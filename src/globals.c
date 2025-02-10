@@ -54,6 +54,7 @@ static Identifier register_string(StrSpan word) {
     X(add) \
     X(static_init) \
     X(chars) \
+    X(data) \
 
 
 #define decl_strings(str) static Identifier builtin_string_##str = 0;

@@ -27,16 +27,21 @@ uint64 strlen(char* str);
 
 void exit(int32 code);
 
+FILE* open_file(char* file, mode) {
+    FILE* res = null;
+    if fopen_s(*res, file, mode) {
+        print("ERROR: Could not open file \"", file, "\".\n");
+        return null;
+    }
+    return res;
+}
+
 char* fileread(char* filename) {
     return fileread(filename, "r");
 }
 
 char* fileread(char* filename, char* mode) {
-    FILE* file;
-    if (fopen_s(*file, filename, mode)) {
-        print("ERROR: Could not open file \"", filename, "\".\n");
-        return null;
-    }
+    FILE* file = open_file(filename, mode);
 
     fseek(file, 0, 2); // 2 = SEEK_END
     uint64 len = ftell(file);
@@ -51,14 +56,8 @@ char* fileread(char* filename, char* mode) {
 }
 
 void filewrite(char* filename, char* content) {
-    FILE* file;
-    if fopen_s(*file, filename, "w") {
-        print("ERROR: Could not open file \"", filename, "\".\n");
-        return;
-    }
-
+    FILE* file = open_file(filename, "w");
     fwrite(content, sizeof char, strlen(content), file);
-
     fclose(file);
 }
 
@@ -72,6 +71,35 @@ void filewrite(string filename, char* content) {
     free(tmp);
 }
 
+
+uint8[] read_binary_file(char* filename) {
+    FILE* file = open_file(filename, "rb");
+    uint8[] buffer = {};
+
+    fseek(file, 0, 2); // 2 = SEEK_END
+    uint64 len = ftell(file);
+    rewind(file);
+
+    buffer.length = len as uint32; // TODO: truncation
+    buffer.data = malloc(buffer.length);
+
+    fread(buffer.data, 1, buffer.length, file);
+    fclose(file);
+    return buffer;
+}
+
+void write_binary_file(char* filename, void* data, uint64 bytes) {
+    uint8[] buffer = {};
+    buffer.data = data;
+    buffer.length = bytes;
+    write_binary_file(filename, buffer);
+}
+
+void write_binary_file(char* filename, uint8[] buffer) {
+    FILE* file = open_file(filename, "wb");
+    fwrite(buffer.data, sizeof uint8, buffer.length, file);
+    fclose(file);
+}
 
 const ArenaSize = 0xFFFF_FFFF;
 struct Arena {

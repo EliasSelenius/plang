@@ -377,11 +377,19 @@ static Datatype validate_deref_expr(Parser* parser, DerefExpression* deref, Data
         } break;
 
         case Typekind_Dynamic_Array:
-            if (member_name == builtin_string_capacity) return type_uint32; // TODO: hardcoded type of capacity field
-        case Typekind_Array:
-        case Typekind_Fixed_Array: {
             if (member_name == builtin_string_length) return type_uint32; // TODO: hardcoded type of length field
-        } break;
+            if (member_name == builtin_string_capacity) return type_uint32; // TODO: hardcoded type of capacity field
+            break;
+
+        case Typekind_Array:
+            if (member_name == builtin_string_length) return type_uint32; // TODO: hardcoded type of length field
+            if (member_name == builtin_string_data)   return type_voidPointer;
+            break;
+
+        case Typekind_Fixed_Array:
+            if (member_name == builtin_string_length) return type_uint32; // TODO: hardcoded type of length field
+            break;
+
         default: break;
     }
 
