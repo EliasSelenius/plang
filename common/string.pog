@@ -102,6 +102,19 @@ string to_string(uint64 num) {
     return { *num_str[i], 20 - i } as string;
 }
 
+string to_string(int32 num) return to_string(num as int64);
+string to_string(int64 num) {
+    let sb = temp_builder();
+
+    if num < 0 {
+        sb_append(sb, '-');
+        num = -num;
+    }
+
+    sb_append(sb, to_string(num as uint64));
+    return to_string(sb);
+}
+
 
 bool string_equals(string a, string b) {
     if a.length != b.length return false;
