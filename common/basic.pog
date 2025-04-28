@@ -74,7 +74,11 @@ void filewrite(string filename, char* content) {
 
 uint8[] read_binary_file(char* filename) {
     FILE* file = open_file(filename, "rb");
-    uint8[] buffer = {};
+    uint8[] buffer;
+    // TODO: this is stupid, but its the only way to create a 'null' array
+    buffer.data = null;
+    buffer.length = 0;
+    if file == null return buffer;
 
     fseek(file, 0, 2); // 2 = SEEK_END
     uint64 len = ftell(file);

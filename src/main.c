@@ -22,6 +22,7 @@
         - field initializers
         - redundant cast warning
         - static variable crash compiler if not assigned to
+        - localy declared types cannot be used in localy declared procedures
 
     InProgress:
         - print structs
