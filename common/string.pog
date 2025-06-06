@@ -115,6 +115,33 @@ string to_string(int64 num) {
     return to_string(sb);
 }
 
+string to_string(float32 f) return to_string(temp_builder(), f);
+string to_string(StringBuilder* sb, float32 f) {
+
+    uint32 bits = @(*f as uint32*);
+    // print("float: ", f, " bits: ", bits, "\n");
+
+    if bits&0x8000_0000  sb_append(sb, "-");
+
+    if bits == 0x7f80_0000 or bits == 0xff80_0000 {
+        sb_append(sb, "Infinity");
+        return to_string(sb);
+    }
+
+    if is_nan(f) {
+        sb_append(sb, "NaN");
+        return to_string(sb);
+    }
+
+    sb_append(sb, to_string(abs(f) as uint64));
+    sb_append(sb, ".");
+
+    let frac = to_string(round(fract(abs(f)) * 1_000_000) as uint64);
+    for 0 .. 6 - frac.length   sb_append(sb, '0');
+    sb_append(sb, frac);
+
+    return to_string(sb);
+}
 
 bool string_equals(string a, string b) {
     if a.length != b.length return false;

@@ -54,6 +54,23 @@ void* list_append(void** list) { return list_add(list, null); }
 void* list_get(void* list, uint32 index) { return (list as byte*) + list_stride(list) * index; }
 void* list_last_item(void* list) { return list_get(list, list_length(list) - 1); }
 
+int32 index_of(void* list, void* data) {
+    let len = list_length(list);
+    for 0 .. len {
+        void* item = list_get(list, it);
+        if memcmp(data, item, list_stride(list)) == 0 return it;
+    }
+
+    return -1;
+}
+
+void list_remove(void* list, item) {
+    int32 i = index_of(list, item);
+    if i != -1 {
+        list_unordered_remove(list, i as uint32);
+    }
+}
+
 void list_unordered_remove(void* list, uint32 index) {
     let len = list_length(list);
     memcpy(list_get(list, index), list_get(list, len - 1), list_stride(list));

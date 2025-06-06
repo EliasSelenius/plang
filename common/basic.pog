@@ -22,6 +22,7 @@ void* realloc(void* buffer, uint64 size);
 void* memcpy(void* dst, void* src, uint64 size);
 void* memset(void* dst, int32 val, uint64 size);
 void* memmove(void* dst, void* src, uint64 size);
+int32 memcmp(void* lhs, rhs, uint64 count);
 
 uint64 strlen(char* str);
 
