@@ -143,6 +143,8 @@ string to_string(StringBuilder* sb, float32 f) {
     return to_string(sb);
 }
 
+bool string_equals(char* a, string b) return string_equals(make_string(a), b);
+bool string_equals(string a, char* b) return string_equals(a, make_string(b));
 bool string_equals(string a, string b) {
     if a.length != b.length return false;
     for i : 0 .. a.length if a.chars[i] != b.chars[i] return false;
