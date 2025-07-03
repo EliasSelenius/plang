@@ -77,9 +77,12 @@ static Type* type_modifier(Parser* parser, Type* type) {
         if (tok(parser, Tok_CloseParen)) return mod;
 
         Type* arg = parseTypeNode(parser);
+        tok(parser, Tok_Word);
+
         mod->procedure.first_argument = arg;
         while (tok(parser, Tok_Comma)) {
             arg->next = parseTypeNode(parser);
+            tok(parser, Tok_Word);
             arg = arg->next;
         }
         expect(parser, Tok_CloseParen);
