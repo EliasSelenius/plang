@@ -83,10 +83,7 @@ float64 parse_float(char* c_str, uint32* length) {
 // TODO: make signed overloads
 string to_string(uint32 num) { return to_string(num as uint64); }
 string to_string(uint64 num) {
-
-    // TODO: make this a fixed array, so we dont have to malloc
-    // static char* num_str = malloc(21); // 20 is max char size for 64 bit integer
-    static char[21] num_str = {};
+    char[21] num_str = {}; // 20 is max char size for 64 bit integer
 
     if num == 0 return {"0", 1} as string;
     uint32 i = 20;
@@ -97,7 +94,11 @@ string to_string(uint64 num) {
         num_str[--i] = '0' + r as char;
     }
 
-    return { *num_str[i], 20 - i } as string;
+    // this is done so that to_string(uint64 num) can be called multiple times
+    string str = { *num_str[i], 20 - i };
+    let sb = temp_builder();
+    sb_append(sb, str);
+    return to_string(sb);
 }
 
 string to_string(int32 num) return to_string(num as int64);
