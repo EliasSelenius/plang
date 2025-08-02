@@ -419,8 +419,13 @@ void sb_insert(StringBuilder* sb, uint32 loc, string str) {
 }
 
 void sb_remove(StringBuilder* sb, uint32 loc, uint32 num_chars) {
+    if loc + num_chars >= sb.length {
+        sb_truncate_length(sb, loc);
+        return;
+    }
+
     uint32 i = loc;
-    while i <= sb.length {
+    while (i+num_chars) <= sb.length {
         sb.content[i] = sb.content[i + num_chars];
         i++;
     }

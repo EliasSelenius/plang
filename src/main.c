@@ -139,7 +139,7 @@ int main(int argc, char* argv[]) {
     printf("%s\n", sb.content);
     int code = system(sb.content);
     if (code == 0) {
-        system("output.exe");
+        // system("output.exe");
     } else {
         printf("clang return code: %d\n", code);
     }
