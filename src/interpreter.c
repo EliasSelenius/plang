@@ -118,36 +118,6 @@ static void scope_context_declare(ReplScope* context, Identifier name, Value v) 
     list_add(context->variables, var);
 }
 
-static u64 datatype_bytesize(Datatype type) {
-    if (type.numPointers) return 8;
-
-    switch (type.kind) {
-
-        case Typekind_uint8:  return 1;
-        case Typekind_uint16: return 2;
-        case Typekind_uint32: return 4;
-        case Typekind_uint64: return 8;
-        case Typekind_int8:   return 1;
-        case Typekind_int16:  return 2;
-        case Typekind_int32:  return 4;
-        case Typekind_int64:  return 8;
-        case Typekind_float32: return 4;
-        case Typekind_float64: return 8;
-        case Typekind_void: return 0;
-        case Typekind_char: return 1;
-        case Typekind_Struct: return 0;
-        case Typekind_Enum: return 0;
-        case Typekind_Typedef: return 0;
-        case Typekind_Procedure: return 8;
-        case Typekind_Array: return 12;
-        case Typekind_Fixed_Array: return 0;
-        case Typekind_Dynamic_Array: return 8;
-
-        default: return 0;
-    }
-}
-
-
 static Value interpret_procedure(ProcCallExpression* call, ReplScope* context) {
     if (call->proc->name == builtin_string_print) {
         if (call->args) {

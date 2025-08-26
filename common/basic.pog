@@ -113,7 +113,9 @@ struct Arena {
 
 Arena* arena_create() {
     Arena* arena = vmem_reserve(ArenaSize);
-    arena.top = sizeof(Arena);
+    uint32 size = sizeof(Arena);
+    vmem_commit(arena, size as uint64);
+    arena.top = size;
     return arena;
 }
 
@@ -121,13 +123,19 @@ void* arena_bottom(Arena* arena) {
     return (arena as uint64 + sizeof(Arena)) as void*;
 }
 
+uint64 align(uint64 value, align) {
+    uint64 res = value / align * align;
+    if value % align == 0  return res;
+    return res + align;
+}
+
 void* arena_alloc(Arena* arena, uint32 size) {
     // TODO: we should do alignment here
 
     uint64 result = (arena as uint64) + arena.top;
+    result = align(result, 8);
 
-    // uint32 align = 8;
-    // result = result / align * align;
+
 
     arena.top += size;
     vmem_commit(arena, arena.top as uint64);

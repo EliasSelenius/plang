@@ -298,7 +298,7 @@ static void transpile_condition_expr(C_Transpiler* tr, NodeRef ref) {
 
 
 static void transpile_struct(C_Transpiler* tr, Struct* stru) {
-    tr_writef("struct %s {", get_string(stru->name));
+    tr_writef("struct %s { // deps = %d", get_string(stru->name), stru->deps);
     tr->tabing++;
 
     foreach (field, stru->fields) {
@@ -398,12 +398,13 @@ static void transpile_local_procedures(C_Transpiler* tr, NodeRef ref) {
 
     foreach (s, ref.Scope->statements) {
         switch (s->node->kind) {
-            case Node_Procedure: transpile_procedure(tr, s->Procedure); break;
-            case Node_Scope:     transpile_local_procedures(tr, *s); break;
-            case Node_IfStmt:    transpile_local_procedures(tr, s->IfStmt->then_statement);
-                                 transpile_local_procedures(tr, s->IfStmt->else_statement); break;
-            case Node_WhileStmt: transpile_local_procedures(tr, s->WhileStmt->statement); break;
-            case Node_ForStmt:   transpile_local_procedures(tr, s->ForStmt->statement); break;
+            case Node_Procedure:  transpile_procedure(tr, s->Procedure); break;
+            case Node_Scope:      transpile_local_procedures(tr, *s); break;
+            case Node_IfStmt:     transpile_local_procedures(tr, s->IfStmt->then_statement);
+                                  transpile_local_procedures(tr, s->IfStmt->else_statement); break;
+            case Node_WhileStmt:  transpile_local_procedures(tr, s->WhileStmt->statement); break;
+            case Node_ForStmt:    transpile_local_procedures(tr, s->ForStmt->statement); break;
+            case Node_SwitchStmt: transpile_local_procedures(tr, (NodeRef)(s->SwitchStmt->scope)); break;
             default: break;
         }
     }
@@ -661,10 +662,13 @@ static u32 countStructDependencies(Struct* stru) {
     for (u32 f = 0; f < fieldsLen; f++) {
         Datatype datatype = stru->fields[f].type->solvedstate;
         if (datatype.numPointers) continue;
-        if (datatype.kind != Typekind_Struct) continue;
-
-        deps++;
-        deps += countStructDependencies(datatype.stru);
+        if (datatype.kind == Typekind_Struct) {
+            deps++;
+            deps += countStructDependencies(datatype.stru);
+        }
+        if (datatype.kind == Typekind_string) {
+            deps++;
+        }
     }
 
     return deps;
@@ -738,6 +742,40 @@ void transpile(Codebase* codebase) {
             }
             dep++;
         }
+    }
+
+    { // rtti
+        tr_write("\n// Runtime type information\n");
+        tr_writef("static Array structs = (Array) { .length = %d, .data = (Struct[]){", structs_count);
+        tr->tabing++; newline(tr);
+        for (u32 i = 0; i < structs_count; i++) {
+            Struct* stru = codebase->structs[i];
+            tr_write("{");
+            tr->tabing++; newline(tr);
+
+            u32 field_len = list_length(stru->fields);
+            char* name = get_string(stru->name);
+            tr_writef(".name = \"%s\",", name); newline(tr);
+            tr_writef(".fields = (Array) { .length = %d, .data = (StructField[]){", field_len);
+            tr->tabing++;
+            for (u32 j = 0; j < field_len; j++) {
+                newline(tr);
+
+                Declaration decl = stru->fields[j];
+                char* field_name = get_string(decl.name);
+                u32 typeid = 0;
+                u32 offset = 0;
+                tr_writef("{.name = \"%s\", .typeid = %d, .offset = %d},", field_name, typeid, offset);
+            }
+            tr->tabing--; newline(tr);
+            tr_write("}}");
+
+            tr->tabing--; newline(tr);
+            tr_write("},");
+            newline(tr);
+        }
+        tr->tabing--; newline(tr);
+        tr_write("}};\n");
     }
 
     tr_write("\n// Forward declarations\n");

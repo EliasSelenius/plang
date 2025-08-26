@@ -19,7 +19,7 @@ void* list_create(uint32 stride, starting_capacity) {
 }
 
 List* list_head(void* list) { return *(list as List*)[-1]; }
-uint32 list_length(void* list) { return list_head(list).length; }
+uint32 list_length(void* list) { return list ? list_head(list).length : 0; }
 uint32 list_capacity(void* list) { return list_head(list).capacity; }
 uint32 list_stride(void* list) { return list_head(list).stride; }
 

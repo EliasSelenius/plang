@@ -662,7 +662,8 @@ Codebase parse(Parser* parser) {
     if (num_errors) {
         print_errors(parser);
         printf("There were %d errors during parsing.\n", num_errors);
-        return cb;
+        list_clear(parser->errors);
+        // return cb;
     }
 
     printf("Validate...\n");

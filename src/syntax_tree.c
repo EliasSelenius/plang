@@ -332,6 +332,65 @@ static Datatype mergeNumberTypes(Datatype a, Datatype b) {
     return (Datatype) { .kind = getTypekindOfNumberInfo(mergeNumberInfos(getNumberInfo(a.kind), getNumberInfo(b.kind))) };
 }
 
+static u64 datatype_bytesize(Datatype type) {
+    if (type.numPointers) return 8;
+
+    switch (type.kind) {
+
+        case Typekind_uint8:  return 1;
+        case Typekind_uint16: return 2;
+        case Typekind_uint32: return 4;
+        case Typekind_uint64: return 8;
+        case Typekind_int8:   return 1;
+        case Typekind_int16:  return 2;
+        case Typekind_int32:  return 4;
+        case Typekind_int64:  return 8;
+        case Typekind_float32: return 4;
+        case Typekind_float64: return 8;
+        case Typekind_void: return 0;
+        case Typekind_char: return 1;
+        case Typekind_Struct: return 0;
+        case Typekind_Enum: return 0;
+        case Typekind_Typedef: return 0;
+        case Typekind_Procedure: return 8;
+        case Typekind_Array: return 12; // TODO: this should be 16 and not 12 because of padding
+        case Typekind_Fixed_Array: return 0;
+        case Typekind_Dynamic_Array: return 8;
+
+        default: return 0;
+    }
+}
+
+static u64 datatype_alignment(Datatype type) {
+    if (type.numPointers) return 8;
+
+    switch (type.kind) {
+
+        case Typekind_uint8:  return 1;
+        case Typekind_uint16: return 2;
+        case Typekind_uint32: return 4;
+        case Typekind_uint64: return 8;
+        case Typekind_int8:   return 1;
+        case Typekind_int16:  return 2;
+        case Typekind_int32:  return 4;
+        case Typekind_int64:  return 8;
+        case Typekind_float32: return 4;
+        case Typekind_float64: return 8;
+        case Typekind_void: return 0;
+        case Typekind_char: return 1;
+
+        case Typekind_Struct: return 0;
+        case Typekind_Enum: return 0;
+        case Typekind_Typedef: return 0;
+        case Typekind_Procedure: return 8;
+        case Typekind_Array: return 8;
+        case Typekind_Fixed_Array: return 0;
+        case Typekind_Dynamic_Array: return 8;
+
+        default: return 0;
+    }
+}
+
 
 // ----Expressions---------------------------------------------
 
@@ -472,6 +531,13 @@ static Statement* getMember(Struct* stru, Identifier name) {
     return null;
 }
 
+static u64 calc_struct_bytesize(Struct* stru) {
+    u32 len = list_length(stru->fields);
+    for (u32 i = 0; i < len; i++) {
+        Declaration decl = stru->fields[i];
+    }
+}
+
 static EnumEntry* getEnumEntry(Enum* en, Identifier name) {
     u32 len = list_length(en->entries);
     for (u32 i = 0; i < len; i++) if (en->entries[i].name == name) {
@@ -507,6 +573,7 @@ static u32 node_struct_sizes[] = {
 
 
 static bool isCompiletimeExpression(NodeRef e) {
+    if (!e.node) return false;
     switch (e.node->kind) {
         default: return false;
 

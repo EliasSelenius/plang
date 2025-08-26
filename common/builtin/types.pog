@@ -5,13 +5,14 @@ struct TypeInfo {
 }
 
 struct Struct {
-    string name;
+    char* name;
     StructField[] fields;
 }
 
 struct StructField {
-    TypeInfo type;
-    string name;
+    char* name;
+    uint32 typeid;
+    uint32 offset;
 }
 
 struct Procedure {
