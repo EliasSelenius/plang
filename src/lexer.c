@@ -45,6 +45,19 @@ static u64 hex_char_to_value(char h) {
     return -1;
 }
 
+static u64 bin_number() {
+    u64 res = 0;
+    while (*cursor == '0' || *cursor == '1' || *cursor == '_') {
+        char c = *cursor;
+        advance_next_char();
+        if (c == '_') continue;
+
+        u8 bit = c == '0' ? 0 : 1;
+        res = (res << 1) | bit;
+    }
+    return res;
+}
+
 static u64 hex_number(u32* numDigits) {
     char* start = cursor;
     while (isHexDigit(*cursor) || *cursor == '_') advance_next_char();
@@ -182,6 +195,19 @@ static void lex(Parser* parser, char* input) {
 
             u32 numDigits;
             token.data.integer = hex_number(&numDigits);
+            cursor--;
+
+            list_add(parser->tokens, token);
+            continue;
+        }
+
+        // bin number
+        if (*cursor == '0' && *(cursor + 1) == 'b') {
+            cursor += 2;
+
+            Token token = construct_token_here(Tok_Integer);
+
+            token.data.integer = bin_number();
             cursor--;
 
             list_add(parser->tokens, token);
