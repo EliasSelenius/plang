@@ -309,7 +309,13 @@ static void validateEnum(Parser* parser, Enum* en) {
     u64 entry_value = 0;
 
     foreach (entry, en->entries) {
-        if (entry->expr.node) validate_expr(parser, entry->expr); // TODO: evaluate expression value
+        if (entry->expr.node) {
+            validate_expr(parser, entry->expr); // TODO: evaluate expression value
+
+            if (entry->expr.node->kind == Node_Literal_Integer) {
+                entry_value = entry->expr.Literal->data.integer;
+            }
+        }
         entry->value = entry_value++;
     }
 }
