@@ -241,6 +241,9 @@ static void transpile_print_call(C_Transpiler* tr, ProcCallExpression* call) {
                     tr_write(".chars");
                 } continue;
 
+                // case Typekind_Enum: {
+                // } continue;
+
                 default: break;
             }
         }

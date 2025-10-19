@@ -114,46 +114,46 @@ static Type* type_modifier(Parser* parser, Type* type) {
     return null;
 }
 
-static void print_typenode(Type* type) {
+static void print_typenode(StringBuilder* sb, Type* type) {
     switch (type->kind) {
-        case Node_Type_MustInfer: printf("let"); break;
+        case Node_Type_MustInfer: sb_append_format(sb, "let"); break;
         case Node_Type_Basic: {
-            printf("%s", get_string(type->name));
+            sb_append_format(sb, "%s", get_string(type->name));
         } break;
 
         case Node_Type_Procedure: {
-            print_typenode(type->procedure.return_type);
-            printf("(");
+            print_typenode(sb, type->procedure.return_type);
+            sb_append_format(sb, "(");
             Type* arg = type->procedure.first_argument;
             if (arg) {
-                print_typenode(arg);
+                print_typenode(sb, arg);
                 arg = arg->next;
                 while (arg) {
-                    printf(", ");
-                    print_typenode(arg);
+                    sb_append_format(sb, ", ");
+                    print_typenode(sb, arg);
                     arg = arg->next;
                 }
             }
-            printf(")");
+            sb_append_format(sb, ")");
         } break;
 
         case Node_Type_Array: {
-            print_typenode(type->array.element_type);
-            printf("[]");
+            print_typenode(sb, type->array.element_type);
+            sb_append_format(sb, "[]");
         } break;
         case Node_Type_Fixed_Array: {
-            print_typenode(type->array.element_type);
-            printf("[%d]", 0); // TODO: print proper size
+            print_typenode(sb, type->array.element_type);
+            sb_append_format(sb, "[%d]", 0); // TODO: print proper size
         } break;
         case Node_Type_Dynamic_Array: {
-            print_typenode(type->array.element_type);
-            printf("[..]");
+            print_typenode(sb, type->array.element_type);
+            sb_append_format(sb, "[..]");
         } break;
 
         default: abort();
     }
 
-    printf("%.*s", type->solvedstate.numPointers, "***********");
+    sb_append_format(sb, "%.*s", type->solvedstate.numPointers, "***********");
 }
 
 
@@ -560,9 +560,11 @@ void bind_units(Parser* parser, Codebase* cb) {
         Type* type = *tp;
         resolve_typenode(parser, type, cb);
         if (type->solvedstate.kind == Typekind_Invalid) {
-            // TODO: include type in error message
-            error_node(parser, (NodeRef)type, "Failed to resolve type");
-            // printf("    "); print_typenode(type); printf("\n");
+
+            StringBuilder* sb = temp_builder();
+            print_typenode(sb, type);
+
+            error_node(parser, (NodeRef)type, "Failed to resolve type: %s", sb->content);
         }
     }
 
