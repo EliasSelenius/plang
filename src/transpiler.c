@@ -659,19 +659,28 @@ switch (p.node->kind) {
     case Nodekind_Count: return;
 }}
 
+
+static u32 countStructDependencies(Struct* stru);
+static u32 count_type_deps(Datatype dt) {
+    if (dt.numPointers) return 0;
+
+    switch (dt.kind) {
+        case Typekind_Struct: return 1 + countStructDependencies(dt.stru);
+        case Typekind_string: return 1;
+        case Typekind_Fixed_Array:
+            Datatype elm = dt.array_typenode->array.element_type->solvedstate;
+            return count_type_deps(elm);
+
+        default: return 0;
+    }
+}
+
 static u32 countStructDependencies(Struct* stru) {
     u32 deps = 0;
     u32 fieldsLen = list_length(stru->fields);
     for (u32 f = 0; f < fieldsLen; f++) {
         Datatype datatype = stru->fields[f].type->solvedstate;
-        if (datatype.numPointers) continue;
-        if (datatype.kind == Typekind_Struct) {
-            deps++;
-            deps += countStructDependencies(datatype.stru);
-        }
-        if (datatype.kind == Typekind_string) {
-            deps++;
-        }
+        deps += count_type_deps(datatype);
     }
 
     return deps;

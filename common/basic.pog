@@ -137,7 +137,7 @@ void* arena_alloc(Arena* arena, uint32 size) {
 
 
 
-    arena.top += size;
+    arena.top += size; // we're not even including possible padding that may occure due to alignment! smh my head....
     vmem_commit(arena, arena.top as uint64);
     return result as void*;
 }
