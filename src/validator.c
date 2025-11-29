@@ -414,6 +414,9 @@ static Datatype validate_deref_expr(Parser* parser, DerefExpression* deref, Data
 
 static Datatype type_ptr(Datatype type, i32 nump) { type.numPointers += nump; return type; }
 
+static bool is_implicit_deref(NodeRef ref) {
+    return ref.node->kind == Node_Deref && node_is_null(ref.Deref->expr);
+}
 
 static Datatype _validate_expr_base(Parser* parser, NodeRef p, Datatype expected_type) {
 switch (p.node->kind) {
@@ -441,8 +444,23 @@ switch (p.node->kind) {
     case Node_Bitwise_Lshift:
     case Node_Bitwise_Rshift:
     {
-        Datatype type_l = validate_expr_expect_type(parser, p.Binary->left,  expected_type);
-        Datatype type_r = validate_expr_expect_type(parser, p.Binary->right, expected_type);
+        NodeRef expr_l = p.Binary->left;
+        NodeRef expr_r = p.Binary->right;
+
+        Datatype type_l = type_invalid;
+        Datatype type_r = type_invalid;
+
+        if (is_implicit_deref(expr_l)) {
+            type_r = validate_expr_expect_type(parser, expr_r, expected_type);
+            type_l = validate_expr_expect_type(parser, expr_l, type_r);
+        } else if (is_implicit_deref(expr_r)) {
+            type_l = validate_expr_expect_type(parser, expr_l, expected_type);
+            type_r = validate_expr_expect_type(parser, expr_r, type_l);
+        } else {
+            type_l = validate_expr_expect_type(parser, expr_l, expected_type);
+            type_r = validate_expr_expect_type(parser, expr_r, expected_type);
+        }
+
 
         if (type_l.kind == Typekind_Invalid || type_r.kind == Typekind_Invalid) return type_invalid;
 

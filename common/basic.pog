@@ -28,6 +28,20 @@ uint64 strlen(char* str);
 
 void exit(int32 code);
 
+void assert(bool test) {
+    // TODO: print line number and file name and other useful info.
+    // this function probably needs some compiler specific functionality:
+    //   assert(x < 10)
+    // in that example we want to also print the value of x.
+    // All assert calls should be disabled for release builds.
+    // We should also do a int3 (debug_break) instead of exit.
+
+    if test return;
+
+    print("Assertion Failed.\n");
+    exit(1);
+}
+
 FILE* open_file(char* file, mode) {
     FILE* res = null;
     if fopen_s(*res, file, mode) {
