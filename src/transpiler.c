@@ -765,6 +765,8 @@ void transpile(Codebase* codebase) {
             tr_write("{");
             tr->tabing++; newline(tr);
 
+            struct_byte_size(stru);
+
             u32 field_len = list_length(stru->fields);
             char* name = get_string(stru->name);
             tr_writef(".name = \"%s\",", name); newline(tr);
@@ -776,7 +778,7 @@ void transpile(Codebase* codebase) {
                 Declaration decl = stru->fields[j];
                 char* field_name = get_string(decl.name);
                 u32 typeid = 0;
-                u32 offset = 0;
+                u32 offset = decl.offset;
                 tr_writef("{.name = \"%s\", .typeid = %d, .offset = %d},", field_name, typeid, offset);
             }
             tr->tabing--; newline(tr);

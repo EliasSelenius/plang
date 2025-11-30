@@ -332,6 +332,10 @@ static Datatype mergeNumberTypes(Datatype a, Datatype b) {
     return (Datatype) { .kind = getTypekindOfNumberInfo(mergeNumberInfos(getNumberInfo(a.kind), getNumberInfo(b.kind))) };
 }
 
+static Datatype dealiasType(Datatype type);
+static u64 struct_byte_size(Struct* stru);
+static u64 struct_alignment(Struct* stru);
+
 static u64 datatype_bytesize(Datatype type) {
     if (type.numPointers) return 8;
 
@@ -349,7 +353,9 @@ static u64 datatype_bytesize(Datatype type) {
         case Typekind_float64: return 8;
         case Typekind_void: return 0;
         case Typekind_char: return 1;
-        case Typekind_Struct: return 0;
+        case Typekind_string: return 16;
+
+        case Typekind_Struct: return struct_byte_size(type.stru);
         case Typekind_Enum: return 0;
         case Typekind_Typedef: return 0;
         case Typekind_Procedure: return 8;
@@ -357,7 +363,9 @@ static u64 datatype_bytesize(Datatype type) {
         case Typekind_Fixed_Array: return 0;
         case Typekind_Dynamic_Array: return 8;
 
-        default: return 0;
+        case Typekind_Invalid: return 0;
+        case Typekind_AmbiguousInteger: return 0;
+        case Typekind_AmbiguousDecimal: return 0;
     }
 }
 
@@ -378,16 +386,25 @@ static u64 datatype_alignment(Datatype type) {
         case Typekind_float64: return 8;
         case Typekind_void: return 0;
         case Typekind_char: return 1;
+        case Typekind_string: return 8;
 
-        case Typekind_Struct: return 0;
-        case Typekind_Enum: return 0;
-        case Typekind_Typedef: return 0;
+        case Typekind_Struct: return struct_alignment(type.stru);
+        case Typekind_Enum: return 4; // TODO: ...
+        case Typekind_Typedef: {
+            Datatype de = dealiasType(type);
+            if (typeEquals(type, de)) {
+                return 1; // Opaque type
+            }
+            return datatype_alignment(de);
+        }
         case Typekind_Procedure: return 8;
         case Typekind_Array: return 8;
-        case Typekind_Fixed_Array: return 0;
+        case Typekind_Fixed_Array: return datatype_alignment(type.array_typenode->array.element_type->solvedstate);
         case Typekind_Dynamic_Array: return 8;
 
-        default: return 0;
+        case Typekind_Invalid: return 0;
+        case Typekind_AmbiguousInteger: return 0;
+        case Typekind_AmbiguousDecimal: return 0;
     }
 }
 
@@ -451,6 +468,7 @@ DefineStatementNode(Declaration, {
     Type*   type;
     NodeRef expr; /* can be null */
     Identifier name;
+    u32 offset;
     bool include_context; /* TODO: flags */
     bool is_static;
 })
@@ -493,8 +511,9 @@ DefineStatementNode(Procedure, {
 // } Field;
 
 DefineStatementNode(Struct, {
+    u64 byte_size;
+    u64 alignment;
     Identifier name;
-    u32 byte_size;
     u32 deps; // TODO: temporary, until we figure out a better way of transpiling structs in the correct order
     Declaration* fields; // list
 })
@@ -531,11 +550,37 @@ static Statement* getMember(Struct* stru, Identifier name) {
     return null;
 }
 
-static u64 calc_struct_bytesize(Struct* stru) {
+static u64 struct_byte_size(Struct* stru) {
+    if (stru->byte_size) return stru->byte_size;
+
+    u64 max_align = 1;
+    u64 bytes = 0;
     u32 len = list_length(stru->fields);
     for (u32 i = 0; i < len; i++) {
-        Declaration decl = stru->fields[i];
+        Declaration* decl = &stru->fields[i];
+        Datatype field_type = decl->type->solvedstate;
+        u64 size = datatype_bytesize(field_type);
+        u64 align = datatype_alignment(field_type);
+
+        if (align > max_align) max_align = align;
+
+        u64 rem = bytes % align;
+        u64 pad = rem ? align - rem : 0;
+        bytes += pad;
+        decl->offset = bytes;
+        bytes += size;
     }
+
+
+    stru->byte_size = bytes;
+    stru->alignment = max_align;
+    return bytes;
+}
+
+static u64 struct_alignment(Struct* stru) {
+    if (stru->alignment) return stru->alignment;
+    struct_byte_size(stru);
+    return stru->alignment;
 }
 
 static EnumEntry* getEnumEntry(Enum* en, Identifier name) {

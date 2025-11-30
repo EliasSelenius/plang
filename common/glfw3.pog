@@ -64,11 +64,9 @@ struct GLFWimage {
 
 struct GLFWgamepadstate {
     // The states of each [gamepad button](@ref gamepad_buttons), `GLFW_PRESS` or `GLFW_RELEASE`.
-    // uint8 buttons[15];
+    uint8[15] buttons;
     // The states of each [gamepad axis](@ref gamepad_axes), in the range -1.0 to 1.0 inclusive.
-    // float32 axes[6];
-    // TODO: make fixed-sized array work
-    int32 removeThisField;
+    float32[6] axes;
 }
 
 
