@@ -356,11 +356,15 @@ static u64 datatype_bytesize(Datatype type) {
         case Typekind_string: return 16;
 
         case Typekind_Struct: return struct_byte_size(type.stru);
-        case Typekind_Enum: return 0;
-        case Typekind_Typedef: return 0;
+        case Typekind_Enum: return 4; // TODO: in the future enums may have uint64 as underlaying type
+        case Typekind_Typedef: {
+            Datatype de = dealiasType(type);
+            if (typeEquals(type, de)) return 0; // Opaque type
+            return datatype_bytesize(de);
+        }
         case Typekind_Procedure: return 8;
         case Typekind_Array: return 12; // TODO: this should be 16 and not 12 because of padding
-        case Typekind_Fixed_Array: return 0;
+        case Typekind_Fixed_Array: return 0; // TODO: we must know the size of this array
         case Typekind_Dynamic_Array: return 8;
 
         case Typekind_Invalid: return 0;
@@ -392,9 +396,7 @@ static u64 datatype_alignment(Datatype type) {
         case Typekind_Enum: return 4; // TODO: ...
         case Typekind_Typedef: {
             Datatype de = dealiasType(type);
-            if (typeEquals(type, de)) {
-                return 1; // Opaque type
-            }
+            if (typeEquals(type, de)) return 1; // Opaque type
             return datatype_alignment(de);
         }
         case Typekind_Procedure: return 8;

@@ -2,6 +2,7 @@
 
 typedef struct C_Transpiler {
     Declaration** static_decls; // list
+    Datatype* type_table; // list
     StringBuilder sb;
     u32 tabing;
 } C_Transpiler;
@@ -686,13 +687,85 @@ static u32 countStructDependencies(Struct* stru) {
     return deps;
 }
 
+u32 transpiler_type_table_index(C_Transpiler* tr, Datatype dt) {
+    u32 type_table_length = list_length(tr->type_table);
+    for (u32 i = 0; i < type_table_length; i++) {
+        if (typeEquals(tr->type_table[i], dt)) return i;
+    }
+
+    return 0;
+}
+
+void transpile_type_info(C_Transpiler* tr, Datatype dt) {
+
+    char* name = get_temp_type_name(dt);
+
+    tr_write("{"); tr->tabing++; newline(tr);
+    tr_writef(".name = \"%s\",", name); newline(tr);
+    tr_writef(".inner_type = 0,"); newline(tr);
+    tr_writef(".bytesize = %llu,", datatype_bytesize(dt)); newline(tr);
+    tr_writef(".alignment = %d,", datatype_alignment(dt)); newline(tr);
+    tr_writef(".kind = %d,", dt.kind); newline(tr);
+    tr_writef(".num_ptr = %d,", dt.numPointers); newline(tr);
+
+    if (dt.numPointers) {
+
+    } else {
+        switch (dt.kind) {
+            case Typekind_Struct: {
+                Struct* stru = dt.stru;
+                u32 field_len = list_length(stru->fields);
+                tr_writef(".fields = (Array) { .length = %d, .data = (StructField[]){", field_len);
+                tr->tabing++;
+                for (u32 j = 0; j < field_len; j++) {
+                    newline(tr);
+
+                    Declaration decl = stru->fields[j];
+                    char* field_name = get_string(decl.name);
+                    u32 type_info = transpiler_type_table_index(tr, decl.type->solvedstate);
+                    u32 offset = decl.offset;
+                    tr_writef("{.type_info = (rtti_types+%d), .name = \"%s\", .offset = %d},", type_info, field_name, offset);
+                }
+                tr->tabing--; newline(tr);
+                tr_write("}},");
+            } break;
+
+            case Typekind_Enum: {
+                Enum* en = dt._enum;
+                u32 entries_len = list_length(en->entries);
+
+                tr_writef(".entries = (Array) { .length = %d, .data = (EnumEntry[]){", entries_len);
+                tr->tabing++;
+                for (u32 i = 0; i < entries_len; i++) {
+                    newline(tr);
+
+                    EnumEntry ent = en->entries[i];
+                    char* name = get_string(ent.name);
+                    i64 value = ent.value;
+                    tr_writef("{.name = \"%s\", .value = %lld},", name, value);
+                }
+                tr->tabing--;
+                newline(tr);
+                tr_write("}},");
+            } break;
+
+            default: break;
+        }
+    }
+
+    tr->tabing--;
+    newline(tr);
+    tr_write("},");
+    newline(tr);
+}
+
 void transpile(Codebase* codebase) {
     // TODO: use a higer initial capacity for the string builder
 
     C_Transpiler transpiler = {0}, *tr = &transpiler;
     transpiler.sb = sbCreate();
     list_init(transpiler.static_decls);
-
+    list_init(transpiler.type_table);
 
     // tr_write("#include <stdlib.h>\n"); // malloc
     // tr_write("#include <stdio.h>\n"); // printf
@@ -712,6 +785,17 @@ void transpile(Codebase* codebase) {
     tr_write("int printf(const char* format, ...);\n");
     tr_write("typedef struct Array { void* data; uint32 length; } Array;\n");
 
+    list_add(tr->type_table, type_int8);
+    list_add(tr->type_table, type_int16);
+    list_add(tr->type_table, type_int32);
+    list_add(tr->type_table, type_int64);
+    list_add(tr->type_table, type_uint8);
+    list_add(tr->type_table, type_uint16);
+    list_add(tr->type_table, type_uint32);
+    list_add(tr->type_table, type_uint64);
+    list_add(tr->type_table, type_float32);
+    list_add(tr->type_table, type_float64);
+
 
     tr_write("\n// Structs forward declarations\n");
     u32 structs_count = list_length(codebase->structs);
@@ -719,19 +803,29 @@ void transpile(Codebase* codebase) {
         Struct* s = codebase->structs[i];
         char* name = get_string(s->name);
         tr_writef("typedef struct %s %s;\n", name, name);
+
+        Datatype dt = get_datatype_from_statement((NodeRef)s);
+        list_add(tr->type_table, dt);
     }
 
     tr_write("\n// Enums\n");
     foreach (enu, codebase->enums) {
         Enum* en = *enu;
         tr_writef("typedef uint32 %s;\n", get_string(en->name));
+
+        Datatype dt = get_datatype_from_statement((NodeRef)en);
+        list_add(tr->type_table, dt);
     }
 
 
     tr_write("\n// Type aliases\n");
     foreach (type_def, codebase->type_defs) {
-        transpile_typedef(tr, *type_def);
+        Typedef* td = *type_def;
+        transpile_typedef(tr, td);
         tr_write("\n");
+
+        Datatype dt = get_datatype_from_statement((NodeRef)td);
+        list_add(tr->type_table, dt);
     }
 
 
@@ -758,38 +852,18 @@ void transpile(Codebase* codebase) {
 
     { // rtti
         tr_write("\n// Runtime type information\n");
-        tr_writef("static Array structs = (Array) { .length = %d, .data = (Struct[]){", structs_count);
+
+        u32 type_count = 0;
+        tr_writef("static TypeInfo rtti_types[] = {");
         tr->tabing++; newline(tr);
-        for (u32 i = 0; i < structs_count; i++) {
-            Struct* stru = codebase->structs[i];
-            tr_write("{");
-            tr->tabing++; newline(tr);
 
-            struct_byte_size(stru);
-
-            u32 field_len = list_length(stru->fields);
-            char* name = get_string(stru->name);
-            tr_writef(".name = \"%s\",", name); newline(tr);
-            tr_writef(".fields = (Array) { .length = %d, .data = (StructField[]){", field_len);
-            tr->tabing++;
-            for (u32 j = 0; j < field_len; j++) {
-                newline(tr);
-
-                Declaration decl = stru->fields[j];
-                char* field_name = get_string(decl.name);
-                u32 typeid = 0;
-                u32 offset = decl.offset;
-                tr_writef("{.name = \"%s\", .typeid = %d, .offset = %d},", field_name, typeid, offset);
-            }
-            tr->tabing--; newline(tr);
-            tr_write("}}");
-
-            tr->tabing--; newline(tr);
-            tr_write("},");
-            newline(tr);
+        u32 type_table_length = list_length(tr->type_table);
+        for (u32 i = 0; i < type_table_length; i++) {
+            transpile_type_info(tr, tr->type_table[i]);
         }
+
         tr->tabing--; newline(tr);
-        tr_write("}};\n");
+        tr_write("};\n");
     }
 
     tr_write("\n// Forward declarations\n");

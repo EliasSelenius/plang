@@ -1,18 +1,37 @@
 
-
-struct TypeInfo {
-    string name;
+enum Typekind {
+    i8; i16; i32; i64;
+    u8; u16; u32; u64;
+    f32; f64;
+    void;
+    char;
+    Typedef;
+    Struct;
+    Array;
+    Enum;
+    Procedure;
 }
 
-struct Struct {
+struct TypeInfo {
     char* name;
+    TypeInfo* inner_type;
+    uint64 bytesize;
+    uint32 alignment;
+    Typekind kind;
+    uint32 num_ptr;
     StructField[] fields;
+    EnumEntry[] entries;
 }
 
 struct StructField {
+    TypeInfo* type_info;
     char* name;
-    uint32 typeid;
     uint32 offset;
+}
+
+struct EnumEntry {
+    char* name;
+    int64 value;
 }
 
 struct Procedure {
@@ -25,7 +44,15 @@ struct Procedure {
 
 }
 
+void print_type_info(TypeInfo* ti, void* ptr) {
+
+}
+
 /*
+    static Array rtti_types = {.length = 0, .data = (TypeInfo[]){
+        {.name = "Name", .kind = 0}
+    }};
+
     static Procedure procedures[number_of_procs] = {
         {
             .name = "test",
