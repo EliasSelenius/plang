@@ -260,7 +260,15 @@ static Datatype validateProcCall(Parser* parser, ProcCallExpression* call) {
             return correct_overload->return_type->solvedstate;
         }
 
-        error_node(parser, (NodeRef)call, "No valid overload found for \"%s\"", get_string(proc->name));
+        StringBuilder* sb = temp_builder();
+        sb_append_format(sb, "No valid overload found for \"%s(", get_string(proc->name));
+        for (int i = 0; i < argslength; i++) {
+            if (i!=0) sb_append_format(sb, ", ");
+            construct_type_string(call->args[i].expr->datatype, sb);
+        }
+        sb_append_format(sb, ")\"");
+
+        error_node(parser, (NodeRef)call, sb->content);
         return type_invalid;
     }
 
