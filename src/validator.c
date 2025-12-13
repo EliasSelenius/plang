@@ -551,9 +551,28 @@ switch (p.node->kind) {
     case Node_Sizeof: return type_ambiguousInteger;
     case Node_Parenthesized: return validate_expr_expect_type(parser, p.Parenthesized->inner_expr, expected_type);
     case Node_Compound: {
-        Datatype inner_expected_type = type_invalid; // TODO: propegate expected type for structs aswell
-        if (expected_type.kind == Typekind_Array) inner_expected_type = expected_type.array_typenode->array.element_type->solvedstate;
-        if (p.Compound->elements) { foreach (el, p.Compound->elements) validate_expr_expect_type(parser, el->expr, inner_expected_type); }
+        if (expected_type.kind == Typekind_Array || expected_type.kind == Typekind_Fixed_Array) {
+            Datatype inner_expected_type = expected_type.array_typenode->array.element_type->solvedstate;
+            if (p.Compound->elements) {
+                foreach (el, p.Compound->elements) validate_expr_expect_type(parser, el->expr, inner_expected_type);
+            }
+        } else if (expected_type.kind == Typekind_Struct) {
+            Struct* stru = expected_type.stru;
+            if (p.Compound->elements) {
+                foreach (el, p.Compound->elements) {
+                    Datatype inner_expected_type = type_invalid;
+
+                    Declaration* field = getField(stru, el->name);
+                    if (field) inner_expected_type = field->type->solvedstate;
+                    // if (!field) field = &stru->fields[el_index];
+                    validate_expr_expect_type(parser, el->expr, inner_expected_type);
+                }
+            }
+        } else {
+            if (p.Compound->elements) {
+                foreach (el, p.Compound->elements) validate_expr_expect_type(parser, el->expr, type_invalid);
+            }
+        }
         return expected_type;
     }
 
