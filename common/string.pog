@@ -164,7 +164,7 @@ string to_string(StringBuilder* sb, float32 f) {
     sb_append(sb, to_string(abs(f) as uint64));
     sb_append(sb, ".");
 
-    let frac = to_string(round(fract(abs(f)) * 1_000_000) as uint64);
+    let frac = to_string((fract(abs(f)) * 1_000_000) as uint64);
     for 0 .. 6 - frac.length   sb_append(sb, '0');
     sb_append(sb, frac);
 
