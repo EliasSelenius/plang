@@ -426,6 +426,31 @@ static bool is_implicit_deref(NodeRef ref) {
     return ref.node->kind == Node_Deref && node_is_null(ref.Deref->expr);
 }
 
+typedef struct {
+    Datatype type[2];
+} Datatype_Pair;
+
+static Datatype_Pair validate_binary_expr(Parser* parser, NodeRef p, Datatype expected_type) {
+    NodeRef expr_l = p.Binary->left;
+    NodeRef expr_r = p.Binary->right;
+
+    Datatype type_l = type_invalid;
+    Datatype type_r = type_invalid;
+
+    if (is_implicit_deref(expr_l)) {
+        type_r = validate_expr_expect_type(parser, expr_r, expected_type);
+        type_l = validate_expr_expect_type(parser, expr_l, type_r);
+    } else if (is_implicit_deref(expr_r)) {
+        type_l = validate_expr_expect_type(parser, expr_l, expected_type);
+        type_r = validate_expr_expect_type(parser, expr_r, type_l);
+    } else {
+        type_l = validate_expr_expect_type(parser, expr_l, expected_type);
+        type_r = validate_expr_expect_type(parser, expr_r, expected_type);
+    }
+
+    return (Datatype_Pair){ type_l, type_r };
+}
+
 static Datatype _validate_expr_base(Parser* parser, NodeRef p, Datatype expected_type) {
 switch (p.node->kind) {
 
@@ -437,8 +462,7 @@ switch (p.node->kind) {
     case Node_NotEquals:
     case Node_BooleanAnd:
     case Node_BooleanOr:
-        validate_expr_expect_type(parser, p.Binary->left,  expected_type);
-        validate_expr_expect_type(parser, p.Binary->right, expected_type);
+        validate_binary_expr(parser, p, expected_type);
         return type_bool;
 
     case Node_Plus:
@@ -452,23 +476,9 @@ switch (p.node->kind) {
     case Node_Bitwise_Lshift:
     case Node_Bitwise_Rshift:
     {
-        NodeRef expr_l = p.Binary->left;
-        NodeRef expr_r = p.Binary->right;
-
-        Datatype type_l = type_invalid;
-        Datatype type_r = type_invalid;
-
-        if (is_implicit_deref(expr_l)) {
-            type_r = validate_expr_expect_type(parser, expr_r, expected_type);
-            type_l = validate_expr_expect_type(parser, expr_l, type_r);
-        } else if (is_implicit_deref(expr_r)) {
-            type_l = validate_expr_expect_type(parser, expr_l, expected_type);
-            type_r = validate_expr_expect_type(parser, expr_r, type_l);
-        } else {
-            type_l = validate_expr_expect_type(parser, expr_l, expected_type);
-            type_r = validate_expr_expect_type(parser, expr_r, expected_type);
-        }
-
+        Datatype_Pair pair = validate_binary_expr(parser, p, expected_type);
+        Datatype type_l = pair.type[0];
+        Datatype type_r = pair.type[1];
 
         if (type_l.kind == Typekind_Invalid || type_r.kind == Typekind_Invalid) return type_invalid;
 
