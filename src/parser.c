@@ -349,7 +349,7 @@ static NodeRef expectStruct(Parser* parser) {
     expect(parser, Tok_OpenCurl);
 
     do {
-        Declaration field;
+        Declaration field = {0};
         field.loc = get_code_location_here(parser);
         field.kind = Node_Declaration;
 

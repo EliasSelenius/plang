@@ -581,7 +581,9 @@ switch (p.node->kind) {
     case Node_Parenthesized:  if (is_binary_expr(p.Parenthesized->inner_expr)) transpile_node(tr, p.Parenthesized->inner_expr);
                               else { tr_write("("); transpile_node(tr, p.Parenthesized->inner_expr); tr_write(")"); } return;
     case Node_Compound: {
-        if (p.Compound->datatype.kind != Typekind_Invalid) {
+        if (p.Compound->datatype.kind != Typekind_Invalid
+        &&  p.Compound->datatype.kind != Typekind_Fixed_Array)
+        {
             tr_write("("); transpile_datatype(tr, p.Compound->datatype); tr_write(") ");
             if (p.Compound->datatype.kind == Typekind_Array) {
                 tr_writef("{ .length = %d, .data = (", p.Compound->elements ? list_length(p.Compound->elements) : 0);

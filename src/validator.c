@@ -587,8 +587,8 @@ switch (p.node->kind) {
                     Datatype inner_expected_type = type_invalid;
 
                     Declaration* field = getField(stru, el->name);
+                    if (!field) field = el_index < list_length(stru->fields) ? &stru->fields[el_index] : null;
                     if (field) inner_expected_type = field->type->solvedstate;
-                    // if (!field) field = &stru->fields[el_index];
                     validate_expr_expect_type(parser, el->expr, inner_expected_type);
                 }
             }
