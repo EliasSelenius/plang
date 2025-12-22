@@ -426,6 +426,14 @@ static bool is_implicit_deref(NodeRef ref) {
     return ref.node->kind == Node_Deref && node_is_null(ref.Deref->expr);
 }
 
+// Used to determine what expresion types will inherit the expected_type from its sibling instead of its parent in binary expressions
+static bool is_type_ambiguous_expr(NodeRef ref) {
+    if (is_implicit_deref(ref)) return true;
+    if (ref.node->kind == Node_Compound) return true;
+
+    return false;
+}
+
 typedef struct {
     Datatype type[2];
 } Datatype_Pair;
@@ -437,10 +445,16 @@ static Datatype_Pair validate_binary_expr(Parser* parser, NodeRef p, Datatype ex
     Datatype type_l = type_invalid;
     Datatype type_r = type_invalid;
 
-    if (is_implicit_deref(expr_l)) {
+    bool is_amb_l = false, is_amb_r = false;
+    if (expected_type.kind == Typekind_Invalid) {
+        is_amb_l = is_type_ambiguous_expr(expr_l);
+        is_amb_r = is_type_ambiguous_expr(expr_r);
+    }
+
+    if (is_amb_l) {
         type_r = validate_expr_expect_type(parser, expr_r, expected_type);
         type_l = validate_expr_expect_type(parser, expr_l, type_r);
-    } else if (is_implicit_deref(expr_r)) {
+    } else if (is_amb_r) {
         type_l = validate_expr_expect_type(parser, expr_l, expected_type);
         type_r = validate_expr_expect_type(parser, expr_r, type_l);
     } else {
