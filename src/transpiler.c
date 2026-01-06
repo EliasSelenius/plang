@@ -257,15 +257,30 @@ static void transpile_print_call(C_Transpiler* tr, ProcCallExpression* call) {
 }
 
 static void transpile_proc_argument(C_Transpiler* tr, ProcCallExpression* call, u32 index) {
-    Datatype type = call->proc ? call->proc->arguments[index].type->solvedstate : type_invalid;
-    if (type.kind == Typekind_void && type.numPointers > 1) {
-        tr_write("(void");
-        tr_write_asterixs(tr, type.numPointers);
+    NodeRef arg = call->args[index];
+    Datatype arg_type = arg.expr->datatype;
+
+    Datatype par_type = call->proc ? call->proc->arguments[index].type->solvedstate : type_invalid;
+
+    bool tr_cast = false;
+
+    if (par_type.kind == Typekind_Dynamic_Array) {
+        Datatype elm_type = par_type.node->array.element_type->solvedstate;
+        if (elm_type.kind == Typekind_void && elm_type.numPointers == 0) {
+            tr_cast = true;
+        }
+    }
+
+    tr_cast |= par_type.kind == Typekind_void && par_type.numPointers > 1;
+
+    if (tr_cast) {
+        tr_write("(");
+        transpile_datatype(tr, par_type);
         tr_write(")(");
-        transpile_node(tr, call->args[index]);
+        transpile_node(tr, arg);
         tr_write(")");
     } else {
-        transpile_node(tr, call->args[index]);
+        transpile_node(tr, arg);
     }
 }
 
@@ -331,6 +346,10 @@ static void transpile_declaration(C_Transpiler* tr, Declaration* decl) {
         list_add(tr->static_decls, decl);
         tr_write("// static decl");
         return;
+    }
+
+    if (decl->type->solvedstate.kind == Typekind_Invalid) {
+        printf("%s:%d:%d: Invalid type kind in declaration. This is a compiler bug.\n", decl->loc.file_name, decl->loc.line, decl->loc.column);
     }
 
     transpile_declarator(tr, decl->type->solvedstate, decl->name);

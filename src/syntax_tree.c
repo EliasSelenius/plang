@@ -212,6 +212,20 @@ struct Type {
 #define type_bool    type_uint8
 
 static inline bool typeEquals(Datatype a, Datatype b) {
+    Typekind kind = a.kind;
+    u32 num_ptrs = a.numPointers;
+    if (kind != b.kind) return false;
+    if (num_ptrs != b.numPointers) return false;
+
+    switch (kind) {
+        case Typekind_Array:
+        case Typekind_Dynamic_Array:
+        case Typekind_Fixed_Array: // TODO: for fixed arrays we must also check if it has the same size
+            return typeEquals(a.node->array.element_type->solvedstate, b.node->array.element_type->solvedstate);
+
+        default: return a.data_ptr == b.data_ptr;
+    }
+
     return a.kind == b.kind && a.data_ptr == b.data_ptr && a.numPointers == b.numPointers;
 }
 

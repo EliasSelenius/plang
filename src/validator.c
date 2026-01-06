@@ -15,8 +15,20 @@ static bool typeAssignable(Datatype toType, Datatype fromType) {
 
     if (typeEquals(toType, fromType)) return true;
 
+    if (toType.kind == Typekind_void && toType.numPointers == 1) {
+        if (fromType.numPointers) return true; // any pointer of any degree can deteriorate to void*
+    }
+
     if (toType.numPointers != fromType.numPointers) return false;
     u32 numPointers = toType.numPointers;
+
+    if (toType.kind == Typekind_Dynamic_Array && fromType.kind == Typekind_Dynamic_Array) {
+        Typekind to_elm_kind = toType.node->array.element_type->solvedstate.kind;
+        Typekind from_elm_kind = fromType.node->array.element_type->solvedstate.kind;
+
+        if (to_elm_kind == Typekind_void) return true;
+        if (from_elm_kind == Typekind_void) return true;
+    }
 
     if (numPointers) { // if we are a pointer of any degree
 
@@ -45,7 +57,9 @@ static bool typeAssignable(Datatype toType, Datatype fromType) {
         case Typekind_float32:
         case Typekind_float64: return true;
         default: return false;
-    } else if (fromType.kind == Typekind_AmbiguousDecimal) switch (toType.kind) {
+    }
+
+    if (fromType.kind == Typekind_AmbiguousDecimal) switch (toType.kind) {
         case Typekind_float32:
         case Typekind_float64: return true;
         default: return false;
@@ -156,10 +170,14 @@ static char* get_temp_type_name(Datatype type) {
 }
 
 
-static void assertAssignability(Parser* parser, Datatype dst_type, Datatype src_type, NodeRef ref) {
+static void assertAssignability(Parser* parser, NodeRef node, Datatype dst_type, Datatype src_type, Identifier proc_name) {
     if (typeAssignable(dst_type, src_type)) return;
 
-    error_node(parser, ref, "Type missmatch. \"%s\" is not assignable to \"%s\".", get_temp_type_name(src_type), get_temp_type_name(dst_type));
+    char* src_str = get_temp_type_name(src_type);
+    char* dst_str = get_temp_type_name(dst_type);
+
+    if (proc_name) error_node(parser, node, "Return type missmatch. \"%s\" is not assignable to \"%s\". In function \"%s\".", src_str, dst_str, get_string(proc_name));
+    else           error_node(parser, node, "Type missmatch. \"%s\" is not assignable to \"%s\".", src_str, dst_str);
 }
 
 static Datatype typeofStatement(Statement* sta) {
@@ -295,7 +313,7 @@ static void validate_declaration(Parser* parser, Declaration* decl) {
         if (type.kind == Typekind_Invalid) return;
 
         if (decl->type->kind == Node_Type_MustInfer) decl->type->solvedstate = resolveTypeAmbiguity(type);
-        else assertAssignability(parser, decl->type->solvedstate, type, decl->expr);
+        else assertAssignability(parser, decl->expr, decl->type->solvedstate, type, 0);
     }
 }
 
@@ -623,7 +641,7 @@ switch (p.node->kind) {
         Datatype src = validate_expr_expect_type(parser, p.Assignment->src_expr, dst);
         // TODO: this only works for normal assignment, but not for += -= etc
         //       make it so this uses operator list
-        assertAssignability(parser, dst, src, p.Assignment->src_expr);
+        assertAssignability(parser, p.Assignment->src_expr, dst, src, 0);
     } return;
 
 
@@ -639,7 +657,7 @@ switch (p.node->kind) {
         if (p.ForStmt->iterator_assignment.node) { // TODO: this is doing the job of an assignment, abstract away...
             Datatype it_type = validate_expr_expect_type(parser, p.ForStmt->iterator_assignment, p.ForStmt->index_type->solvedstate);
             if (p.ForStmt->index_type->kind == Node_Type_MustInfer) p.ForStmt->index_type->solvedstate = it_type;
-            else assertAssignability(parser, p.ForStmt->index_type->solvedstate, it_type, p.ForStmt->iterator_assignment);
+            else assertAssignability(parser, p.ForStmt->iterator_assignment, p.ForStmt->index_type->solvedstate, it_type, 0);
         }
         validate_expr(parser, p.ForStmt->min_expr);
         if (p.ForStmt->max_expr.node) validate_expr(parser, p.ForStmt->max_expr);
@@ -651,10 +669,11 @@ switch (p.node->kind) {
     case Node_BreakStmt: return;
     case Node_ReturnStmt: { // TODO: this is kinda similar to an 'assignment' (see TODO in case Node_ForStmt) consider abstracting away
         Datatype type = type_void;
-        if (p.ReturnStmt->expr.node) type = validate_expr_expect_type(parser, p.ReturnStmt->expr, parser->procedure->return_type->solvedstate);
+        Type* ret_type = parser->procedure->return_type;
+        if (p.ReturnStmt->expr.node) type = validate_expr_expect_type(parser, p.ReturnStmt->expr, ret_type->solvedstate);
         if (type.kind == Typekind_Invalid) return;
-        if (parser->procedure->return_type->kind == Node_Type_MustInfer) parser->procedure->return_type->solvedstate = resolveTypeAmbiguity(type);
-        else if (!typeAssignable(parser->procedure->return_type->solvedstate, type)) error_node(parser, p, "Return type missmatch in function \"%s\".", get_string(parser->procedure->name));
+        if (ret_type->kind == Node_Type_MustInfer) ret_type->solvedstate = resolveTypeAmbiguity(type);
+        else assertAssignability(parser, p, ret_type->solvedstate, type, parser->procedure->name);
     } return;
 
     case Node_GotoStmt: return;
