@@ -109,7 +109,6 @@ float64 parse_float(char* c_str, uint32* length) {
 }
 
 
-// TODO: make signed overloads
 string to_string(uint32 num) { return to_string(num as uint64); }
 string to_string(uint64 num) {
     char[21] num_str = {}; // 20 is max char size for 64 bit integer
@@ -171,11 +170,22 @@ string to_string(StringBuilder* sb, float32 f) {
     return to_string(sb);
 }
 
+bool string_equals(char* a, b) return string_equals(make_string(a), make_string(b));
 bool string_equals(char* a, string b) return string_equals(make_string(a), b);
 bool string_equals(string a, char* b) return string_equals(a, make_string(b));
 bool string_equals(string a, string b) {
     if a.length != b.length return false;
     for i : 0 .. a.length if a.chars[i] != b.chars[i] return false;
+    return true;
+}
+
+bool starts_with(string text, start) {
+    if text.length < start.length return false;
+
+    for 0 .. start.length {
+        if to_lower(text.chars[it]) != to_lower(start.chars[it]) return false;
+    }
+
     return true;
 }
 
@@ -188,6 +198,8 @@ bool starts_with(char* text, char* start) {
 
     return true;
 }
+
+// bool contains_substr(string a, b) {}
 
 string substr_until(char* str, char delim) {
     string res = { str, 0 };
@@ -279,6 +291,9 @@ bool is_whitespace_or_empty(string str) {
     return true;
 }
 
+char to_upper(char c) return is_lower_case_letter(c) ? c + 'A'-'a' : c;
+char to_lower(char c) return is_upper_case_letter(c) ? c + 'a'-'A' : c;
+
 string alloc_string_copy(char* str) { return alloc_string_copy(make_string(str)); }
 string alloc_string_copy(string str) {
     string res = {};
@@ -296,7 +311,6 @@ string alloc_string_copy(string str) {
 
 // Levenshtein edit distance
 //   naive implementation
-//   TODO: maybe implement Wagner-Fischer algorithm
 uint32 lev(string a, string b) {
     string tail(string str) {
         return { str.chars + 1, str.length - 1 };
@@ -314,7 +328,46 @@ uint32 lev(string a, string b) {
     return i + 1;
 }
 
+// Levenshtein edit distance
+//   Wagner-Fischer algorithm
+uint32 lev_(string a, b) {
+    uint32 rows = (a.length+1);
+    uint32 cols = (b.length+1);
+    uint32* slots = calloc(rows * cols, sizeof uint32);
 
+    uint32 ind(uint32 s, int32 r, c) return s*r + c;
+
+    for 0 .. rows  slots[ind(cols, it, 0)] = it;
+    for 0 .. cols  slots[ind(cols, 0, it)] = it;
+
+    for i: 1 .. rows for j: 1 .. cols  {
+
+        uint32 dels = slots[ind(cols, i-1, j)] + 1
+        uint32 inse = slots[ind(cols, i, j-1)] + 1
+        uint32 subs = slots[ind(cols, i-1, j-1)] + (a.chars[i-1] != b.chars[j-1]) as uint32;
+
+        slots[ind(cols, i, j)] = min(dels, min(inse, subs));
+    }
+
+    if false { // visualize matrix
+        print("   ");
+        for 1 .. cols print(" ", b.chars[it-1]);
+        print("\n");
+
+        for i: 0 .. rows {
+            if i != 0 print(a.chars[i-1]);
+            else print(" ");
+            for j: 0 .. cols {
+                print(" ", slots[ind(cols, i, j)]);
+            }
+            print("\n");
+        }
+    }
+
+    uint32 result = slots[ind(cols, rows-1, cols-1)];
+    free(slots);
+    return result;
+}
 
 
 
@@ -347,6 +400,11 @@ StringBuilder* temp_builder() {
     return sb;
 }
 
+char* temp_cstr(string str) {
+    let sb = temp_builder();
+    sb_append(sb, str);
+    return sb.content;
+}
 
 /* TODO: all these overloads are stupid. something like this would be better:
     char* concat(any[] params...) {
