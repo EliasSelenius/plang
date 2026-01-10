@@ -28,6 +28,9 @@ uint64 strlen(char* str);
 
 void exit(int32 code);
 
+void qsort(void* ptr, uint64 count, size, int32(void*, void*) comp);
+
+
 void assert(bool test) {
     // TODO: print line number and file name and other useful info.
     // this function probably needs some compiler specific functionality:

@@ -280,7 +280,18 @@ static void lex(Parser* parser, char* input) {
         // string
         if (*cursor == '"') {
             char* strStart = cursor + 1;
-            while ( !(*++cursor == '"' && *(cursor - 1) != '\\') ) {
+            bool escape = false;
+            while (true) {
+                cursor++;
+
+                if (escape) {
+                    escape = false;
+                } else {
+                    if (*cursor == '"') break;
+                    if (*cursor == '\\') escape = true;
+                }
+
+
                 if (*cursor == '\n') {
                     // TODO: consider whether we want to allow multi-line strings
                     lexer_error(parser, "Strings cannot contain new-lines.");

@@ -342,8 +342,8 @@ uint32 lev_(string a, b) {
 
     for i: 1 .. rows for j: 1 .. cols  {
 
-        uint32 dels = slots[ind(cols, i-1, j)] + 1
-        uint32 inse = slots[ind(cols, i, j-1)] + 1
+        uint32 dels = slots[ind(cols, i-1, j)] + 1;
+        uint32 inse = slots[ind(cols, i, j-1)] + 1;
         uint32 subs = slots[ind(cols, i-1, j-1)] + (a.chars[i-1] != b.chars[j-1]) as uint32;
 
         slots[ind(cols, i, j)] = min(dels, min(inse, subs));
