@@ -231,8 +231,9 @@ static Scope* expectScope(Parser* parser) {
     expect(parser, Tok_OpenCurl);
     while (!tok(parser, Tok_CloseCurl)) {
         NodeRef ref = expect_node(parser);
-        if (!ref.node) continue; // there must have been an error.
+        again:
 
+        if (!ref.node) continue; // there must have been an error.
         list_add(scope->statements, ref);
 
         switch (ref.node->kind) {
@@ -254,6 +255,25 @@ static Scope* expectScope(Parser* parser) {
                 declare_local_type(parser, ref);
 
             default: break;
+        }
+
+        if (parser->multi_declaration) {
+            Declaration* decl = alloc_node(parser, Node_Declaration).Declaration;
+            decl->loc = get_code_location_here(parser);
+            decl->type = parser->multi_declaration->type;
+            decl->name = identifier(parser);
+
+            if (tok(parser, Tok_Assign)) decl->expr = expect_expr(parser);
+
+            if (tok(parser, Tok_Comma)) {
+                parser->multi_declaration = decl;
+            } else {
+                semicolon(parser);
+                parser->multi_declaration = null;
+            }
+
+            ref = (NodeRef)decl;
+            goto again;
         }
     }
 

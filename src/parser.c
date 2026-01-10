@@ -451,7 +451,12 @@ static NodeRef proc_or_var(Parser* parser, bool declare_localy) {
 
     if (tok(parser, Tok_Assign)) decl->expr = expect_expr(parser);
 
-    semicolon(parser);
+    if (tok(parser, Tok_Comma)) {
+        parser->multi_declaration = decl;
+    } else {
+        semicolon(parser);
+    }
+
     return (NodeRef)decl;
 }
 

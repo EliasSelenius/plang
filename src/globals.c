@@ -120,6 +120,8 @@ typedef struct Parser {
     Unit* current_unit;
     char* current_file_name;
 
+    Declaration* multi_declaration;
+
     Scope* scope;         // current scope being parsed
     Procedure* procedure; // current procedure that is being validated
 
