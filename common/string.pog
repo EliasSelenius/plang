@@ -15,7 +15,7 @@ struct string {
 */
 
 
-string make_string(char* c_str) return { c_str, strlen(c_str) };
+string make_string(char* c_str) return c_str ? { c_str, strlen(c_str) } : {};
 string make_string(char* c_str, uint32 len) return { c_str, len };
 
 // TODO: shouldnt this be a pow overload in math.pog
