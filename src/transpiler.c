@@ -434,6 +434,12 @@ static void transpile_local_procedures(C_Transpiler* tr, NodeRef ref) {
 }
 
 static void transpile_procedure(C_Transpiler* tr, Procedure* proc) {
+    if (node_is_null(proc->sub_node)) {
+        transpile_proc_signature(tr, proc);
+        tr_write(";");
+        return;
+    }
+
     transpile_local_procedures(tr, proc->sub_node);
     transpile_proc_signature(tr, proc);
     tr_write(" ");
@@ -919,7 +925,6 @@ void transpile(Codebase* codebase) {
         tr_write("\n// Implementations\n");
         for (u32 i = 0; i < procs_count; i++) {
             Procedure* proc = codebase->procedures[i];
-            if (node_is_null(proc->sub_node)) continue;
             transpile_procedure(tr, proc);
         }
 
