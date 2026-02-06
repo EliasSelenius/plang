@@ -436,7 +436,7 @@ static void transpile_local_procedures(C_Transpiler* tr, NodeRef ref) {
 static void transpile_procedure(C_Transpiler* tr, Procedure* proc) {
     if (node_is_null(proc->sub_node)) {
         transpile_proc_signature(tr, proc);
-        tr_write(";");
+        tr_write(";\n");
         return;
     }
 
