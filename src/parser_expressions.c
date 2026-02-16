@@ -54,7 +54,7 @@ static NodeRef expect_leaf(Parser* parser) {
 
                 el.expr = expect_expr(parser);
                 list_add(p.Compound->elements, el);
-            } while (tok(parser, Tok_Comma));
+            } while (tok(parser, Tok_Comma) && peek(parser).type != Tok_CloseCurl);
 
             expect(parser, Tok_CloseCurl);
         } break;
