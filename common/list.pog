@@ -105,7 +105,10 @@ void* list_insert(void[..]* list, uint32 index, void* data) {
 }
 
 void* list_pop(void[..] list) {
-    void* res = list_last_item(list);
-    list_head(list).length--;
+    uint32 len = list_length(list);
+    if len == 0 return null;
+
+    void* res = list_get(list, len - 1);
+    list_set_length(list, len - 1);
     return res;
 }
