@@ -40,6 +40,7 @@ static Identifier register_string(StrSpan word) {
     X(int64) \
     X(uint64) \
     X(float32) \
+    X(float) \
     X(float64) \
     X(char) \
     X(void) \

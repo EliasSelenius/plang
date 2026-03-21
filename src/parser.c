@@ -179,6 +179,7 @@ static void resolve_typenode(Parser* parser, Type* type, Codebase* codebase) {
             if (type->name == builtin_string_int64)   { datatype = type_int64; break; }
             if (type->name == builtin_string_uint64)  { datatype = type_uint64; break; }
             if (type->name == builtin_string_float32) { datatype = type_float32; break; }
+            if (type->name == builtin_string_float)   { datatype = type_float32; break; }
             if (type->name == builtin_string_float64) { datatype = type_float64; break; }
             if (type->name == builtin_string_char)    { datatype = type_char; break; }
             if (type->name == builtin_string_void)    { datatype = type_void; break; }
