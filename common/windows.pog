@@ -4,6 +4,8 @@
 type HANDLE = void*;
 const INVALID_HANDLE_VALUE = -1 as HANDLE;
 
+bool32 CloseHandle(HANDLE hObject);
+
 
 struct FILETIME {
     uint32 dwLowDateTime;
@@ -73,7 +75,23 @@ const PAGE_READWRITE         = 0x04;
 const PAGE_EXECUTE_READWRITE = 0x40;
 
 
+struct Win32_Security_Attributes {
+    uint32 nLength;
+    void* lpSecurityDescriptor;
+    bool32 bInheritHandle;
+}
 
+HANDLE CreateThread(
+    Win32_Security_Attributes*  lpThreadAttributes,
+    uint64                      dwStackSize,
+    uint32(void*)               lpStartAddress,
+    void*                       lpParameter,
+    uint32                      dwCreationFlags,
+    uint32*                     lpThreadId);
+
+uint32 SuspendThread(HANDLE hThread);
+uint32 ResumeThread(HANDLE hThread);
+HANDLE GetCurrentThread();
 
 
 
@@ -83,3 +101,4 @@ void* vmem_reserve(uint64 size)                { return VirtualAlloc(null,    si
 void vmem_release(void* address)               {        VirtualFree (address, 0,    MEM_RELEASE);                 }
 void vmem_commit(void* address, uint64 size)   {        VirtualAlloc(address, size, MEM_COMMIT,  PAGE_READWRITE); }
 void vmem_decommit(void* address, uint64 size) {        VirtualFree (address, size, MEM_DECOMMIT);                }
+

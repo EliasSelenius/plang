@@ -450,6 +450,13 @@ void sb_grow(StringBuilder* sb, uint32 len) {
     }
 }
 
+void ensure_size(StringBuilder* sb, uint32 size) {
+    if sb.capacity < size {
+        uint32 len = size - sb.capacity;
+        sb_grow(sb, len);
+    }
+}
+
 void sb_append(StringBuilder* sb, char* str) sb_append(sb, make_string(str));
 void sb_append(StringBuilder* sb, string str) {
     sb_grow(sb, str.length);

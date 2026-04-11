@@ -1,5 +1,6 @@
 
 type bool = uint8;
+type bool32 = int32;
 type byte = uint8;
 
 type FILE;
