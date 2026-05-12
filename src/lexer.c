@@ -178,10 +178,7 @@ static void lex(Parser* parser, char* input) {
 
 
             Token token = construct_token_here(tokType);
-            if (token.type == Tok_Word) {
-                token.data.string = register_string(word);
-            }
-
+            token.data.string = register_string(word);
             list_add(parser->tokens, token);
 
             continue;

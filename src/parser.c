@@ -14,6 +14,8 @@ static Token expect(Parser* parser, TokenType type) {
 
 static Identifier identifier(Parser* parser) {
     Token token = advance(parser);
+    if (token.type == Tok_Keyword_Or) return token.data.string;
+    if (token.type == Tok_Keyword_And) return token.data.string;
     if (token.type == Tok_Word) return token.data.string;
     fatal_parse_error(parser, "Invalid identifier: %s", TokenType_Names[token.type]);
 }

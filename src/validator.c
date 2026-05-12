@@ -194,21 +194,34 @@ static Datatype typeofStatement(Statement* sta) {
     }
 }
 
-static Procedure* searchMatchingOverload(Procedure* proc, ProcCallExpression* call) {
+static Procedure* searchMatchingOverload(Procedure* starting_proc, ProcCallExpression* call) {
+    if (starting_proc->next_overload == null) return starting_proc;
+
     u32 argslen = call->args ? list_length(call->args) : 0;
 
-    Procedure* starting_proc = proc;
+    Procedure *proc_exact = null, *proc_assignable = null;
+    Procedure* proc = starting_proc;
     do {
-        if (argslen != (proc->arguments ? list_length(proc->arguments) : 0)) goto next;
+        if (argslen != (proc->arguments ? list_length(proc->arguments) : 0)) continue;
 
-        for (u32 i = 0; i < argslen; i++)
-            if (!typeAssignable(proc->arguments[i].type->solvedstate, call->args[i].expr->datatype)) goto next;
+        bool assignable = true;
+        bool exact = true;
 
-        return proc;
-        next:
-        proc = proc->next_overload;
-    } while (proc && (proc != starting_proc));
+        for (u32 i = 0; i < argslen; i++) {
+            Datatype param = proc->arguments[i].type->solvedstate;
+            Datatype argum = call->args[i].expr->datatype;
 
+            exact = exact && typeEquals(param, argum);
+            assignable = assignable && typeAssignable(param, argum);
+        }
+
+        if (exact) proc_exact = proc;
+        if (assignable) proc_assignable = proc;
+
+    } while ((proc = proc->next_overload) != starting_proc);
+
+    if (proc_exact) return proc_exact;
+    if (proc_assignable) return proc_assignable;
     return null;
 }
 
@@ -228,8 +241,13 @@ foo.bar();
 */
 
 static Procedure* get_possibly_overloaded_proc(NodeRef p) {
+    if (node_is_null(p)) return null;
     switch (p.node->kind) {
-        case Node_Variable: if (p.Variable->ref.node->kind == Node_Procedure) return p.Variable->ref.Procedure; else return null;
+        case Node_Variable: {
+            if (node_is_null(p.Variable->ref)) return null;
+            if (p.Variable->ref.node->kind == Node_Procedure) return p.Variable->ref.Procedure;
+            else return null;
+        }
 
         // TODO: when contextual-inclusion on arguments are implemented, then this expression may return a Procedure that could be overloaded
         // case Node_Deref: {
@@ -269,7 +287,6 @@ static Datatype validateProcCall(Parser* parser, ProcCallExpression* call) {
     }
 
 
-    // Special case for overloaded procedures
     Procedure* proc = get_possibly_overloaded_proc(call->proc_expr);
     if (proc) {
         Procedure* correct_overload = searchMatchingOverload(proc, call);
