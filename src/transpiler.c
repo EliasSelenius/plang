@@ -220,15 +220,15 @@ static void transpile_print_call(C_Transpiler* tr, ProcCallExpression* call) {
                         }
 
                         if (field->type->solvedstate.kind == Typekind_string) {
-                            transpile_node(tr, *arg);
+                            tr_write("(");transpile_node(tr, *arg);tr_write(")");
                             tr_writef(".%s", get_string(field->name));
                             tr_write(".length, ");
 
-                            transpile_node(tr, *arg);
+                            tr_write("(");transpile_node(tr, *arg);tr_write(")");
                             tr_writef(".%s", get_string(field->name));
                             tr_write(".chars, ");
                         } else {
-                            transpile_node(tr, *arg);
+                            tr_write("(");transpile_node(tr, *arg);tr_write(")");
                             tr_writef(".%s, ", get_string(field->name));
                         }
                     }
@@ -236,9 +236,9 @@ static void transpile_print_call(C_Transpiler* tr, ProcCallExpression* call) {
                 } continue;
 
                 case Typekind_string: {
-                    transpile_node(tr, *arg); // TODO: if node is a large expression with side effects then transpiling it twice is obviously wrong
+                    tr_write("(");transpile_node(tr, *arg);tr_write(")"); // TODO: if node is a large expression with side effects then transpiling it twice is obviously wrong
                     tr_write(".length, ");
-                    transpile_node(tr, *arg);
+                    tr_write("(");transpile_node(tr, *arg);tr_write(")");
                     tr_write(".chars");
                 } continue;
 
