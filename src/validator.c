@@ -725,7 +725,9 @@ static void validate(Parser* parser, Codebase* cb) {
     }
 
     foreach (decl, cb->global_vars) {
-        validate_declaration(parser, *decl);
+        if ((*decl)->expr.node && (*decl)->type->kind == Node_Type_MustInfer) {
+            validate_declaration(parser, *decl);
+        }
     }
 
     foreach (con, cb->global_consts) {
@@ -735,5 +737,14 @@ static void validate(Parser* parser, Codebase* cb) {
     parser->procedure = null;
     foreach (proc, cb->procedures) {
         validate_procedure(parser, *proc);
+    }
+
+    {
+        foreach (decl, cb->global_vars) {
+            if ((*decl)->expr.node && (*decl)->type->kind == Node_Type_MustInfer);
+            else {
+                validate_declaration(parser, *decl);
+            }
+        }
     }
 }
