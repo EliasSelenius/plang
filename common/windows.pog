@@ -102,3 +102,7 @@ void vmem_release(void* address)               {        VirtualFree (address, 0,
 void vmem_commit(void* address, uint64 size)   {        VirtualAlloc(address, size, MEM_COMMIT,  PAGE_READWRITE); }
 void vmem_decommit(void* address, uint64 size) {        VirtualFree (address, size, MEM_DECOMMIT);                }
 
+void debug_break() {
+    void DebugBreak();
+    DebugBreak();
+}
