@@ -34,7 +34,7 @@ void[] as_span(void[..] list) {
     return span;
 }
 
-void list_grow(void[..]* list, uint32 new_capacity) {
+void list_realloc(void[..]* list, uint32 new_capacity) {
     List* head = list_head(@list);
 
     head.capacity = new_capacity;
@@ -47,7 +47,7 @@ void* list_add(void[..]* list, void* data) {
     let cap = list_capacity(@list);
     let stride = list_stride(@list);
 
-    if cap == len  list_grow(list, cap * 2);
+    if cap == len  list_realloc(list, cap * 2);
 
     void* dst = (@list as byte*) + len * stride;
     if data  memcpy(dst, data, stride);
@@ -56,6 +56,7 @@ void* list_add(void[..]* list, void* data) {
     return dst;
 }
 
+void* list_add(void[..]* list) return list_add(list, null);
 void* list_append(void[..]* list) { return list_add(list, null); }
 
 void* list_get(void[..] list, int32 index) { return (list as byte*) + (list_stride(list) as int32) * index; }

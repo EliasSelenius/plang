@@ -124,7 +124,7 @@ void write_binary_file(char* filename, uint8[] buffer) {
     fclose(file);
 }
 
-const ArenaSize = 0xFFFF_FFFF;
+const ArenaSize = 256 * 1024 * 1024; // 0xFFFF_FFFF;
 struct Arena {
     uint32 top;
 }
@@ -148,11 +148,8 @@ uint64 align(uint64 value, align) {
 }
 
 void* arena_alloc(Arena* arena, uint32 size) {
-    // TODO: we should do alignment here
-
     uint64 result = (arena as uint64) + arena.top;
     result = align(result, 8);
-
 
 
     arena.top += size; // we're not even including possible padding that may occure due to alignment! smh my head....
