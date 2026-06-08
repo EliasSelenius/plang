@@ -43,13 +43,14 @@ void assert(bool test) {
     if test return;
 
     print("Assertion Failed.\n");
-    exit(1);
+    debug_break();
 }
 
 FILE* open_file(char* file, mode) {
     FILE* res = null;
     if fopen_s(*res, file, mode) {
         print("ERROR: Could not open file \"", file, "\".\n");
+        debug_break();
         return null;
     }
     return res;
