@@ -355,10 +355,21 @@ static void validateEnum(Parser* parser, Enum* en) {
         if (entry->expr.node) {
             validate_expr(parser, entry->expr); // TODO: evaluate expression value
 
-            if (entry->expr.node->kind == Node_Literal_Integer) {
-                entry_value = entry->expr.Literal->data.integer;
+            NodeRef ref = entry->expr;
+            if (ref.node->kind == Node_Variable) {
+                NodeRef var_ref = ref.Variable->ref;
+                if (var_ref.node && var_ref.node->kind == Node_Constant) {
+                    ref = var_ref.Constant->expr;
+                }
+            }
+
+            if (ref.node->kind == Node_Literal_Integer) {
+                entry_value = ref.Literal->data.integer;
+            } else {
+                error_node(parser, (NodeRef)entry, "Unable to determine value of enum entry \"%s\".", get_string(entry->name));
             }
         }
+
         entry->value = entry_value++;
     }
 }
