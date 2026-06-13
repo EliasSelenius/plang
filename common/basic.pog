@@ -92,9 +92,9 @@ void filewrite(string filename, char* content) {
 }
 
 
-uint8[] read_binary_file(char* filename) {
+byte[] read_binary_file(char* filename) {
     FILE* file = open_file(filename, "rb");
-    uint8[] buffer;
+    byte[] buffer;
     // TODO: this is stupid, but its the only way to create a 'null' array
     buffer.data = null;
     buffer.length = 0;
@@ -113,15 +113,15 @@ uint8[] read_binary_file(char* filename) {
 }
 
 void write_binary_file(char* filename, void* data, uint64 bytes) {
-    uint8[] buffer = {};
+    byte[] buffer = {};
     buffer.data = data;
     buffer.length = bytes;
     write_binary_file(filename, buffer);
 }
 
-void write_binary_file(char* filename, uint8[] buffer) {
+void write_binary_file(char* filename, byte[] buffer) {
     FILE* file = open_file(filename, "wb");
-    fwrite(buffer.data, sizeof uint8, buffer.length, file);
+    fwrite(buffer.data, sizeof byte, buffer.length, file);
     fclose(file);
 }
 

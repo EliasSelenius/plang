@@ -548,18 +548,97 @@ void sb_clear(StringBuilder* sb) {
 
 // ------------String-Reader---(generic-tokenizer)----------------
 
-struct StringReader {
-    char* current;
-    uint32 line;
-    uint32 column;
+enum Tokenkind {
+    unknown;
+    whitespace;
+    word;
+    keyword;
+    punctuation;
+    integer;
+    decimal;
+    string_literal;
+    comment;
+    end_of_input;
 }
 
-struct SR_Token {
-    string str;
-    uint32 line;
-    uint32 column;
+struct Token {
+    string text;
+    Tokenkind kind;
 }
 
-// SR_Token read_token(with StringReader* sr) {
-//     if @sr.current == 0  return 
-// }
+Token get_next_token(char* start) {
+    Token token = {0};
+    token.text.chars = start;
+    token.text.length = 0;
+    token.kind = .unknown;
+
+    if @start == '\0' {
+        token.kind = .end_of_input;
+        return token;
+    }
+
+    if is_letter(@start) or @start == '_' {
+        token.kind = .word;
+
+        int32 is_word_char(char c) {
+            return is_alphanumeric(c) or c == '_';
+        }
+
+        while is_word_char(start[++token.text.length]);
+        return token;
+    }
+
+    if is_whitespace(@start) {
+        token.kind = .whitespace;
+
+        while is_whitespace(start[++token.text.length]);
+        return token;
+    }
+
+    if is_digit(@start) {
+        token.kind = .integer;
+        while is_digit(start[++token.text.length]);
+
+        if start[token.text.length] == '.' {
+            token.text.length++;
+            token.kind = .decimal;
+            while is_digit(start[++token.text.length]);
+        }
+
+        return token;
+    }
+
+    if start[0] == '/' and start[1] == '/' {
+        token.kind = .comment;
+
+        while start[++token.text.length];
+        return token;
+    }
+
+    if @start == '"' or @start == '\'' {
+        let end = @start;
+        token.kind = .string_literal;
+
+        bool escape = false;
+        while true {
+            let c = start[++token.text.length];
+            if escape { escape = false; continue; }
+            if c == '\\' { escape = true; continue; }
+            if c == end break;
+            if c == 0 break;
+        }
+
+        token.text.length++;
+        return token;
+    }
+
+    if is_punctuation(@start) {
+        token.kind = .punctuation;
+        token.text.length = 1;
+        return token;
+    }
+
+    token.text.length = 1;
+    return token;
+}
+
