@@ -113,29 +113,38 @@ byte[] read_binary_file(char* filename) {
 }
 
 void write_binary_file(char* filename, void* data, uint64 bytes) {
-    byte[] buffer = {};
-    buffer.data = data;
-    buffer.length = bytes;
-    write_binary_file(filename, buffer);
-}
-
-void write_binary_file(char* filename, byte[] buffer) {
     FILE* file = open_file(filename, "wb");
-    fwrite(buffer.data, sizeof byte, buffer.length, file);
+    fwrite(data, sizeof byte, bytes, file);
     fclose(file);
 }
 
-const ArenaSize = 256 * 1024 * 1024; // 0xFFFF_FFFF;
+void write_binary_file(char* filename, byte[] buffer) {
+    write_binary_file(filename, buffer.data, buffer.length as uint64);
+}
+
+const kB = 1024;
+const MB = kB*kB;
+const GB = MB*kB;
+
+const ArenaSize = 256*MB;
 struct Arena {
-    uint32 top;
+    uint64 bytes;
 }
 
 Arena* arena_create() {
     Arena* arena = vmem_reserve(ArenaSize);
-    uint32 size = sizeof(Arena);
-    vmem_commit(arena, size as uint64);
-    arena.top = size;
+    uint64 size = sizeof(Arena);
+    vmem_commit(arena, size);
+    arena.bytes = size;
     return arena;
+}
+
+void arena_reset(Arena* arena) {
+    arena.bytes = sizeof Arena;
+}
+
+void arena_release(Arena* arena) {
+    vmem_release(arena);
 }
 
 void* arena_bottom(Arena* arena) {
@@ -148,16 +157,30 @@ uint64 align(uint64 value, align) {
     return res + align;
 }
 
-void* arena_alloc(Arena* arena, uint32 size) {
-    uint64 result = (arena as uint64) + arena.top;
-    result = align(result, 8);
+void* arena_alloc(Arena* arena, uint32 size) return arena_alloc(arena, size, 8);
+void* arena_alloc(Arena* arena, uint32 size, alignment) {
+    uint64 arena_addr = arena as uint64;
+    uint64 addr = align(arena_addr + arena.bytes, alignment as uint64);
 
+    arena.bytes = addr + size - arena_addr;
+    vmem_commit(arena, arena.bytes);
 
-    arena.top += size; // we're not even including possible padding that may occure due to alignment! smh my head....
-    vmem_commit(arena, arena.top as uint64);
-    return result as void*;
+    return addr as void*;
 }
 
-void arena_release(Arena* arena) {
-    vmem_release(arena);
+string arena_string(Arena* arena, char* str) return arena_string(arena, make_string(str));
+string arena_string(Arena* arena, string str) {
+    string res = {};
+    res.chars = arena_alloc(arena, str.length+1, 1);
+    res.length = str.length;
+    memcpy(res.chars, str.chars, str.length);
+    res.chars[str.length] = 0;
+    return res;
+}
+
+void[] arena_array(Arena* arena, uint32 size, count) {
+    void[] array;
+    array.data = arena_alloc(arena, size*count);
+    array.length = count;
+    return array;
 }
