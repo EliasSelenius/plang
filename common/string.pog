@@ -498,6 +498,36 @@ void sb_append(StringBuilder* sb, vec2 v) {
     sb_append(sb, v.y);
 }
 
+void sb_append(StringBuilder* sb, uint32 num) sb_append(sb, num as uint64);
+void sb_append(StringBuilder* sb, uint64 num) {
+    if num == 0 {
+        sb_append(sb, '0');
+        return;
+    }
+
+    char[21] num_str = {}; // 20 is max char size for 64 bit integer
+
+    uint32 i = 20;
+    while num != 0 {
+        uint8 r = (num % 10) as uint8;
+        num /= 10;
+        num_str[--i] = '0' + r as char;
+    }
+
+    string str = { *num_str[i], 20 - i };
+    sb_append(sb, str);
+}
+
+void sb_append(StringBuilder* sb, int32 num) sb_append(sb, num as int64);
+void sb_append(StringBuilder* sb, int64 num) {
+    if num < 0 {
+        sb_append(sb, '-');
+        num = -num;
+    }
+
+    sb_append(sb, num as uint64);
+}
+
 void sb_insert(StringBuilder* sb, uint32 loc, string str) {
     sb_grow(sb, str.length);
 
