@@ -157,7 +157,20 @@ uint64 align(uint64 value, align) {
     return res + align;
 }
 
-void* arena_alloc(Arena* arena, uint32 size) return arena_alloc(arena, size, 8);
+void* arena_alloc(Arena* arena, uint32 size) {
+    uint32 alignment = 8;
+
+    if size == 1   alignment = 1;
+    if size == 2   alignment = 2;
+    if size == 3   alignment = 2;
+    if size == 4   alignment = 4;
+    if size == 5   alignment = 4;
+    if size == 6   alignment = 4;
+    if size == 7   alignment = 4;
+
+    return arena_alloc(arena, size, alignment);
+}
+
 void* arena_alloc(Arena* arena, uint32 size, alignment) {
     uint64 arena_addr = arena as uint64;
     uint64 addr = align(arena_addr + arena.bytes, alignment as uint64);
