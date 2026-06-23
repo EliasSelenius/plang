@@ -942,6 +942,18 @@ void transpile(Codebase* codebase) {
             tr_write(";\n");
         }
 
+        {
+            tr_write("\n// Symbols\n");
+            tr_writef("static Array Globals = {.length=%d, .data=(Symbol[]){\n", list_length(codebase->global_vars));
+            foreach (global_var, codebase->global_vars) {
+                Declaration* decl = *global_var;
+                u32 type_index = transpiler_type_table_index(tr, decl->type->solvedstate);
+                char* name = get_string(decl->name);
+                tr_writef("    {(rtti_types+%d), &%s, {\"%s\", %d}},\n", type_index, name, name, strlen(name));
+            }
+            tr_write("}};\n");
+        }
+
         tr_write(impl_sb.content);
         sbDestroy(&impl_sb);
     }

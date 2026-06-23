@@ -44,6 +44,12 @@ struct Procedure {
 
 }
 
+struct Symbol {
+    TypeInfo* type_info;
+    void* ptr;
+    string name;
+}
+
 void print_type_info(TypeInfo* ti, void* ptr) {
 
 }
