@@ -714,13 +714,13 @@ static u32 countStructDependencies(Struct* stru) {
     return deps;
 }
 
-u32 transpiler_type_table_index(C_Transpiler* tr, Datatype dt) {
-    u32 type_table_length = list_length(tr->type_table);
-    for (u32 i = 0; i < type_table_length; i++) {
+s64 transpiler_type_table_index(C_Transpiler* tr, Datatype dt) {
+    s64 type_table_length = (s64)list_length(tr->type_table);
+    for (s64 i = 0; i < type_table_length; i++) {
         if (typeEquals(tr->type_table[i], dt)) return i;
     }
 
-    return 0;
+    return -1;
 }
 
 void transpile_type_info(C_Transpiler* tr, Datatype dt) {
@@ -749,9 +749,12 @@ void transpile_type_info(C_Transpiler* tr, Datatype dt) {
 
                     Declaration decl = stru->fields[j];
                     char* field_name = get_string(decl.name);
-                    u32 type_info = transpiler_type_table_index(tr, decl.type->solvedstate);
-                    u32 offset = decl.offset;
-                    tr_writef("{.type_info = (rtti_types+%d), .name = \"%s\", .offset = %d},", type_info, field_name, offset);
+                    s64 type_info = transpiler_type_table_index(tr, decl.type->solvedstate);
+                    if (type_info == -1) {
+                        tr_writef("{.type_info = 0, .name = \"%s\", .offset = %d},", field_name, decl.offset);
+                    } else {
+                        tr_writef("{.type_info = (rtti_types+%d), .name = \"%s\", .offset = %d},", type_info, field_name, decl.offset);
+                    }
                 }
                 tr->tabing--; newline(tr);
                 tr_write("}},");
@@ -947,9 +950,14 @@ void transpile(Codebase* codebase) {
             tr_writef("static Array Globals = {.length=%d, .data=(Symbol[]){\n", list_length(codebase->global_vars));
             foreach (global_var, codebase->global_vars) {
                 Declaration* decl = *global_var;
-                u32 type_index = transpiler_type_table_index(tr, decl->type->solvedstate);
                 char* name = get_string(decl->name);
-                tr_writef("    {(rtti_types+%d), &%s, {\"%s\", %d}},\n", type_index, name, name, strlen(name));
+
+                s64 type_index = transpiler_type_table_index(tr, decl->type->solvedstate);
+                if (type_index == -1) {
+                    tr_writef("    {0, &%s, {\"%s\", %d}},\n", name, name, strlen(name));
+                } else {
+                    tr_writef("    {(rtti_types+%d), &%s, {\"%s\", %d}},\n", type_index, name, name, strlen(name));
+                }
             }
             tr_write("}};\n");
         }
