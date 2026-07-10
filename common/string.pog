@@ -226,9 +226,23 @@ string substr_until(string str, char delim) {
 }
 
 string substr_to_end(string str, char start) {
-    int64 i = str.length - 1;
-    while (i >= 0 and str.chars[i] != start) i--;
-    return { *str.chars[i], str.length - i };
+    int64 i = str.length as int64 - 1;
+    while (i >= 0) {
+        if str.chars[i] == start   return { *str.chars[i], str.length - i };
+        i--;
+    }
+
+    return str;
+}
+
+int64 last_index_of(string str, char c) {
+    uint32 l = str.length;
+    for 0 .. l {
+        int64 i = l-it-1;
+        if str.chars[i] == c  return i;
+    }
+
+    return -1;
 }
 
 // string[2] split_once(string str, char delim) {
@@ -248,9 +262,18 @@ char* trim_starting_whitespace(char* c_str) {
     return c_str;
 }
 
-string trim_start(string str, uint32 len) { return { str.chars + len, str.length - len }; }
-string trim_end(string str, uint32 len) { return { str.chars, str.length - len }; }
-string trim(string str, uint32 len) { return { str.chars + len, str.length - len*2 }; }
+string trim_start(string str, uint32 len) {
+    if str.length <= len  return { str.chars, 0 };
+    return { str.chars + len, str.length - len };
+}
+string trim_end(string str, uint32 len) {
+    if str.length <= len  return { str.chars, 0 };
+    return { str.chars, str.length - len };
+}
+string trim(string str, uint32 len) {
+    if str.length <= len*2  return { str.chars, 0 };
+    return { str.chars + len, str.length - len*2 };
+}
 
 string trim_start(string str, char c) {
     uint32 count = 0;
@@ -602,8 +625,9 @@ Token get_next_token(char* start) {
     token.text.length = 0;
     token.kind = .unknown;
 
-    if @start == '\0' {
+    if @start == (0 as char) {
         token.kind = .end_of_input;
+        token.text.length = 0;
         return token;
     }
 
