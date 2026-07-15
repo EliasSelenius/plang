@@ -20,7 +20,7 @@ static inline void newline(C_Transpiler* tr) {
     while (t--) tr_write("    ");
 }
 
-static void transpile_procedure(C_Transpiler* tr, Procedure* proc);
+static void transpile_procedure(C_Transpiler* tr, Procedure* proc, bool local_proc);
 static void transpile_node(C_Transpiler* tr, NodeRef p);
 
 
@@ -421,7 +421,7 @@ static void transpile_local_procedures(C_Transpiler* tr, NodeRef ref) {
 
     foreach (s, ref.Scope->statements) {
         switch (s->node->kind) {
-            case Node_Procedure:  transpile_procedure(tr, s->Procedure); break;
+            case Node_Procedure:  transpile_procedure(tr, s->Procedure, true); break;
             case Node_Scope:      transpile_local_procedures(tr, *s); break;
             case Node_IfStmt:     transpile_local_procedures(tr, s->IfStmt->then_statement);
                                   transpile_local_procedures(tr, s->IfStmt->else_statement); break;
@@ -433,10 +433,12 @@ static void transpile_local_procedures(C_Transpiler* tr, NodeRef ref) {
     }
 }
 
-static void transpile_procedure(C_Transpiler* tr, Procedure* proc) {
+static void transpile_procedure(C_Transpiler* tr, Procedure* proc, bool local_proc) {
     if (node_is_null(proc->sub_node)) {
-        transpile_proc_signature(tr, proc);
-        tr_write(";\n");
+        if (local_proc) {
+            transpile_proc_signature(tr, proc);
+            tr_write(";\n");
+        }
         return;
     }
 
@@ -928,7 +930,7 @@ void transpile(Codebase* codebase) {
         tr_write("\n// Implementations\n");
         for (u32 i = 0; i < procs_count; i++) {
             Procedure* proc = codebase->procedures[i];
-            transpile_procedure(tr, proc);
+            transpile_procedure(tr, proc, false);
         }
 
         StringBuilder impl_sb = tr->sb;

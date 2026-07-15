@@ -25,7 +25,7 @@ uint32 list_stride(void[..] list) { return list_head(list).stride; }
 
 void list_set_length(void[..] list, uint32 new_len) { list_head(list).length = new_len; }
 void list_delete(void[..] list) { free(list_head(list)); }
-void list_clear(void[..] list) { list_head(list).length = 0; }
+void list_clear(void[..] list) { if list list_head(list).length = 0; }
 
 void[] as_span(void[..] list) {
     void[] span;
@@ -58,6 +58,11 @@ void* list_add(void[..]* list, void* data) {
 
 void* list_add(void[..]* list) return list_add(list, null);
 void* list_append(void[..]* list) { return list_add(list, null); }
+void* list_append(void[..]* list, uint32 count) {
+    void* ret = list_add(list, null);
+    for 1 .. count  list_add(list, null);
+    return ret;
+}
 
 void* list_get(void[..] list, int32 index) { return (list as byte*) + (list_stride(list) as int32) * index; }
 void* list_get(void[..] list, uint32 index) { return (list as byte*) + list_stride(list) * index; }
