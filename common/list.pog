@@ -27,6 +27,9 @@ void list_set_length(void[..] list, uint32 new_len) { list_head(list).length = n
 void list_delete(void[..] list) { free(list_head(list)); }
 void list_clear(void[..] list) { if list list_head(list).length = 0; }
 
+bool list_out_of_bounds(void[..] list, uint32 it) return it >= list_length(list);
+bool list_out_of_bounds(void[..] list, int32 it) return it<0  or  it as uint32 >= list_length(list);
+
 void[] as_span(void[..] list) {
     void[] span;
     span.data = list as void*;
