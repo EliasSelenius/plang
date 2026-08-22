@@ -111,21 +111,8 @@ float64 parse_float(char* c_str, uint32* length) {
 
 string to_string(uint32 num) { return to_string(num as uint64); }
 string to_string(uint64 num) {
-    char[21] num_str = {}; // 20 is max char size for 64 bit integer
-
-    if num == 0 return {"0", 1} as string;
-    uint32 i = 20;
-
-    while num != 0 {
-        let r = (num % 10) as uint8;
-        num /= 10;
-        num_str[--i] = '0' + r as char;
-    }
-
-    // this is done so that to_string(uint64 num) can be called multiple times
-    string str = { *num_str[i], 20 - i };
     let sb = temp_builder();
-    sb_append(sb, str);
+    sb_append(sb, num);
     return to_string(sb);
 }
 
@@ -142,31 +129,9 @@ string to_string(int64 num) {
     return to_string(sb);
 }
 
-string to_string(float32 f) return to_string(temp_builder(), f);
-string to_string(StringBuilder* sb, float32 f) {
-
-    uint32 bits = @(*f as uint32*);
-    // print("float: ", f, " bits: ", bits, "\n");
-
-    if bits&0x8000_0000  sb_append(sb, "-");
-
-    if bits == 0x7f80_0000 or bits == 0xff80_0000 {
-        sb_append(sb, "Infinity");
-        return to_string(sb);
-    }
-
-    if is_nan(f) {
-        sb_append(sb, "NaN");
-        return to_string(sb);
-    }
-
-    sb_append(sb, to_string(abs(f) as uint64));
-    sb_append(sb, ".");
-
-    let frac = to_string((fract(abs(f)) * 1_000_000) as uint64);
-    for 0 .. 6 - frac.length   sb_append(sb, '0');
-    sb_append(sb, frac);
-
+string to_string(float f) {
+    let sb = temp_builder();
+    sb_append(sb, f);
     return to_string(sb);
 }
 
@@ -495,7 +460,8 @@ void sb_append(StringBuilder* sb, char c) {
     sb.content[sb.length] = 0 as char;
 }
 
-void sb_append(StringBuilder* sb, float32 f) {
+// TODO: exact float value (raddbg does this, have a look at its source code)
+void sb_append(StringBuilder* sb, float f) {
     uint32 bits = @(*f as uint32*);
     // print("float: ", f, " bits: ", bits, "\n");
 
@@ -506,12 +472,13 @@ void sb_append(StringBuilder* sb, float32 f) {
     } else if is_nan(f) {
         sb_append(sb, "NaN");
     } else {
-        sb_append(sb, to_string(abs(f) as uint64));
+        sb_append(sb, abs(f) as uint64);
         sb_append(sb, ".");
+        uint32 dec_start = sb.length;
 
-        let frac = to_string(round(fract(abs(f)) * 1_000_000) as uint64);
-        for 0 .. 6 - frac.length   sb_append(sb, '0');
-        sb_append(sb, frac);
+        uint64 fr = round(fract(abs(f)) * 1_000_000);
+        sb_append(sb, fr);
+        for 0 .. 6 - (sb.length - dec_start)   sb_insert(sb, dec_start, make_string("0"));
     }
 }
 
