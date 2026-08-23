@@ -478,7 +478,8 @@ void sb_append(StringBuilder* sb, float f) {
 
         uint64 fr = round(fract(abs(f)) * 1_000_000);
         sb_append(sb, fr);
-        for 0 .. 6 - (sb.length - dec_start)   sb_insert(sb, dec_start, make_string("0"));
+        int32 len = 6 - (sb.length - dec_start);
+        for 0 .. len   sb_insert(sb, dec_start, make_string("0"));
     }
 }
 
