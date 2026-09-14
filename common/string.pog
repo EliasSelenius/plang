@@ -125,7 +125,7 @@ string to_string(int64 num) {
         num = -num;
     }
 
-    sb_append(sb, to_string(num as uint64));
+    sb_append(sb, to_string(num as uint64)); // TODO: why am I using to_string here? this uses two temp_builders
     return to_string(sb);
 }
 
