@@ -256,7 +256,7 @@ string trim(string str, char c) {
     return trim_start(trim_end(str, c), c);
 }
 
-bool is_whitespace(char c) { return c == ' ' or c == '\n' or c == '\t'; }
+bool is_whitespace(char c) { return c == ' ' or c == '\n' or c == '\r' or c == '\t'; }
 bool is_whitespace_or_null(char c) { return is_whitespace(c) or c == 0; }
 bool is_upper_case_letter(char c) { return c >= 'A' and c <= 'Z'; }
 bool is_lower_case_letter(char c) { return c >= 'a' and c <= 'z'; }

@@ -49,19 +49,16 @@ void assert(bool test) {
 FILE* open_file(char* file, mode) {
     FILE* res = null;
     if fopen_s(*res, file, mode) {
-        print("ERROR: Could not open file \"", file, "\".\n");
-        debug_break();
+        // print("ERROR: Could not open file \"", file, "\".\n");
+        // debug_break();
         return null;
     }
     return res;
 }
 
 char* fileread(char* filename) {
-    return fileread(filename, "r");
-}
-
-char* fileread(char* filename, char* mode) {
-    FILE* file = open_file(filename, mode);
+    FILE* file = open_file(filename, "rb");
+    if file == null   return null;
 
     fseek(file, 0, 2); // 2 = SEEK_END
     uint64 len = ftell(file);
@@ -75,12 +72,11 @@ char* fileread(char* filename, char* mode) {
     return buffer;
 }
 
-void filewrite(char* filename, char* content) {
-    FILE* file = open_file(filename, "w");
+void filewrite(char* filename, content) {
+    FILE* file = open_file(filename, "wb");
     fwrite(content, sizeof char, strlen(content), file);
     fclose(file);
 }
-
 
 void filewrite(string filename, char* content) {
     // TODO: isnt this beautiful!
@@ -121,6 +117,15 @@ void write_binary_file(char* filename, void* data, uint64 bytes) {
 void write_binary_file(char* filename, byte[] buffer) {
     write_binary_file(filename, buffer.data, buffer.length as uint64);
 }
+
+
+void swap(uint32 size, void* a, b) {
+    uint8[size] temp;
+    memcpy(temp, a, size);
+    memcpy(a, b, size);
+    memcpy(b, temp, size);
+}
+
 
 const kB = 1024;
 const MB = kB*kB;
