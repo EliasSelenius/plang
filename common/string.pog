@@ -164,7 +164,22 @@ bool starts_with(char* text, char* start) {
     return true;
 }
 
-// bool contains_substr(string a, b) {}
+bool contains(string text, substr) {
+    return find_substr(text, substr) != -1;
+}
+
+int32 find_substr(string text, substr) {
+    if text.length < substr.length return -1;
+
+    uint32 count = 1 + text.length - substr.length;
+    for 0 .. count {
+        if starts_with(trim_start(text, it as uint32), substr) return it;
+    }
+
+    return -1;
+}
+
+
 
 string substr_until(char* str, char delim) {
     string res = { str, 0 };
@@ -491,22 +506,18 @@ void sb_free(StringBuilder sb) {
 
 char* sb_grow(StringBuilder* sb, uint32 len) {
     uint32 req_cap = sb.length + len;
-
-    // note that the <= here is so that we have space for null termination
-    if sb.capacity <= req_cap {
-        sb.capacity *= 2;
-        while sb.capacity <= req_cap   sb.capacity *= 2;
-
-        sb.content = realloc(sb.content, sb.capacity);
-    }
-
+    sb_ensure_capacity(sb, req_cap);
     return sb.content + sb.length;
 }
 
-void ensure_size(StringBuilder* sb, uint32 size) {
-    if sb.capacity < size {
-        uint32 len = size - sb.capacity;
-        sb_grow(sb, len);
+void sb_ensure_capacity(StringBuilder* sb, uint32 required_cap) {
+
+    // note that the <= here is so that we have space for null termination
+    if sb.capacity <= required_cap {
+        sb.capacity = max(sb.capacity * 2, 1);
+        while sb.capacity <= required_cap   sb.capacity *= 2;
+
+        sb.content = realloc(sb.content, sb.capacity);
     }
 }
 
