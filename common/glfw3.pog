@@ -73,10 +73,13 @@ struct GLFWgamepadstate {
 int32 glfwInit();
 void glfwTerminate();
 void glfwInitHint(int32 hint, int32 value);
+
 void glfwGetVersion(int32* major, int32* minor, int32* rev);
 /*const*/ char* glfwGetVersionString();
+
 int32 glfwGetError(/*const*/ char** description);
 GLFWerrorfun glfwSetErrorCallback(GLFWerrorfun callback);
+
 GLFWmonitor** glfwGetMonitors(int32* count);
 GLFWmonitor* glfwGetPrimaryMonitor();
 void glfwGetMonitorPos(GLFWmonitor* monitor, int32* xpos, int32* ypos);
@@ -87,14 +90,17 @@ void glfwGetMonitorContentScale(GLFWmonitor* monitor, float32* xscale, float32* 
 void glfwSetMonitorUserPointer(GLFWmonitor* monitor, void* pointer);
 void* glfwGetMonitorUserPointer(GLFWmonitor* monitor);
 GLFWmonitorfun glfwSetMonitorCallback(GLFWmonitorfun callback);
+
 /*const*/ GLFWvidmode* glfwGetVideoModes(GLFWmonitor* monitor, int32* count);
 /*const*/ GLFWvidmode* glfwGetVideoMode(GLFWmonitor* monitor);
 void glfwSetGamma(GLFWmonitor* monitor, float32 gamma);
 /*const*/ GLFWgammaramp* glfwGetGammaRamp(GLFWmonitor* monitor);
 void glfwSetGammaRamp(GLFWmonitor* monitor, /*const*/ GLFWgammaramp* ramp);
+
 void glfwDefaultWindowHints();
 void glfwWindowHint(int32 hint, int32 value);
 void glfwWindowHintString(int32 hint, /*const*/ char* value);
+
 GLFWwindow* glfwCreateWindow(int32 width, int32 height, /*const*/ char* title, GLFWmonitor* monitor, GLFWwindow* share);
 void glfwDestroyWindow(GLFWwindow* window);
 int32 glfwWindowShouldClose(GLFWwindow* window);
@@ -125,6 +131,7 @@ int32 glfwGetWindowAttrib(GLFWwindow* window, int32 attrib);
 void glfwSetWindowAttrib(GLFWwindow* window, int32 attrib, int32 value);
 void glfwSetWindowUserPointer(GLFWwindow* window, void* pointer);
 void* glfwGetWindowUserPointer(GLFWwindow* window);
+
 GLFWwindowposfun glfwSetWindowPosCallback(GLFWwindow* window, GLFWwindowposfun callback);
 GLFWwindowsizefun glfwSetWindowSizeCallback(GLFWwindow* window, GLFWwindowsizefun callback);
 GLFWwindowclosefun glfwSetWindowCloseCallback(GLFWwindow* window, GLFWwindowclosefun callback);
@@ -134,10 +141,12 @@ GLFWwindowiconifyfun glfwSetWindowIconifyCallback(GLFWwindow* window, GLFWwindow
 GLFWwindowmaximizefun glfwSetWindowMaximizeCallback(GLFWwindow* window, GLFWwindowmaximizefun callback);
 GLFWframebuffersizefun glfwSetFramebufferSizeCallback(GLFWwindow* window, GLFWframebuffersizefun callback);
 GLFWwindowcontentscalefun glfwSetWindowContentScaleCallback(GLFWwindow* window, GLFWwindowcontentscalefun callback);
+
 void glfwPollEvents();
 void glfwWaitEvents();
 void glfwWaitEventsTimeout(float64 timeout);
 void glfwPostEmptyEvent();
+
 int32 glfwGetInputMode(GLFWwindow* window, int32 mode);
 void glfwSetInputMode(GLFWwindow* window, int32 mode, int32 value);
 int32 glfwRawMouseMotionSupported();
@@ -151,6 +160,7 @@ GLFWcursor* glfwCreateCursor(/*const*/ GLFWimage* image, int32 xhot, int32 yhot)
 GLFWcursor* glfwCreateStandardCursor(int32 shape);
 void glfwDestroyCursor(GLFWcursor* cursor);
 void glfwSetCursor(GLFWwindow* window, GLFWcursor* cursor);
+
 GLFWkeyfun glfwSetKeyCallback(GLFWwindow* window, GLFWkeyfun callback);
 GLFWcharfun glfwSetCharCallback(GLFWwindow* window, GLFWcharfun callback);
 GLFWcharmodsfun glfwSetCharModsCallback(GLFWwindow* window, GLFWcharmodsfun callback);
@@ -159,6 +169,7 @@ GLFWcursorposfun glfwSetCursorPosCallback(GLFWwindow* window, GLFWcursorposfun c
 GLFWcursorenterfun glfwSetCursorEnterCallback(GLFWwindow* window, GLFWcursorenterfun callback);
 GLFWscrollfun glfwSetScrollCallback(GLFWwindow* window, GLFWscrollfun callback);
 GLFWdropfun glfwSetDropCallback(GLFWwindow* window, GLFWdropfun callback);
+
 int32 glfwJoystickPresent(int32 jid);
 /*const*/ float32* glfwGetJoystickAxes(int32 jid, int32* count);
 /*const*/ uint8* glfwGetJoystickButtons(int32 jid, int32* count);
@@ -169,19 +180,25 @@ void glfwSetJoystickUserPointer(int32 jid, void* pointer);
 void* glfwGetJoystickUserPointer(int32 jid);
 int32 glfwJoystickIsGamepad(int32 jid);
 GLFWjoystickfun glfwSetJoystickCallback(GLFWjoystickfun callback);
+
 int32 glfwUpdateGamepadMappings(/*const*/ char* string);
 /*const*/ char* glfwGetGamepadName(int32 jid);
 int32 glfwGetGamepadState(int32 jid, GLFWgamepadstate* state);
+
 void glfwSetClipboardString(GLFWwindow* window, /*const*/ char* string);
 /*const*/ char* glfwGetClipboardString(GLFWwindow* window);
+
 float64 glfwGetTime();
 void glfwSetTime(float64 time);
 uint64 glfwGetTimerValue();
 uint64 glfwGetTimerFrequency();
+
 void glfwMakeContextCurrent(GLFWwindow* window);
 GLFWwindow* glfwGetCurrentContext();
+
 void glfwSwapBuffers(GLFWwindow* window);
 void glfwSwapInterval(int32 interval);
+
 int32 glfwExtensionSupported(/*const*/ char* extension);
 GLFWglproc glfwGetProcAddress(/*const*/ char* procname);
 int32 glfwVulkanSupported();
