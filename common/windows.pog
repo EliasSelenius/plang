@@ -75,6 +75,10 @@ const PAGE_READWRITE         = 0x04;
 const PAGE_EXECUTE_READWRITE = 0x40;
 
 
+
+
+
+
 struct Win32_Security_Attributes {
     uint32 nLength;
     void* lpSecurityDescriptor;
@@ -92,6 +96,96 @@ HANDLE CreateThread(
 uint32 SuspendThread(HANDLE hThread);
 uint32 ResumeThread(HANDLE hThread);
 HANDLE GetCurrentThread();
+
+
+
+
+
+type HWND       = void*;
+type HMENU      = void*;
+type HINSTANCE  = void*;
+type HMODULE    = HINSTANCE;
+
+
+type HICON      = void*;
+type HCURSOR    = void*;
+type HBRUSH     = void*;
+
+
+HCURSOR LoadCursorA(HINSTANCE hInstance, char* lpCursorName);
+
+type ATOM = uint16;
+
+type WNDPROC = int64(HWND, uint32, uint64, int64);
+
+struct WNDCLASSEXA {
+    uint32        cbSize;
+    // Win 3.x
+    uint32        style;
+    WNDPROC       lpfnWndProc;
+    int32         cbClsExtra;
+    int32         cbWndExtra;
+    HINSTANCE     hInstance;
+    HICON         hIcon;
+    HCURSOR       hCursor;
+    HBRUSH        hbrBackground;
+    char*         lpszMenuName;
+    char*         lpszClassName;
+    // Win 4.0
+    HICON         hIconSm;
+}
+
+ATOM RegisterClassExA(WNDCLASSEXA* wnd_class_ex);
+bool32 UnregisterClassA(char* lpClassName, HINSTANCE hInstance);
+
+HWND CreateWindowExA(
+    uint32    dwExStyle,
+    char*     lpClassName,
+    char*     lpWindowName,
+    uint32    dwStyle,
+    int32     X,
+    int32     Y,
+    int32     nWidth,
+    int32     nHeight,
+    HWND      hWndParent,
+    HMENU     hMenu,
+    HINSTANCE hInstance,
+    void*     lpParam);
+
+bool32 DestroyWindow(HWND hWnd);
+
+bool32 ShowWindow(HWND hWnd, int32 nCmdShow);
+bool32 AnimateWindow(HWND hWnd, uint32 dwTime, uint32 dwFlags);
+
+bool32 UpdateWindow(HWND hWnd);
+
+type POINT = ivec2;
+
+struct MSG {
+    HWND     hwnd;
+    uint32   message;
+    uint64   wParam;
+    int64    lParam;
+    uint32   time;
+    POINT    pt;
+// #ifdef _MAC
+    uint32   lPrivate;
+// #endif
+}
+
+bool32 GetMessageA(MSG* lpMsg, HWND hWnd, uint32 wMsgFilterMin, uint32 wMsgFilterMax);
+bool32 TranslateMessage(MSG* lpMsg);
+int64 DispatchMessageA(MSG* lpMsg);
+
+int64 DefWindowProcA(HWND hWnd, uint32 Msg, uint64 wParam, int64 lParam);
+
+
+type proc = int64();
+// libloaderapi.h
+HMODULE GetModuleHandleA(char* ModuleName);
+proc GetProcAddress(HMODULE hModule, char* ProcName);
+
+
 
 
 
