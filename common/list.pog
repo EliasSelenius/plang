@@ -1,5 +1,4 @@
 
-// Temp list implementation until we make language integrated lists
 
 const ListStartingCapacity = 2;
 
@@ -71,6 +70,10 @@ void* list_get(void[..] list, int32 index) { return (list as byte*) + (list_stri
 void* list_get(void[..] list, uint32 index) { return (list as byte*) + list_stride(list) * index; }
 void* list_last_item(void[..] list) { return list_get(list, list_length(list) - 1); }
 
+void list_swap(void[..] list, uint32 i, j) {
+    swap(list_stride(list), list_get(list, i), list_get(list, j));
+}
+
 int32 index_of(void[..] list, void* data) {
     let len = list_length(list);
     for 0 .. len {
@@ -121,3 +124,82 @@ void* list_pop(void[..] list) {
     list_set_length(list, len - 1);
     return res;
 }
+
+
+type Heap_Compare = bool(void[..], uint32, uint32);
+
+bool int32_minheap(int32[..] heap, uint32 l, r) {
+    return heap[l] < heap[r];
+}
+
+void heapify_up(void[..] heap, uint32 i, Heap_Compare compare) {
+    uint32 p = (i-1)/2;
+    while i and compare(heap, i, p) {
+        list_swap(heap, i, p);
+        i = p;
+        p = (i-1)/2
+    }
+}
+
+void heap_insert(void[..]* heap, void* data, Heap_Compare compare) {
+    uint32 index = list_length(heap);
+    list_add(heap, data);
+    heapify_up(@heap, index, compare);
+}
+
+void heapify_down(void[..] heap, uint32 index, Heap_Compare compare) {
+    uint32 len = list_length(heap);
+
+    while true {
+        uint32 il = index*2 + 1;
+        uint32 ir = index*2 + 2;
+
+        uint32 small = index;
+        if il < len and compare(heap, il, small)   small = il;
+        if ir < len and compare(heap, ir, small)   small = ir;
+
+        if small == index  break;
+
+        list_swap(heap, index, small);
+        index = small;
+    }
+}
+
+bool heap_extract(void[..] heap, Heap_Compare compare, void* out_value) {
+    void* last = list_pop(heap);
+    if last == null  return false;
+
+    uint32 stride = list_stride(heap)
+    if out_value    memmove(out_value, heap, stride);
+    memmove(heap, last, stride);
+
+    heapify_down(heap, 0, compare);
+    return true;
+}
+
+void heap_test() {
+    int32[..] heap = list_create(sizeof int32);
+
+    for 0 .. 10 {
+        int32 r = (random01() * 100.0) as int32;
+        print(r, ", ");
+        heap_insert(*heap, *r, int32_minheap);
+    }
+    print("\n");
+
+
+    uint32 len = list_length(heap);
+    for 0 .. len {
+        print(heap[it], ", ");
+    }
+    print("\n");
+
+
+    int32 value = 0;
+    while heap_extract(heap, int32_minheap, *value) {
+        print(value, ", ");
+    }
+    print("\n");
+
+}
+
