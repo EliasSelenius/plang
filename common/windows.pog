@@ -101,6 +101,16 @@ HANDLE GetCurrentThread();
 
 
 
+type proc = int64();
+// libloaderapi.h
+HMODULE LoadLibraryA(char* LibFileName);
+HMODULE GetModuleHandleA(char* ModuleName);
+proc GetProcAddress(HMODULE hModule, char* ProcName);
+
+
+
+
+
 type HWND       = void*;
 type HMENU      = void*;
 type HINSTANCE  = void*;
@@ -110,6 +120,7 @@ type HMODULE    = HINSTANCE;
 type HICON      = void*;
 type HCURSOR    = void*;
 type HBRUSH     = void*;
+
 
 
 HCURSOR LoadCursorA(HINSTANCE hInstance, char* lpCursorName);
@@ -159,7 +170,15 @@ bool32 AnimateWindow(HWND hWnd, uint32 dwTime, uint32 dwFlags);
 
 bool32 UpdateWindow(HWND hWnd);
 
-type POINT = ivec2;
+
+bool32 IsZoomed(HWND hWnd);
+bool32 IsIconic(HWND hWnd);
+
+
+int32 GetWindowLongA(HWND hWnd, int32 nIndex);
+int64 GetWindowLongPtrA(HWND hWnd, int32 nIndex);
+int32 SetWindowLongA(HWND hWnd, int32 nIndex, int32 NewLong);
+int64 SetWindowLongPtrA(HWND hWnd, int32 nIndex, int64 NewLong);
 
 struct MSG {
     HWND     hwnd;
@@ -167,23 +186,110 @@ struct MSG {
     uint64   wParam;
     int64    lParam;
     uint32   time;
-    POINT    pt;
+    ivec2    pt;
 // #ifdef _MAC
     uint32   lPrivate;
 // #endif
 }
 
-bool32 GetMessageA(MSG* lpMsg, HWND hWnd, uint32 wMsgFilterMin, uint32 wMsgFilterMax);
-bool32 TranslateMessage(MSG* lpMsg);
-int64 DispatchMessageA(MSG* lpMsg);
+bool32 GetMessageA(MSG* msg, HWND hWnd, uint32 wMsgFilterMin, uint32 wMsgFilterMax);
+bool32 PeekMessageA(MSG* msg, HWND hWnd, uint32 wMsgFilterMin, uint32 wMsgFilterMax, uint32 wRemoveMsg);
+bool32 TranslateMessage(MSG* msg);
+int64 DispatchMessageA(MSG* msg);
 
-int64 DefWindowProcA(HWND hWnd, uint32 Msg, uint64 wParam, int64 lParam);
+int64 DefWindowProcA(HWND hWnd, uint32 msg, uint64 wParam, int64 lParam);
+
+type HDC = void*;
+HDC GetDC(HWND hWnd);
+
+struct PIXEL_FORMAT_DESCRIPTOR {
+    uint16  nSize;
+    uint16  nVersion;
+    uint32  dwFlags;
+    byte    iPixelType;
+    byte    cColorBits;
+    byte    cRedBits;
+    byte    cRedShift;
+    byte    cGreenBits;
+    byte    cGreenShift;
+    byte    cBlueBits;
+    byte    cBlueShift;
+    byte    cAlphaBits;
+    byte    cAlphaShift;
+    byte    cAccumBits;
+    byte    cAccumRedBits;
+    byte    cAccumGreenBits;
+    byte    cAccumBlueBits;
+    byte    cAccumAlphaBits;
+    byte    cDepthBits;
+    byte    cStencilBits;
+    byte    cAuxBuffers;
+    byte    iLayerType;
+    byte    bReserved;
+    uint32  dwLayerMask;
+    uint32  dwVisibleMask;
+    uint32  dwDamageMask;
+}
+
+// pixel types
+const PFD_TYPE_RGBA             = 0;
+const PFD_TYPE_COLORINDEX       = 1;
+
+// layer types
+const PFD_MAIN_PLANE            = 0;
+const PFD_OVERLAY_PLANE         = 1;
+const PFD_UNDERLAY_PLANE        = -1;
+
+// PIXEL_FORMAT_DESCRIPTOR flags
+const PFD_DOUBLEBUFFER          = 0x00000001;
+const PFD_STEREO                = 0x00000002;
+const PFD_DRAW_TO_WINDOW        = 0x00000004;
+const PFD_DRAW_TO_BITMAP        = 0x00000008;
+const PFD_SUPPORT_GDI           = 0x00000010;
+const PFD_SUPPORT_OPENGL        = 0x00000020;
+const PFD_GENERIC_FORMAT        = 0x00000040;
+const PFD_NEED_PALETTE          = 0x00000080;
+const PFD_NEED_SYSTEM_PALETTE   = 0x00000100;
+const PFD_SWAP_EXCHANGE         = 0x00000200;
+const PFD_SWAP_COPY             = 0x00000400;
+const PFD_SWAP_LAYER_BUFFERS    = 0x00000800;
+const PFD_GENERIC_ACCELERATED   = 0x00001000;
+const PFD_SUPPORT_DIRECTDRAW    = 0x00002000;
+const PFD_DIRECT3D_ACCELERATED  = 0x00004000;
+const PFD_SUPPORT_COMPOSITION   = 0x00008000;
 
 
-type proc = int64();
-// libloaderapi.h
-HMODULE GetModuleHandleA(char* ModuleName);
-proc GetProcAddress(HMODULE hModule, char* ProcName);
+int32    ChoosePixelFormat(HDC hdc, PIXEL_FORMAT_DESCRIPTOR* ppfd);
+bool32   SetPixelFormat(HDC hdc, int32 format, PIXEL_FORMAT_DESCRIPTOR* ppfd);
+
+type HGLRC = void*;
+
+// bool32  wglCopyContext(HGLRC hglrc1, HGLRC hglrc2, uint32 i);
+// HGLRC   wglCreateContext(HDC hdc);
+// HGLRC   wglCreateLayerContext(HDC hdc, int32 i);
+// bool32  wglDeleteContext(HGLRC hglrc);
+// HGLRC   wglGetCurrentContext();
+// HDC     wglGetCurrentDC();
+// proc    wglGetProcAddress(char* str);
+// bool32  wglMakeCurrent(HDC hdc, HGLRC hglrc);
+// bool32  wglShareLists(HGLRC hglrc1, HGLRC hglrc2);
+// bool32  wglUseFontBitmapsA(HDC hdc, uint32 a,b,c);
+// bool32  wglUseFontBitmapsW(HDC hdc, uint32 a,b,c);
+
+type proc_wglCopyContext        = bool32  (HGLRC hglrc1, HGLRC hglrc2, uint32 i);
+type proc_wglCreateContext      = HGLRC   (HDC hdc);
+type proc_wglCreateLayerContext = HGLRC   (HDC hdc, int32 i);
+type proc_wglDeleteContext      = bool32  (HGLRC hglrc);
+type proc_wglGetCurrentContext  = HGLRC   ();
+type proc_wglGetCurrentDC       = HDC     ();
+type proc_wglGetProcAddress     = proc    (char* str);
+type proc_wglMakeCurrent        = bool32  (HDC hdc, HGLRC hglrc);
+type proc_wglShareLists         = bool32  (HGLRC hglrc1, HGLRC hglrc2);
+type proc_wglUseFontBitmapsA    = bool32  (HDC hdc, uint32, uint32, uint32);
+type proc_wglUseFontBitmapsW    = bool32  (HDC hdc, uint32, uint32, uint32);
+
+
+bool32 SwapBuffers(HDC hdc);
 
 
 
