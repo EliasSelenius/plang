@@ -36,6 +36,13 @@ void[] as_span(void[..] list) {
     return span;
 }
 
+void[] make_span(void* data, uint32 len) {
+    void[] span;
+    span.data   = data;
+    span.length = len;
+    return span;
+}
+
 void list_realloc(void[..]* list, uint32 new_capacity) {
     List* head = list_head(@list);
 
@@ -132,6 +139,10 @@ bool int32_minheap(int32[..] heap, uint32 l, r) {
     return heap[l] < heap[r];
 }
 
+bool float32_minheap(float[..] heap, uint32 l, r) {
+    return heap[l] < heap[r];
+}
+
 void heapify_up(void[..] heap, uint32 i, Heap_Compare compare) {
     uint32 p = (i-1)/2;
     while i and compare(heap, i, p) {
@@ -203,3 +214,140 @@ void heap_test() {
 
 }
 
+struct Graph {
+    Graph_Node[..] nodes;
+    Graph_Edge[..] edges;
+}
+
+struct Graph_Node {
+    uint32 start_edge;
+    uint32 edges;
+}
+
+struct Graph_Edge {
+    uint32 node;
+    float dist;
+}
+
+void add_node(Graph* g) {
+    Graph_Node* n = list_add(*g.nodes);
+    uint32 start = list_length(g.edges);
+    @n = {start, 0};
+}
+
+void add_edge(Graph* g, uint32 node, float dist) {
+    Graph_Edge e = {node, dist};
+    list_add(*g.edges, *e);
+
+    Graph_Node* n = list_last_item(g.nodes);
+    n.edges++;
+}
+
+void dijkstra_test() {
+    Graph g = {};
+    g.nodes = list_create(sizeof Graph_Node);
+    g.edges = list_create(sizeof Graph_Edge);
+
+    const A = 0;
+    const B = 1;
+    const C = 2;
+    const D = 3;
+    const E = 4;
+    const F = 5;
+    const G = 6;
+
+
+    add_node(*g); // A
+    add_edge(*g, B, 20);
+    add_edge(*g, C, 45);
+    add_edge(*g, D, 102);
+
+    add_node(*g); // B
+    add_edge(*g, A, 20);
+    add_edge(*g, D, 85);
+    add_edge(*g, E, 79);
+
+    add_node(*g); // C
+    add_edge(*g, F, 15);
+    add_edge(*g, A, 45);
+    add_edge(*g, D, 55);
+
+    add_node(*g); // D
+    add_edge(*g, A, 102);
+    add_edge(*g, B, 85);
+    add_edge(*g, C, 55);
+    add_edge(*g, E, 4);
+    add_edge(*g, F, 55);
+    add_edge(*g, G, 12);
+
+    add_node(*g); // E
+    add_edge(*g, B, 79);
+    add_edge(*g, D, 4);
+    add_edge(*g, G, 5);
+
+    add_node(*g); // F
+    add_edge(*g, C, 15);
+    add_edge(*g, D, 55);
+    add_edge(*g, G, 32);
+
+    add_node(*g); // G
+    add_edge(*g, D, 12);
+    add_edge(*g, E, 5);
+    add_edge(*g, F, 32);
+
+    float[] dists = dijkstra(*g);
+
+    for 0 .. dists.length {
+        print(dists[it], ", ");
+    }
+    print("\n");
+
+}
+
+struct PQ_Node {
+    uint32 node;
+    float dist;
+}
+
+float[] dijkstra(Graph* g) {
+
+
+    bool minheap_PQ_Node(PQ_Node[..] heap, uint32 l, r) {
+        return heap[l].dist < heap[r].dist;
+    }
+
+    PQ_Node[..] heap = list_create(sizeof PQ_Node);
+    PQ_Node first = {0, 0.0};
+    heap_insert(*heap, *first, minheap_PQ_Node);
+
+    uint32 node_count = list_length(g.nodes);
+    float* dists = alloc float[node_count];
+    for 0 .. node_count {
+        dists[it] = Infinity;
+    }
+
+    dists[0] = 0.0;
+
+
+    PQ_Node value = {};
+    while heap_extract(heap, minheap_PQ_Node, *value) {
+        Graph_Node node = g.nodes[value.node];
+
+        if value.dist > dists[value.node]  continue;
+
+        for node.start_edge .. node.start_edge + node.edges {
+            Graph_Edge edge = g.edges[it];
+
+            float d = dists[value.node] + edge.dist;
+            if d < dists[edge.node] {
+                dists[edge.node] = d;
+                PQ_Node n = {edge.node, d};
+                heap_insert(*heap, *n, minheap_PQ_Node);
+            }
+        }
+    }
+
+    list_delete(heap);
+
+    return make_span(dists, node_count);
+}
