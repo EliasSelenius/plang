@@ -15,9 +15,9 @@ ListHead* list_head(void* list) { return &((ListHead*)list)[-1]; }
 
 void list_delete(void* list) { free(list_head(list)); }
 void list_clear(void* list) { list_head(list)->length = 0; }
-u32 list_length(void* list)   { return ((u32*)list)[-3]; }
-u32 list_capacity(void* list) { return ((u32*)list)[-2]; }
-u32 list_stride(void* list)   { return ((u32*)list)[-1]; }
+u32 list_length(void* list)   { return list ? ((u32*)list)[-3] : 0; }
+u32 list_capacity(void* list) { return list ? ((u32*)list)[-2] : 0; }
+u32 list_stride(void* list)   { return list ? ((u32*)list)[-1] : 0; }
 
 #define list_create(type) _list_create(sizeof(type))
 #define list_init(list) do { (list) = list_create(typeof(*(list))); } while (0)

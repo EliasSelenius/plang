@@ -18,9 +18,9 @@ void[..] list_create(uint32 stride, starting_capacity) {
 }
 
 List* list_head(void[..] list) { return *(list as List*)[-1]; }
-uint32 list_length(void[..] list) { return list ? list_head(list).length : 0; }
-uint32 list_capacity(void[..] list) { return list_head(list).capacity; }
-uint32 list_stride(void[..] list) { return list_head(list).stride; }
+uint32 list_length(void[..] list)   { return list ? list_head(list).length   : 0; }
+uint32 list_capacity(void[..] list) { return list ? list_head(list).capacity : 0; }
+uint32 list_stride(void[..] list)   { return list ? list_head(list).stride   : 0; }
 
 void list_set_length(void[..] list, uint32 new_len) { list_head(list).length = new_len; }
 void list_delete(void[..] list) { free(list_head(list)); }
@@ -33,15 +33,22 @@ void[] as_span(void[..] list) {
     void[] span;
     span.data = list as void*;
     span.length = list_length(list);
+    span.stride = list_stride(list);
     return span;
 }
 
-void[] make_span(void* data, uint32 len) {
+void[] make_span(void* data, uint32 len, stride) {
     void[] span;
     span.data   = data;
     span.length = len;
+    span.stride = stride;
     return span;
 }
+
+void[] alloc_span(uint32 len, stride) {
+    return make_span(malloc(len*stride), len, stride);
+}
+
 
 void list_realloc(void[..]* list, uint32 new_capacity) {
     List* head = list_head(@list);
@@ -148,7 +155,7 @@ void heapify_up(void[..] heap, uint32 i, Heap_Compare compare) {
     while i and compare(heap, i, p) {
         list_swap(heap, i, p);
         i = p;
-        p = (i-1)/2
+        p = (i-1)/2;
     }
 }
 
@@ -180,7 +187,7 @@ bool heap_extract(void[..] heap, Heap_Compare compare, void* out_value) {
     void* last = list_pop(heap);
     if last == null  return false;
 
-    uint32 stride = list_stride(heap)
+    uint32 stride = list_stride(heap);
     if out_value    memmove(out_value, heap, stride);
     memmove(heap, last, stride);
 
@@ -295,7 +302,7 @@ void dijkstra_test() {
     add_edge(*g, E, 5);
     add_edge(*g, F, 32);
 
-    float[] dists = dijkstra(*g);
+    float[] dists = dijkstra(*g, A);
 
     for 0 .. dists.length {
         print(dists[it], ", ");
@@ -309,38 +316,41 @@ struct PQ_Node {
     float dist;
 }
 
-float[] dijkstra(Graph* g) {
-
+float[] dijkstra(Graph* g, uint32 start) {
 
     bool minheap_PQ_Node(PQ_Node[..] heap, uint32 l, r) {
         return heap[l].dist < heap[r].dist;
     }
 
     PQ_Node[..] heap = list_create(sizeof PQ_Node);
-    PQ_Node first = {0, 0.0};
+    PQ_Node first = {start, 0.0};
     heap_insert(*heap, *first, minheap_PQ_Node);
 
     uint32 node_count = list_length(g.nodes);
     float* dists = alloc float[node_count];
+    int32* parent = alloc int32[node_count];
+
     for 0 .. node_count {
         dists[it] = Infinity;
+        parent[it] = -1;
     }
 
-    dists[0] = 0.0;
-
+    dists[start] = 0.0;
+    parent[start] = start as int32;
 
     PQ_Node value = {};
     while heap_extract(heap, minheap_PQ_Node, *value) {
-        Graph_Node node = g.nodes[value.node];
-
         if value.dist > dists[value.node]  continue;
 
+        Graph_Node node = g.nodes[value.node];
         for node.start_edge .. node.start_edge + node.edges {
             Graph_Edge edge = g.edges[it];
 
             float d = dists[value.node] + edge.dist;
             if d < dists[edge.node] {
                 dists[edge.node] = d;
+                parent[edge.node] = value.node;
+
                 PQ_Node n = {edge.node, d};
                 heap_insert(*heap, *n, minheap_PQ_Node);
             }
@@ -348,6 +358,5 @@ float[] dijkstra(Graph* g) {
     }
 
     list_delete(heap);
-
-    return make_span(dists, node_count);
+    return make_span(dists, node_count, sizeof float);
 }

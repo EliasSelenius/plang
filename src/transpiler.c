@@ -490,6 +490,10 @@ static void transpile_for_loop(C_Transpiler* tr, ForStmt* forsta) {
     }
 }
 
+static void tr_write_array(C_Transpiler* tr, char* prefix, u32 len, char* elem_type) {
+    tr_writef("%s(Array) { .length = %d, .stride = sizeof(%s), .data = (%s[]){", prefix, len, elem_type, elem_type);
+}
+
 static void transpile_node(C_Transpiler* tr, NodeRef p) {
 switch (p.node->kind) {
 
@@ -612,11 +616,20 @@ switch (p.node->kind) {
         &&  p.Compound->datatype.kind != Typekind_Fixed_Array)
         {
             tr_write("("); transpile_datatype(tr, p.Compound->datatype); tr_write(") ");
-            if (p.Compound->datatype.kind == Typekind_Array) {
-                tr_writef("{ .length = %d, .data = (", p.Compound->elements ? list_length(p.Compound->elements) : 0);
-                transpile_datatype(tr, p.Compound->datatype.array_typenode->array.element_type->solvedstate);
-                tr_write("[])");
-            }
+        }
+
+        if (p.Compound->datatype.kind == Typekind_Array) {
+            u32 elem_count = list_length(p.Compound->elements);
+            Datatype elem_type = p.Compound->datatype.array_typenode->array.element_type->solvedstate;
+
+            // tr_write_array(tr, elem_count, elem_type);
+
+            tr_writef("{ .length = %d, .stride = sizeof(", elem_count);
+            transpile_datatype(tr, elem_type);
+
+            tr_writef("), .data = (");
+            transpile_datatype(tr, elem_type);
+            tr_write("[])");
         }
 
         tr_write("{");
@@ -744,7 +757,8 @@ void transpile_type_info(C_Transpiler* tr, Datatype dt) {
             case Typekind_Struct: {
                 Struct* stru = dt.stru;
                 u32 field_len = list_length(stru->fields);
-                tr_writef(".fields = (Array) { .length = %d, .data = (StructField[]){", field_len);
+                tr_write_array(tr, ".fields = ", field_len, "StructField");
+
                 tr->tabing++;
                 for (u32 j = 0; j < field_len; j++) {
                     newline(tr);
@@ -766,7 +780,8 @@ void transpile_type_info(C_Transpiler* tr, Datatype dt) {
                 Enum* en = dt._enum;
                 u32 entries_len = list_length(en->entries);
 
-                tr_writef(".entries = (Array) { .length = %d, .data = (EnumEntry[]){", entries_len);
+                tr_write_array(tr, ".entries = ", entries_len, "EnumEntry");
+
                 tr->tabing++;
                 for (u32 i = 0; i < entries_len; i++) {
                     newline(tr);
@@ -815,7 +830,7 @@ void transpile(Codebase* codebase) {
     tr_write("typedef float float32;\n");
     tr_write("typedef double float64;\n");
     tr_write("int printf(const char* format, ...);\n");
-    tr_write("typedef struct Array { void* data; uint32 length; } Array;\n");
+    tr_write("typedef struct Array { void* data; uint32 length, stride; } Array;\n");
 
     list_add(tr->type_table, type_int8);
     list_add(tr->type_table, type_int16);
@@ -949,7 +964,8 @@ void transpile(Codebase* codebase) {
 
         {
             tr_write("\n// Symbols\n");
-            tr_writef("static Array Globals = {.length=%d, .data=(Symbol[]){\n", list_length(codebase->global_vars));
+            tr_write_array(tr, "static Array Globals = ", list_length(codebase->global_vars), "Symbol");
+
             foreach (global_var, codebase->global_vars) {
                 Declaration* decl = *global_var;
                 char* name = get_string(decl->name);
