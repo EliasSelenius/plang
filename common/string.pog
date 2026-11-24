@@ -144,36 +144,39 @@ bool string_equals(string a, string b) {
     return true;
 }
 
-bool starts_with(string text, start) {
-    if text.length < start.length return false;
 
-    for 0 .. start.length {
-        if to_lower(text.chars[it]) != to_lower(start.chars[it]) return false;
+bool starts_with(char* text, substr, bool caseinsensitive) return starts_with(make_string(text), make_string(substr), caseinsensitive);
+bool starts_with(char* text, substr)                       return starts_with(make_string(text), make_string(substr), false);
+
+bool starts_with(string text, substr) return starts_with(text, substr, false);
+bool starts_with(string text, substr, bool caseinsensitive) {
+    if text.length < substr.length return false;
+
+    if caseinsensitive {
+        for 0 .. substr.length {
+            if to_lower(text.chars[it]) != to_lower(substr.chars[it]) return false;
+        }
+    } else {
+        for 0 .. substr.length {
+            if text.chars[it] != substr.chars[it] return false;
+        }
     }
 
     return true;
 }
 
-bool starts_with(char* text, char* start) {
-    int32 i = 0;
-    while start[i] {
-        if start[i] != text[i] return false;
-        i++;
-    }
-
-    return true;
-}
-
-bool contains(string text, substr) {
+bool contains(string text, substr) return contains(text, substr, false);
+bool contains(string text, substr, bool caseinsensitive) {
     return find_substr(text, substr) != -1;
 }
 
-int32 find_substr(string text, substr) {
+int32 find_substr(string text, substr) return find_substr(text, substr, false);
+int32 find_substr(string text, substr, bool caseinsensitive) {
     if text.length < substr.length return -1;
 
     uint32 count = 1 + text.length - substr.length;
     for 0 .. count {
-        if starts_with(trim_start(text, it as uint32), substr) return it;
+        if starts_with(trim_start(text, it as uint32), substr, caseinsensitive) return it;
     }
 
     return -1;
@@ -263,7 +266,7 @@ string trim_start(string str, char c) {
 
 string trim_end(string str, char c) {
     uint32 count = 0;
-    while str.chars[str.length-1 - count] == c  count++;
+    while count < str.length and str.chars[str.length-1 - count] == c   count++;
     return trim_end(str, count);
 }
 
@@ -302,12 +305,8 @@ string alloc_string_copy(string str) {
     string res = {};
     res.length = str.length;
     res.chars = malloc(str.length + 1);
-
-    for 0 .. str.length {
-        res.chars[it] = str.chars[it];
-    }
+    memcpy(res.chars, str.chars, str.length);
     res.chars[str.length] = 0 as char;
-
     return res;
 }
 
@@ -372,6 +371,32 @@ uint32 lev_(string a, b) {
     return result;
 }
 
+string make_ascii(string dst, src) {
+    char* cur = src.chars;
+    uint32 i = 0;
+    while cur < src.chars + src.length and i < dst.length {
+        uint32 cp = utf8_decode(*cur);
+        char c = cp <= 127 ? cp : '?';
+        dst.chars[i++] = c;
+    }
+
+    return {dst.chars, i};
+}
+
+// for make_ascii(name) {
+// }
+
+// char make_ascii(string src) {
+//     char* cur = src.chars;
+//     uint32 i = 0;
+//     while cur < src.chars + src.length {
+//         uint32 cp = utf8_decode(*cur);
+//         char c = cp <= 127 ? cp : '?';
+//         yield c;
+//     }
+
+//     return 0 as char;
+// }
 
 uint32 utf8_decode(char** pptr) {
     uint32 cp = 0;

@@ -626,10 +626,13 @@ switch (p.node->kind) {
 
             tr_writef("{ .length = %d, .stride = sizeof(", elem_count);
             transpile_datatype(tr, elem_type);
+            tr_write("), .data = ");
+            if (elem_count == 0) {
+                tr_write("0 }");
+                return;
+            }
 
-            tr_writef("), .data = (");
-            transpile_datatype(tr, elem_type);
-            tr_write("[])");
+            tr_write("("); transpile_datatype(tr, elem_type); tr_write("[])");
         }
 
         tr_write("{");

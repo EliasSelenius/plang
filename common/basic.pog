@@ -5,19 +5,18 @@ type byte = uint8;
 
 type FILE;
 
-int32 fopen_s(FILE** stream, char* filename, char* mode);
-int32 fclose(FILE* stream);
-
-int32 fseek(FILE* stream, int32 offset, int32 origin);
+int32  fopen_s(FILE** stream, char* filename, char* mode);
+int32  fclose(FILE* stream);
+int32  fseek(FILE* stream, int32 offset, int32 origin);
 uint64 ftell(FILE* stream);
-void rewind(FILE* stream);
+void   rewind(FILE* stream);
 uint64 fread(void* buffer, uint64 elementSize, uint64 elementCount, FILE* stream);
 uint64 fwrite(void* ptr, uint64 size, uint64 nmemb, FILE* stream);
 
 
 void* calloc(uint64 count, uint64 size);
 void* malloc(uint64 size);
-void free(void* block);
+void  free(void* block);
 void* realloc(void* buffer, uint64 size);
 
 void* memcpy(void* dst, void* src, uint64 size);
@@ -56,66 +55,51 @@ FILE* open_file(char* file, mode) {
     return res;
 }
 
-char* fileread(char* filename) {
-    FILE* file = open_file(filename, "rb");
-    if file == null   return null;
+uint64 stream_seek_size(FILE* stream) {
+    fseek(stream, 0, 2); // 2 = SEEK_END
+    uint64 len = ftell(stream);
+    rewind(stream);
+    return len;
+}
 
-    fseek(file, 0, 2); // 2 = SEEK_END
-    uint64 len = ftell(file);
-    rewind(file);
+byte[] fileread_bytes(char* name) {
+    FILE* file = open_file(name, "rb");
+    if file == null return {};
 
-    char* buffer = calloc(len + 1, 1);
-    let end = fread(buffer, 1, len, file);
-    buffer[end] = 0 as char; // null-termination
+    uint64 len = stream_seek_size(file);
+    byte* ptr  = malloc(len + 1);
+    ptr[len]   = 0; // null termination, in case this is used as a cstr
 
+    fread(ptr, 1, len, file);
     fclose(file);
-    return buffer;
+    return make_span(ptr, len as uint32, 1);
 }
 
-void filewrite(char* filename, content) {
-    FILE* file = open_file(filename, "wb");
-    fwrite(content, sizeof char, strlen(content), file);
-    fclose(file);
+string fileread_string(char* name) {
+    byte[] content = fileread_bytes(name);
+    return {chars=content.data, length=content.length};
 }
 
-void filewrite(string filename, char* content) {
-    // TODO: isnt this beautiful!
-    char* tmp = malloc(filename.length + 1);
-    memcpy(tmp, filename.chars, filename.length);
-    tmp[filename.length] = 0;
-    filewrite(tmp, content);
-    free(tmp);
+char* fileread(char* name) {
+    return fileread_bytes(name).data;
 }
 
 
-byte[] read_binary_file(char* filename) {
-    FILE* file = open_file(filename, "rb");
-    byte[] buffer;
-    // TODO: this is stupid, but its the only way to create a 'null' array
-    buffer.data = null;
-    buffer.length = 0;
-    if file == null return buffer;
-
-    fseek(file, 0, 2); // 2 = SEEK_END
-    uint64 len = ftell(file);
-    rewind(file);
-
-    buffer.length = len as uint32; // TODO: truncation
-    buffer.data = malloc(buffer.length);
-
-    fread(buffer.data, 1, buffer.length, file);
-    fclose(file);
-    return buffer;
-}
-
-void write_binary_file(char* filename, void* data, uint64 bytes) {
-    FILE* file = open_file(filename, "wb");
+void filewrite(char* name, void* data, uint64 bytes) {
+    FILE* file = open_file(name, "wb");
     fwrite(data, sizeof byte, bytes, file);
     fclose(file);
 }
 
-void write_binary_file(char* filename, byte[] buffer) {
-    write_binary_file(filename, buffer.data, buffer.length as uint64);
+void filewrite(string name, char* content) filewrite(temp_cstr(name), content);
+void filewrite(char* name, content) {
+    FILE* file = open_file(name, "wb");
+    fwrite(content, sizeof char, strlen(content), file);
+    fclose(file);
+}
+
+void filewrite(char* name, void[] array) {
+    filewrite(name, array.data, (array.length * array.stride) as uint64);
 }
 
 
@@ -196,9 +180,17 @@ string arena_string(Arena* arena, string str) {
     return res;
 }
 
+void[] arena_array(Arena* arena, void[..] list) return arena_array(arena, as_span(list));
+void[] arena_array(Arena* arena, void[] span) {
+    void[] res = arena_array(arena, span.stride, span.length);
+    uint32 bytes = span.stride * span.length;
+    memcpy(res.data, span.data, bytes);
+    return res;
+}
 void[] arena_array(Arena* arena, uint32 size, count) {
     void[] array;
     array.data = arena_alloc(arena, size*count);
     array.length = count;
+    array.stride = size;
     return array;
 }

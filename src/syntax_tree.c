@@ -377,7 +377,7 @@ static u64 datatype_bytesize(Datatype type) {
             return datatype_bytesize(de);
         }
         case Typekind_Procedure: return 8;
-        case Typekind_Array: return 12; // TODO: this should be 16 and not 12 because of padding
+        case Typekind_Array: return 16;
         case Typekind_Fixed_Array: return 0; // TODO: we must know the size of this array
         case Typekind_Dynamic_Array: return 8;
 

@@ -22,12 +22,18 @@ static bool typeAssignable(Datatype toType, Datatype fromType) {
     if (toType.numPointers != fromType.numPointers) return false;
     u32 numPointers = toType.numPointers;
 
-    if (toType.kind == Typekind_Dynamic_Array && fromType.kind == Typekind_Dynamic_Array) {
-        Typekind to_elm_kind = toType.node->array.element_type->solvedstate.kind;
-        Typekind from_elm_kind = fromType.node->array.element_type->solvedstate.kind;
+    if (toType.kind == fromType.kind) {
+        switch (toType.kind) {
+            case Typekind_Dynamic_Array:
+            case Typekind_Array:
+                Typekind to_elm_kind = toType.node->array.element_type->solvedstate.kind;
+                Typekind from_elm_kind = fromType.node->array.element_type->solvedstate.kind;
 
-        if (to_elm_kind == Typekind_void) return true;
-        if (from_elm_kind == Typekind_void) return true;
+                if (to_elm_kind == Typekind_void) return true;
+                if (from_elm_kind == Typekind_void) return true;
+                break;
+            default: break;
+        }
     }
 
     if (numPointers) { // if we are a pointer of any degree
